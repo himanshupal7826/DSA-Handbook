@@ -5,13 +5,15 @@
 <title>zariya.in — Engineering Handbooks</title>
 <meta name="description" content="zariya.in — comprehensive, interview-focused engineering handbooks: DSA Patterns, Django, Go, System Design, Docker, Kubernetes, NumPy/Pandas, and SQL.">
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="icon" type="image/png" href="assets/images/03_favicon.png">
+<link rel="apple-touch-icon" href="assets/images/02_app_icon.png">
 <script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
 <style>
-  .portal-hero{background:linear-gradient(135deg,var(--accent-soft),transparent);border:1px solid var(--border-soft);border-radius:20px;padding:48px 36px;margin:24px auto;max-width:1100px;text-align:center}
-  .portal-hero .logo-big{width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,var(--accent),#9333ea);display:grid;place-items:center;color:#fff;font-size:30px;font-weight:800;margin:0 auto 14px}
-  .portal-hero h1{font-size:44px;letter-spacing:-1.5px;margin:0 0 8px}
-  .portal-hero .dot{color:var(--accent)}
+  .portal-hero{background:linear-gradient(135deg,var(--accent-soft),transparent);border:1px solid var(--border-soft);border-radius:20px;padding:44px 36px;margin:24px auto;max-width:1100px;text-align:center}
+  .portal-hero .hero-logo{display:inline-block;background:#fff;border-radius:18px;padding:18px 26px;box-shadow:var(--shadow-lg);margin-bottom:18px}
+  .portal-hero .hero-logo img{display:block;width:min(380px,72vw);height:auto}
   .portal-hero p{color:var(--text-soft);font-size:17px;max-width:680px;margin:0 auto}
+  .portal-top .brand-logo{height:30px;width:auto;background:#fff;border-radius:7px;padding:3px 7px;box-shadow:var(--shadow);display:block}
   .portal-wrap{max-width:1100px;margin:0 auto;padding:0 24px 80px}
   .portal-search{max-width:560px;margin:22px auto 0;position:relative}
   .portal-search input{width:100%;padding:13px 18px 13px 44px;border:1px solid var(--border);border-radius:999px;background:var(--bg-alt);color:var(--text);font-size:15px;outline:none}
@@ -31,13 +33,12 @@
 </head>
 <body>
 <div class="portal-top">
-  <div style="font-weight:800;font-size:18px;display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),#9333ea);display:grid;place-items:center;color:#fff;font-size:13px">z</span>zariya<span class="dot" style="color:var(--accent)">.in</span></div>
+  <a href="index.html" style="display:flex;align-items:center"><img class="brand-logo" src="assets/images/01_horizontal_logo.png" alt="Zariya"></a>
   <div class="theme-switch" id="theme-switch"></div>
 </div>
 
 <div class="portal-hero">
-  <div class="logo-big">z</div>
-  <h1>zariya<span class="dot">.in</span></h1>
+  <div class="hero-logo"><img src="assets/images/01_horizontal_logo.png" alt="Zariya — The Pathway to Engineering Mastery"></div>
   <p>Comprehensive, interview-focused engineering handbooks. 176+ deep-dive topics across 8 subjects — patterns, recognition signals, production-grade code, and practice. Pick a handbook to begin.</p>
   <div class="portal-search">
     <span class="si">🔍</span>

@@ -19,8 +19,8 @@
     if (!bar) return;
     bar.innerHTML =
       '<button class="menu-toggle" id="menu-toggle" aria-label="Menu">☰</button>' +
-      '<a class="brand" href="dsa.html"><span class="logo">DSA</span>' +
-      '<span class="full">Patterns Handbook</span></a>' +
+      '<a class="brand" href="dsa.html"><img class="logo-img" src="assets/images/03_favicon.png" alt="Zariya">' +
+      '<span class="full">DSA Patterns Handbook</span></a>' +
       '<div class="grow"></div>' +
       '<div class="search-wrap">' +
       '<span class="icon">🔍</span>' +

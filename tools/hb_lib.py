@@ -96,6 +96,7 @@ INDEX_TMPL = """<!DOCTYPE html>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>__NAME__ — zariya.in</title>
 <link rel="stylesheet" href="../assets/css/style.css">
+<link rel="icon" type="image/png" href="../assets/images/03_favicon.png">
 __THEME__
 </head>
 <body>
@@ -165,6 +166,7 @@ TOPIC_TMPL = """<!DOCTYPE html>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Topic — __NAME__</title>
 <link rel="stylesheet" href="../assets/css/style.css">
+<link rel="icon" type="image/png" href="../assets/images/03_favicon.png">
 __THEME__
 </head>
 <body>

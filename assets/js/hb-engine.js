@@ -15,7 +15,7 @@
     var hb = HB();
     bar.innerHTML =
       '<button class="menu-toggle" id="menu-toggle" aria-label="Menu">☰</button>' +
-      '<a class="brand" href="index.html" title="' + hb.name + ' home"><span class="logo">' + (hb.icon || "📘") + '</span><span class="full">' + hb.name + '</span></a>' +
+      '<a class="brand" href="index.html" title="' + hb.name + ' home"><img class="logo-img" src="../assets/images/03_favicon.png" alt="Zariya"><span class="full">' + (hb.icon || "📘") + " " + hb.name + '</span></a>' +
       '<div class="grow"></div>' +
       '<div class="search-wrap"><span class="icon">🔍</span>' +
       '<input id="global-search" type="text" placeholder="Search ' + hb.name + '…  (press /)" autocomplete="off">' +

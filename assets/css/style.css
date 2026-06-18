@@ -90,6 +90,11 @@ a:hover { text-decoration: underline; }
   background: linear-gradient(135deg, var(--accent), #9333ea);
   display: grid; place-items: center; color: #fff; font-size: 15px;
 }
+/* Brand glyph rendered from the Zariya favicon image */
+.topbar .brand .logo-img {
+  width: 32px; height: 32px; border-radius: 8px; object-fit: contain;
+  background: #fff; padding: 2px; display: block; box-shadow: var(--shadow);
+}
 .topbar .grow { flex: 1; }
 .menu-toggle { display: none; background: none; border: none; color: var(--text); font-size: 22px; cursor: pointer; }
 
