@@ -52,7 +52,7 @@
     } else {
       document.title = DSAApp.pad(pattern.id) + " " + pattern.name + " — DSA Patterns Handbook";
       document.getElementById("breadcrumb").innerHTML =
-        '<a href="index.html">Home</a> › ' + pattern.category + ' › Pattern ' + DSAApp.pad(pattern.id);
+        '<a href="index.html">zariya.in</a> › <a href="dsa.html">DSA</a> › ' + pattern.category + ' › Pattern ' + DSAApp.pad(pattern.id);
       var lb = document.getElementById("level-badge");
       lb.textContent = pattern.level; lb.className = "badge lvl-" + pattern.level;
       document.getElementById("cat-tag").textContent = pattern.category;
@@ -115,7 +115,7 @@
       var prev = nb.prev ? '<a class="prev" href="pattern.html?p=' + nb.prev.slug + '"><div class="dir">← Previous</div><div class="ttl">' + DSAApp.pad(nb.prev.id) + ". " + nb.prev.name + '</div></a>' : '<span></span>';
       var next = nb.next ? '<a class="next" href="pattern.html?p=' + nb.next.slug + '"><div class="dir">Next →</div><div class="ttl">' + DSAApp.pad(nb.next.id) + ". " + nb.next.name + '</div></a>' : '<span></span>';
       el.innerHTML = prev +
-        '<a href="index.html" style="flex:0 0 auto;max-width:none;text-align:center" title="Back to roadmap"><div class="dir">&nbsp;</div><div class="ttl">🗺️ Roadmap</div></a>' +
+        '<a href="dsa.html" style="flex:0 0 auto;max-width:none;text-align:center" title="DSA Home"><div class="dir">&nbsp;</div><div class="ttl">🏠 DSA Home</div></a>' +
         next;
     }
   </script>

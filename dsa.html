@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DSA Patterns Handbook — Master 100 Patterns for FAANG Interviews</title>
+  <meta name="description" content="The most comprehensive DSA pattern handbook: 100 patterns, recognition signals, Go/Python/Java/C++ templates, complexity, and LeetCode sets for FAANG & competitive programming.">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+</head>
+<body>
+  <header class="topbar" id="topbar"></header>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="layout">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <main class="main">
+      <section class="hero">
+        <h1>DSA Patterns Handbook</h1>
+        <p>Stop memorizing problems. Learn the <strong>100 core patterns</strong> behind them — with recognition signals, brute-force→optimal journeys, production-grade templates in Go / Python / Java / C++, complexity tables, and curated LeetCode sets. Built for Software, Senior, Staff & FAANG interviews and competitive programming.</p>
+        <div class="stats">
+          <div class="stat"><div class="n">100</div><div class="l">Patterns</div></div>
+          <div class="stat"><div class="n">15</div><div class="l">Sections each</div></div>
+          <div class="stat"><div class="n">4</div><div class="l">Languages</div></div>
+          <div class="stat"><div class="n">1000+</div><div class="l">LeetCode links</div></div>
+        </div>
+        <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn primary" href="pattern.html?p=01-frequency-counter">▶ Start with Pattern 01</a>
+          <a class="btn" href="pattern-selector.html">🧭 Which pattern do I need?</a>
+          <a class="btn" href="view.html?f=roadmap/000-ROADMAP.md">🗺️ View Roadmap</a>
+        </div>
+      </section>
+
+      <!-- Progress dashboard -->
+      <h2 class="section-title" id="dashboard"><span class="bar"></span>Your Progress Dashboard</h2>
+      <div class="dash" id="dash-tiles"></div>
+      <div style="margin-top:16px" id="level-progress"></div>
+
+      <!-- Pattern categories -->
+      <h2 class="section-title"><span class="bar"></span>Pattern Categories</h2>
+      <div class="card-grid" id="category-grid"></div>
+
+      <!-- Roadmaps -->
+      <h2 class="section-title"><span class="bar"></span>Study Roadmaps</h2>
+      <div class="chips" id="roadmap-chips"></div>
+
+      <!-- Top questions -->
+      <h2 class="section-title"><span class="bar"></span>Top Interview Questions</h2>
+      <p class="muted">High-frequency problems mapped to their governing pattern — click to jump straight to the technique.</p>
+      <div class="card-grid" id="top-questions"></div>
+
+      <!-- Quick revision -->
+      <h2 class="section-title"><span class="bar"></span>Quick Revision</h2>
+      <p class="muted">Jump into any pattern's 5-minute revision card. Bookmark patterns from their pages to build a personal review list.</p>
+      <div class="chips" id="revision-chips"></div>
+    </main>
+  </div>
+
+  <script src="assets/js/patterns-data.js"></script>
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/progress.js"></script>
+  <script src="assets/js/search.js"></script>
+  <script src="assets/js/markdown.js"></script>
+  <script src="assets/js/content.js" onerror="window.DSA_CONTENT=window.DSA_CONTENT||{}"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    DSAApp.initChrome(null);
+
+    // ---- Dashboard ----
+    function renderDash() {
+      var s = DSAProgress.stats();
+      document.getElementById("dash-tiles").innerHTML =
+        tile(s.completed + "/" + s.total, "Patterns Completed") +
+        tile(s.pct + "%", "Overall Progress") +
+        tile(s.bookmarked, "Bookmarked") +
+        tile(s.mastered, "Mastered");
+
+      var byLevel = DSAProgress.byLevel();
+      var lp = '<div class="progress-bar"><span style="width:' + s.pct + '%"></span></div>' +
+        '<div class="muted" style="font-size:13px;margin-bottom:14px">Overall: ' + s.completed + ' of ' + s.total + ' patterns complete</div>';
+      lp += '<div class="card-grid">';
+      Object.keys(byLevel).forEach(function (lv) {
+        var d = byLevel[lv]; var pct = d.total ? Math.round(d.done / d.total * 100) : 0;
+        lp += '<div class="card"><h3>' + lv + '</h3>' +
+          '<div class="progress-bar"><span style="width:' + pct + '%"></span></div>' +
+          '<div class="count">' + d.done + ' / ' + d.total + ' (' + pct + '%)</div></div>';
+      });
+      lp += '</div>';
+      document.getElementById("level-progress").innerHTML = lp;
+    }
+    function tile(big, lbl) { return '<div class="tile"><div class="big">' + big + '</div><div class="lbl">' + lbl + '</div></div>'; }
+
+    // ---- Categories ----
+    (function () {
+      var grid = document.getElementById("category-grid");
+      grid.innerHTML = (window.DSA_CATEGORIES || []).map(function (c) {
+        var pats = DSA_PATTERNS.filter(function (p) { return p.category === c.name; });
+        var first = pats[0];
+        return '<a class="card" href="pattern.html?p=' + (first ? first.slug : "") + '">' +
+          '<div class="cat-icon">' + c.icon + '</div>' +
+          '<h3>' + c.name + '</h3>' +
+          '<p>' + (first ? first.summary : "") + '</p>' +
+          '<div class="count">' + pats.length + ' pattern' + (pats.length > 1 ? "s" : "") + ' · ' + c.level + '</div></a>';
+      }).join("");
+    })();
+
+    // ---- Roadmaps ----
+    (function () {
+      var roads = [
+        ["000-ROADMAP.md", "🗺️ Master Roadmap"],
+        ["001-BEGINNER-PATH.md", "🌱 Beginner Path"],
+        ["002-INTERMEDIATE-PATH.md", "📈 Intermediate Path"],
+        ["003-ADVANCED-PATH.md", "🚀 Advanced Path"],
+        ["004-FAANG-PREP-GUIDE.md", "🏢 FAANG Prep Guide"],
+        ["005-TOP-150-LEETCODE.md", "📋 Top 150 LeetCode"],
+        ["006-TOP-75-FAANG.md", "⭐ Top 75 FAANG"],
+        ["007-30-DAY-PLAN.md", "📅 30-Day Plan"],
+        ["008-60-DAY-PLAN.md", "📅 60-Day Plan"],
+        ["009-90-DAY-PLAN.md", "📅 90-Day Plan"]
+      ];
+      document.getElementById("roadmap-chips").innerHTML = roads.map(function (r) {
+        return '<a class="chip" href="view.html?f=roadmap/' + r[0] + '">' + r[1] + '</a>';
+      }).join("");
+    })();
+
+    // ---- Top questions (curated mapping) ----
+    (function () {
+      var top = [
+        ["Two Sum", "02-hashmap-lookup", "Easy"],
+        ["Longest Substring Without Repeating", "18-distinct-character-window", "Medium"],
+        ["3Sum", "10-three-sum", "Medium"],
+        ["Merge Intervals", "29-merge-intervals", "Medium"],
+        ["Number of Islands", "62-graph-dfs", "Medium"],
+        ["Course Schedule", "63-topological-sort", "Medium"],
+        ["Coin Change", "77-coin-change", "Medium"],
+        ["Sliding Window Maximum", "41-sliding-window-maximum", "Hard"],
+        ["Kth Largest Element", "43-top-k-elements", "Medium"],
+        ["Word Search II", "89-trie", "Hard"],
+        ["Median of Data Stream", "47-median-of-stream", "Hard"],
+        ["Largest Rectangle in Histogram", "38-histogram-pattern", "Hard"]
+      ];
+      document.getElementById("top-questions").innerHTML = top.map(function (t) {
+        var p = DSAApp.bySlug(t[1]);
+        return '<a class="card" href="pattern.html?p=' + t[1] + '">' +
+          '<span class="badge lvl-' + (t[2] === "Easy" ? "Beginner" : t[2] === "Medium" ? "Intermediate" : "Expert") + '">' + t[2] + '</span>' +
+          '<h3>' + t[0] + '</h3>' +
+          '<p>Pattern: ' + (p ? p.name : t[1]) + '</p></a>';
+      }).join("");
+    })();
+
+    // ---- Revision chips: bookmarked first, else first 12 ----
+    (function () {
+      var bookmarked = DSA_PATTERNS.filter(function (p) { return DSAProgress.isBookmarked(p.slug); });
+      var list = bookmarked.length ? bookmarked : DSA_PATTERNS.slice(0, 12);
+      var label = bookmarked.length ? "★ Your bookmarks" : "";
+      var el = document.getElementById("revision-chips");
+      el.innerHTML = (label ? '<div style="width:100%;font-size:13px;color:var(--text-soft);margin-bottom:6px">' + label + '</div>' : "") +
+        list.map(function (p) {
+          return '<a class="chip" href="pattern.html?p=' + p.slug + '#revision-notes">⚡ ' + p.name + '</a>';
+        }).join("");
+    })();
+
+    renderDash();
+    DSAProgress.onChange(renderDash);
+  </script>
+</body>
+</html>

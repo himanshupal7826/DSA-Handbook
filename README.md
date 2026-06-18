@@ -1,6 +1,27 @@
-# 📘 DSA Patterns Handbook
+# 🌐 zariya.in — Engineering Handbooks
 
-The most comprehensive **pattern-first** DSA knowledge base for Software / Senior / Staff / FAANG interviews and competitive programming. **100 patterns**, each with 15 exhaustive sections, rendered as a fast, offline, dark-mode documentation site.
+This folder is the **zariya.in** portal: a set of comprehensive, interview-focused engineering handbooks sharing one offline, dark-mode documentation engine.
+
+**Open `index.html`** — the portal landing page — and pick a handbook:
+
+| Handbook | Topics | Path |
+|----------|--------|------|
+| 🧠 DSA Patterns | 100 | `dsa.html` |
+| 🎸 Django | 10 | `django/` |
+| 🐹 Go | 10 | `go/` |
+| 🏛️ System Design | 12 | `system-design/` |
+| 🐳 Docker | 10 | `docker/` |
+| ☸️ Kubernetes | 10 | `kubernetes/` |
+| 🐼 NumPy & Pandas | 12 | `numpy-pandas/` |
+| 🗄️ SQL | 12 | `sql/` |
+
+Each new handbook has its own `index.html` (home), `topic.html` (renderer), `data.js` (manifest), `content.js` (offline content), and `markdown/`. They share the engine in `assets/js/hb-*.js` + `markdown.js`/`theme.js` and `assets/css/style.css`. Regenerate them with `python3 tools/build_handbooks.py` (handbook specs live in `tools/src/*_hb.py`).
+
+---
+
+# 📘 DSA Patterns Handbook (the flagship)
+
+The most comprehensive **pattern-first** DSA knowledge base for Software / Senior / Staff / FAANG interviews and competitive programming. **100 patterns**, each with 15 exhaustive sections, rendered as a fast, offline, dark-mode documentation site. Its home is **`dsa.html`**.
 
 > **Stop memorizing problems. Learn the patterns behind them.**
 
@@ -9,7 +30,7 @@ The most comprehensive **pattern-first** DSA knowledge base for Software / Senio
 ## 🚀 Quick Start
 
 ### Option A — open directly (offline)
-Just open **`index.html`** in any modern browser. Pattern content is embedded in `assets/js/content.js`, so everything works under `file://` with no server.
+Open **`index.html`** (the zariya.in portal) in any modern browser; click into any handbook. All content is embedded in each handbook's `content.js`, so everything works under `file://` with no server.
 
 ### Option B — local server (recommended for editing)
 ```bash

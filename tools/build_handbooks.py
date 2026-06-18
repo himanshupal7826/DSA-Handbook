@@ -1,11 +1,47 @@
-<!DOCTYPE html>
+#!/usr/bin/env python3
+"""build_handbooks.py — generate all handbook subfolders + the zariya.in portal.
+Run from the project root: python3 tools/build_handbooks.py"""
+import os, sys, json
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+sys.path.insert(0, os.path.join(ROOT, "tools", "src"))
+import hb_lib
+
+import sql_hb, go_hb, django_hb, docker_hb, k8s_hb, numpy_pandas_hb, system_design_hb
+SPECS = [django_hb.SPEC, go_hb.SPEC, system_design_hb.SPEC, docker_hb.SPEC,
+         k8s_hb.SPEC, numpy_pandas_hb.SPEC, sql_hb.SPEC]
+
+cards = []
+# DSA handbook is self-contained at the root with its own engine — link to dsa.html
+cards.append({"id": "dsa", "name": "DSA Patterns Handbook", "icon": "🧠",
+              "tagline": "100 algorithm & data-structure patterns for FAANG interviews and competitive programming.",
+              "count": 100, "categories": 15, "href": "dsa.html",
+              "tags": ["algorithms", "data structures", "leetcode", "interview"]})
+
+for spec in SPECS:
+    summary = hb_lib.build(spec, ROOT)
+    summary["href"] = spec["id"] + "/index.html"
+    summary["tags"] = sorted({kw for it in spec["items"] for kw in it.get("keywords", [])})[:8]
+    cards.append(summary)
+    print("built:", spec["id"], "(%d topics)" % summary["count"])
+
+# ----- Portal index.html -----
+THEME = ('<script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";'
+         'var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;'
+         'document.documentElement.setAttribute("data-theme",d);})();</script>')
+
+cards_json = json.dumps(cards, ensure_ascii=False)
+total_topics = sum(c["count"] for c in cards)
+
+portal = """<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>zariya.in — Engineering Handbooks</title>
 <meta name="description" content="zariya.in — comprehensive, interview-focused engineering handbooks: DSA Patterns, Django, Go, System Design, Docker, Kubernetes, NumPy/Pandas, and SQL.">
 <link rel="stylesheet" href="assets/css/style.css">
-<script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+__THEME__
 <style>
   .portal-hero{background:linear-gradient(135deg,var(--accent-soft),transparent);border:1px solid var(--border-soft);border-radius:20px;padding:48px 36px;margin:24px auto;max-width:1100px;text-align:center}
   .portal-hero .logo-big{width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,var(--accent),#9333ea);display:grid;place-items:center;color:#fff;font-size:30px;font-weight:800;margin:0 auto 14px}
@@ -38,7 +74,7 @@
 <div class="portal-hero">
   <div class="logo-big">z</div>
   <h1>zariya<span class="dot">.in</span></h1>
-  <p>Comprehensive, interview-focused engineering handbooks. 176+ deep-dive topics across 8 subjects — patterns, recognition signals, production-grade code, and practice. Pick a handbook to begin.</p>
+  <p>Comprehensive, interview-focused engineering handbooks. __TOTAL__+ deep-dive topics across __NHB__ subjects — patterns, recognition signals, production-grade code, and practice. Pick a handbook to begin.</p>
   <div class="portal-search">
     <span class="si">🔍</span>
     <input id="hb-search" type="text" placeholder="Search handbooks (e.g. docker, sql, dijkstra, caching)…" autocomplete="off">
@@ -52,7 +88,7 @@
 
 <script src="assets/js/theme.js"></script>
 <script>
-var CARDS = [{"id": "dsa", "name": "DSA Patterns Handbook", "icon": "🧠", "tagline": "100 algorithm & data-structure patterns for FAANG interviews and competitive programming.", "count": 100, "categories": 15, "href": "dsa.html", "tags": ["algorithms", "data structures", "leetcode", "interview"]}, {"id": "django", "name": "Django Handbook", "icon": "🎸", "tagline": "Master Django for web/backend interviews: models & ORM, views, DRF APIs, auth, migrations, and production performance.", "count": 10, "categories": 5, "levels": ["Beginner", "Intermediate", "Advanced"], "href": "django/index.html", "tags": ["annotate", "api", "asgi", "async", "authentication", "authorization", "cache", "cbv"]}, {"id": "go", "name": "Go Handbook", "icon": "🐹", "tagline": "Master Go for backend and systems interviews: syntax, goroutines, channels, interfaces, error handling, and idiomatic concurrency.", "count": 10, "categories": 5, "levels": ["Beginner", "Intermediate", "Advanced"], "href": "go/index.html", "tags": ["%w", ":=", "WithCancel", "any", "append", "array", "atomic", "buffered"]}, {"id": "system-design", "name": "System Design Handbook", "icon": "🏛️", "tagline": "Master system design for senior/staff/FAANG interviews: scaling, caching, databases, queues, consistency, and real architectures.", "count": 12, "categories": 5, "levels": ["Beginner", "Intermediate", "Advanced"], "href": "system-design/index.html", "tags": ["acid", "api gateway", "async", "availability", "backoff", "backpressure", "bandwidth", "base62"]}, {"id": "docker", "name": "Docker Handbook", "icon": "🐳", "tagline": "Master containers for interviews and production: images, Dockerfiles, networking, volumes, Compose, and security.", "count": 10, "categories": 5, "levels": ["Beginner", "Intermediate", "Advanced"], "href": "docker/index.html", "tags": ["artifact", "bind mount", "bridge", "builder", "buildkit", "cache", "capabilities", "cgroup"]}, {"id": "kubernetes", "name": "Kubernetes Handbook", "icon": "☸️", "tagline": "Master Kubernetes for SRE/backend interviews: pods, deployments, services, config, scaling, and troubleshooting.", "count": 10, "categories": 5, "levels": ["Beginner", "Intermediate", "Advanced"], "href": "kubernetes/index.html", "tags": ["affinity", "api server", "base64", "cluster autoscaler", "clusterip", "configmap", "container", "control plane"]}, {"id": "numpy-pandas", "name": "NumPy & Pandas Handbook", "icon": "🐼", "tagline": "Master NumPy & Pandas for data/ML interviews: arrays, vectorization, broadcasting, DataFrames, groupby, joins, and performance.", "count": 12, "categories": 5, "levels": ["Beginner", "Intermediate", "Advanced"], "href": "numpy-pandas/index.html", "tags": ["agg", "aggregate", "argmax", "axis", "boolean", "boolean mask", "broadcasting", "categorical"]}, {"id": "sql", "name": "SQL Handbook", "icon": "🗄️", "tagline": "Master relational databases for interviews and production: queries, joins, indexing, transactions, window functions, and tuning.", "count": 12, "categories": 5, "levels": ["Beginner", "Intermediate", "Advanced"], "href": "sql/index.html", "tags": ["1nf", "2nf", "3nf", "acid", "avg", "b-tree", "cardinality", "case"]}];
+var CARDS = __CARDS__;
 function render(filter){
   filter = (filter||"").toLowerCase();
   var grid = document.getElementById("hb-grid");
@@ -76,3 +112,11 @@ document.getElementById("hb-search").addEventListener("input", function(e){ rend
 </script>
 </body>
 </html>
+"""
+portal = (portal.replace("__THEME__", THEME).replace("__CARDS__", cards_json)
+          .replace("__TOTAL__", str(total_topics)).replace("__NHB__", str(len(cards))))
+with open(os.path.join(ROOT, "index.html"), "w", encoding="utf-8") as f:
+    f.write(portal)
+
+print("\nportal written: index.html")
+print("total handbooks:", len(cards), "| total topics:", total_topics)

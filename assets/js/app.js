@@ -19,7 +19,7 @@
     if (!bar) return;
     bar.innerHTML =
       '<button class="menu-toggle" id="menu-toggle" aria-label="Menu">☰</button>' +
-      '<a class="brand" href="index.html"><span class="logo">DSA</span>' +
+      '<a class="brand" href="dsa.html"><span class="logo">DSA</span>' +
       '<span class="full">Patterns Handbook</span></a>' +
       '<div class="grow"></div>' +
       '<div class="search-wrap">' +
@@ -29,6 +29,7 @@
       '</div>' +
       '<div class="grow"></div>' +
       '<a class="btn" href="pattern-selector.html" title="Pattern Selector">🧭 Selector</a>' +
+      '<a class="btn" href="index.html" title="All handbooks">⌂ zariya.in</a>' +
       '<div class="theme-switch" id="theme-switch"></div>';
 
     if (window.DSASearch) window.DSASearch.attach("global-search", "search-results");
@@ -77,7 +78,7 @@
     html += '<div style="margin-top:18px;padding:0 8px">' +
       '<a class="nav-link" href="view.html?f=roadmap/000-ROADMAP.md">🗺️ Full Roadmap</a>' +
       '<a class="nav-link" href="pattern-selector.html">🧭 Pattern Selector</a>' +
-      '<a class="nav-link" href="index.html#dashboard">📊 Progress Dashboard</a>' +
+      '<a class="nav-link" href="dsa.html#dashboard">📊 Progress Dashboard</a>' +
       '<a class="nav-link" href="view.html?f=resources/big-o-cheatsheet.md">⏱️ Big-O Cheat Sheet</a>' +
       '<a class="nav-link" href="view.html?f=resources/pattern-decision-guide.md">🧭 Decision Guide</a>' +
       "</div>";
