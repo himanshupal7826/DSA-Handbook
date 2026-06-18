@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document — DSA Patterns Handbook</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+</head>
+<body>
+  <header class="topbar" id="topbar"></header>
+  <div class="scrim" id="scrim"></div>
+  <div class="layout">
+    <nav class="sidebar" id="sidebar"></nav>
+    <main class="main">
+      <div class="breadcrumb" id="breadcrumb"></div>
+      <div class="content md" id="content"><div class="spinner"></div></div>
+    </main>
+  </div>
+
+  <script src="assets/js/patterns-data.js"></script>
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/progress.js"></script>
+  <script src="assets/js/search.js"></script>
+  <script src="assets/js/markdown.js"></script>
+  <script src="assets/js/content.js" onerror="window.DSA_CONTENT=window.DSA_CONTENT||{}"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    DSAApp.initChrome(null);
+    var file = DSAApp.qparam("f") || "roadmap/000-ROADMAP.md";
+    // allow only in-project relative paths
+    if (/^(https?:|\/|\.\.)/.test(file) || file.indexOf("..") !== -1) {
+      document.getElementById("content").innerHTML = "<h1>Invalid document path</h1>";
+    } else {
+      document.getElementById("breadcrumb").innerHTML = '<a href="index.html">Home</a> › ' + file;
+      var reg = window.DSA_CONTENT || {};
+      var loader = reg[file] ? Promise.resolve(reg[file])
+        : fetch(file).then(function (r) { if (!r.ok) throw 0; return r.text(); });
+      loader.then(function (md) {
+        var c = document.getElementById("content");
+        c.innerHTML = DSAMarkdown.render(md);
+        var toc = DSAMarkdown.buildTOC(c);
+        if (toc) { var h1 = c.querySelector("h1"); if (h1) h1.insertAdjacentHTML("afterend", toc); }
+        DSAMarkdown.wire(c);
+        document.title = (c.querySelector("h1") ? c.querySelector("h1").textContent : file) + " — DSA Handbook";
+      }).catch(function () {
+        document.getElementById("content").innerHTML =
+          '<h1>Could not load document</h1><div class="callout warn">Open <code>' + file +
+          '</code> directly, or run a local server (<code>python3 -m http.server</code>) so it can be fetched.</div>';
+      });
+    }
+  </script>
+</body>
+</html>

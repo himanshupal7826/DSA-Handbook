@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pattern — DSA Patterns Handbook</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+</head>
+<body>
+  <header class="topbar" id="topbar"></header>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="layout">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <main class="main">
+      <div class="breadcrumb" id="breadcrumb"></div>
+
+      <div class="pattern-head">
+        <div>
+          <span class="badge" id="level-badge"></span>
+          <span class="tag" id="cat-tag"></span>
+        </div>
+        <div class="page-actions" id="page-actions"></div>
+      </div>
+
+      <div class="content md" id="content">
+        <div class="spinner"></div>
+      </div>
+
+      <div class="pager" id="pager"></div>
+    </main>
+  </div>
+
+  <script src="assets/js/patterns-data.js"></script>
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/progress.js"></script>
+  <script src="assets/js/search.js"></script>
+  <script src="assets/js/markdown.js"></script>
+  <script src="assets/js/content.js" onerror="window.DSA_CONTENT=window.DSA_CONTENT||{}"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    var slug = DSAApp.qparam("p") || "01-frequency-counter";
+    var pattern = DSAApp.bySlug(slug);
+
+    DSAApp.initChrome(slug);
+
+    if (!pattern) {
+      document.getElementById("content").innerHTML =
+        '<h1>Pattern not found</h1><p>No pattern matches “' + slug + '”. <a href="index.html">Back to home</a>.</p>';
+    } else {
+      document.title = DSAApp.pad(pattern.id) + " " + pattern.name + " — DSA Patterns Handbook";
+      document.getElementById("breadcrumb").innerHTML =
+        '<a href="index.html">Home</a> › ' + pattern.category + ' › Pattern ' + DSAApp.pad(pattern.id);
+      var lb = document.getElementById("level-badge");
+      lb.textContent = pattern.level; lb.className = "badge lvl-" + pattern.level;
+      document.getElementById("cat-tag").textContent = pattern.category;
+
+      renderActions();
+      loadAndRender();
+      renderPager();
+    }
+
+    function renderActions() {
+      var el = document.getElementById("page-actions");
+      function refresh() {
+        var done = DSAProgress.isComplete(slug);
+        var marked = DSAProgress.isBookmarked(slug);
+        var rev = DSAProgress.getRevision(slug);
+        var revLabel = { "new": "🔲 New", learning: "📖 Learning", mastered: "✅ Mastered" }[rev];
+        el.innerHTML =
+          '<button class="btn ' + (done ? "done" : "") + '" id="b-done">' + (done ? "✓ Completed" : "Mark Complete") + '</button>' +
+          '<button class="btn" id="b-mark">' + (marked ? "★ Bookmarked" : "☆ Bookmark") + '</button>' +
+          '<button class="btn" id="b-rev" title="Cycle revision status">' + revLabel + '</button>';
+        document.getElementById("b-done").onclick = function () { DSAProgress.toggleComplete(slug); refresh(); };
+        document.getElementById("b-mark").onclick = function () { DSAProgress.toggleBookmark(slug); refresh(); };
+        document.getElementById("b-rev").onclick = function () { DSAProgress.cycleRevision(slug); refresh(); };
+      }
+      refresh();
+    }
+
+    function loadAndRender() {
+      DSAApp.loadContent(slug).then(function (md) {
+        var container = document.getElementById("content");
+        var html = DSAMarkdown.render(md);
+        container.innerHTML = html;
+        // inject TOC after the first h1
+        var toc = DSAMarkdown.buildTOC(container);
+        if (toc) {
+          var h1 = container.querySelector("h1");
+          if (h1) h1.insertAdjacentHTML("afterend", toc);
+        }
+        DSAMarkdown.wire(container);
+        // smooth-scroll if a hash is present
+        if (location.hash) {
+          var t = document.getElementById(location.hash.slice(1));
+          if (t) setTimeout(function () { t.scrollIntoView(); }, 60);
+        }
+      }).catch(function () {
+        document.getElementById("content").innerHTML =
+          '<h1>' + DSAApp.pad(pattern.id) + ". " + pattern.name + '</h1>' +
+          '<div class="callout warn"><strong>Content not loaded.</strong> If you opened this file directly (file://) ' +
+          'the markdown could not be fetched. Run a local server in the project root: <code>python3 -m http.server</code> ' +
+          'then open <code>http://localhost:8000</code>. The offline registry (content.js) also provides this content once built.</div>' +
+          '<p><strong>Summary:</strong> ' + pattern.summary + '</p>' +
+          '<p><strong>Keywords:</strong> ' + pattern.keywords.join(", ") + '</p>' +
+          '<p><strong>Practice:</strong> ' + pattern.leetcode.join(" · ") + '</p>';
+      });
+    }
+
+    function renderPager() {
+      var nb = DSAApp.neighbors(slug);
+      var el = document.getElementById("pager");
+      var prev = nb.prev ? '<a class="prev" href="pattern.html?p=' + nb.prev.slug + '"><div class="dir">← Previous</div><div class="ttl">' + DSAApp.pad(nb.prev.id) + ". " + nb.prev.name + '</div></a>' : '<span></span>';
+      var next = nb.next ? '<a class="next" href="pattern.html?p=' + nb.next.slug + '"><div class="dir">Next →</div><div class="ttl">' + DSAApp.pad(nb.next.id) + ". " + nb.next.name + '</div></a>' : '<span></span>';
+      el.innerHTML = prev +
+        '<a href="index.html" style="flex:0 0 auto;max-width:none;text-align:center" title="Back to roadmap"><div class="dir">&nbsp;</div><div class="ttl">🗺️ Roadmap</div></a>' +
+        next;
+    }
+  </script>
+</body>
+</html>

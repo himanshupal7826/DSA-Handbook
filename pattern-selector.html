@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pattern Selector — DSA Patterns Handbook</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+</head>
+<body>
+  <header class="topbar" id="topbar"></header>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="layout">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <main class="main">
+      <div class="breadcrumb"><a href="index.html">Home</a> › Pattern Selector</div>
+      <h1 style="font-size:30px;margin:6px 0 6px">🧭 Pattern Selector</h1>
+      <p class="muted">Answer a few questions about the problem in front of you. The selector narrows 100 patterns down to the few that fit — plus related patterns and LeetCode problems to practice.</p>
+
+      <div class="selector">
+        <div id="questions"></div>
+        <div style="display:flex;gap:10px;margin:6px 0 20px">
+          <button class="btn primary" id="recommend">🎯 Recommend Patterns</button>
+          <button class="btn" id="reset">↺ Reset</button>
+        </div>
+        <div id="results"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/js/patterns-data.js"></script>
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/progress.js"></script>
+  <script src="assets/js/search.js"></script>
+  <script src="assets/js/markdown.js"></script>
+  <script src="assets/js/content.js" onerror="window.DSA_CONTENT=window.DSA_CONTENT||{}"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    DSAApp.initChrome(null);
+
+    // Each question contributes tags; patterns are scored by tag matches.
+    var QUESTIONS = [
+      { id: "structure", q: "What is the primary data structure?",
+        opts: [["Array / String", "array"], ["Linked List", "linkedlist"], ["Tree", "tree"], ["Graph / Grid", "graph"], ["Numbers / Math", "number"], ["Intervals", "interval"]] },
+      { id: "sorted", q: "Is the input sorted (or can sorting help)?",
+        opts: [["Sorted", "sorted"], ["Can sort it", "cansort"], ["Unsorted / N/A", "unsorted"]] },
+      { id: "shape", q: "What are you searching for?",
+        opts: [["A pair / triplet", "pair"], ["A contiguous subarray/substring", "subarray"], ["A subsequence", "subsequence"], ["A path / connectivity", "path"], ["An optimal value (min/max/count)", "optimize"], ["All combinations", "enumerate"]] },
+      { id: "objective", q: "What is the objective?",
+        opts: [["Longest / Maximum", "longest"], ["Shortest / Minimum", "shortest"], ["Count ways", "count"], ["Existence / Yes-No", "exists"], ["Kth / Top-K", "topk"], ["Order / Schedule", "order"]] },
+      { id: "constraint", q: "What does the size / constraint hint?",
+        opts: [["n ≤ 20 (exponential ok)", "small"], ["n ≤ 10^3 (O(n²) ok)", "medium"], ["n ≤ 10^5 (need O(n log n))", "large"], ["n ≤ 10^7 (need O(n))", "huge"], ["Streaming / online", "stream"]] }
+    ];
+
+    // Pattern -> tags it satisfies (curated heuristic mapping).
+    var TAGS = {
+      "01-frequency-counter": ["array","unsorted","count","exists"],
+      "02-hashmap-lookup": ["array","unsorted","pair","exists","large"],
+      "03-prefix-sum": ["array","subarray","count","large","optimize"],
+      "04-difference-array": ["array","interval","count","large"],
+      "05-sorting-based": ["array","cansort","order","optimize"],
+      "06-opposite-two-pointers": ["array","sorted","pair","optimize","large"],
+      "07-same-direction-two-pointers": ["array","unsorted","subarray","large"],
+      "08-fast-slow-pointer": ["linkedlist","number","exists","path"],
+      "09-dutch-national-flag": ["array","cansort","order","large"],
+      "10-three-sum": ["array","cansort","sorted","pair","medium"],
+      "11-four-sum": ["array","cansort","sorted","pair","medium"],
+      "12-container-pattern": ["array","pair","optimize","large"],
+      "13-fixed-window": ["array","subarray","optimize","large"],
+      "14-variable-window": ["array","subarray","longest","shortest","large"],
+      "15-longest-window": ["array","subarray","longest","large"],
+      "16-shortest-window": ["array","subarray","shortest","large"],
+      "17-anagram-window": ["array","subarray","exists","large"],
+      "18-distinct-character-window": ["array","subarray","longest","large"],
+      "19-subarray-sum-window": ["array","subarray","count","large"],
+      "20-classic-binary-search": ["array","sorted","exists","large"],
+      "21-first-occurrence": ["array","sorted","exists","large"],
+      "22-last-occurrence": ["array","sorted","exists","large"],
+      "23-lower-bound": ["array","sorted","count","large"],
+      "24-upper-bound": ["array","sorted","count","large"],
+      "25-binary-search-on-answer": ["array","optimize","shortest","longest","large"],
+      "26-search-rotated-array": ["array","sorted","exists","large"],
+      "27-peak-element": ["array","exists","large"],
+      "28-monotonic-function-search": ["array","number","optimize","large"],
+      "29-merge-intervals": ["interval","cansort","order","large"],
+      "30-insert-interval": ["interval","order","large"],
+      "31-meeting-rooms": ["interval","cansort","count","optimize"],
+      "32-sweep-line": ["interval","cansort","count","large"],
+      "33-interval-scheduling": ["interval","cansort","optimize","order"],
+      "34-monotonic-increasing-stack": ["array","subarray","optimize","large"],
+      "35-monotonic-decreasing-stack": ["array","subarray","optimize","large"],
+      "36-next-greater-element": ["array","optimize","large"],
+      "37-previous-greater-element": ["array","optimize","large"],
+      "38-histogram-pattern": ["array","optimize","longest","large"],
+      "39-daily-temperatures": ["array","optimize","large"],
+      "40-monotonic-queue": ["array","subarray","optimize","large"],
+      "41-sliding-window-maximum": ["array","subarray","longest","large"],
+      "42-bfs-queue": ["graph","path","shortest","large"],
+      "43-top-k-elements": ["array","topk","large","stream"],
+      "44-k-closest-elements": ["array","topk","large"],
+      "45-two-heaps": ["array","stream","optimize","topk"],
+      "46-merge-k-sorted-lists": ["linkedlist","array","sorted","order"],
+      "47-median-of-stream": ["stream","number","optimize"],
+      "48-reverse-linked-list": ["linkedlist","order"],
+      "49-cycle-detection": ["linkedlist","exists","path"],
+      "50-merge-linked-lists": ["linkedlist","sorted","order"],
+      "51-dummy-node": ["linkedlist","order"],
+      "52-k-group-reversal": ["linkedlist","order"],
+      "53-tree-dfs": ["tree","path","enumerate"],
+      "54-tree-bfs": ["tree","path","shortest"],
+      "55-tree-height": ["tree","optimize"],
+      "56-diameter-of-tree": ["tree","longest","optimize"],
+      "57-balanced-tree": ["tree","exists"],
+      "58-path-sum": ["tree","path","count","exists"],
+      "59-lowest-common-ancestor": ["tree","path"],
+      "60-tree-dp": ["tree","optimize","count"],
+      "61-graph-bfs": ["graph","path","shortest","large"],
+      "62-graph-dfs": ["graph","path","exists","enumerate"],
+      "63-topological-sort": ["graph","order","exists"],
+      "64-union-find": ["graph","exists","count","large"],
+      "65-dijkstra": ["graph","path","shortest","optimize","large"],
+      "66-bellman-ford": ["graph","path","shortest","optimize"],
+      "67-floyd-warshall": ["graph","path","shortest","medium"],
+      "68-minimum-spanning-tree": ["graph","optimize","cansort"],
+      "69-subsets": ["array","enumerate","small"],
+      "70-combinations": ["array","enumerate","count","small"],
+      "71-permutations": ["array","enumerate","small"],
+      "72-n-queens": ["enumerate","exists","small"],
+      "73-sudoku-solver": ["enumerate","exists","small"],
+      "74-01-knapsack": ["array","subsequence","optimize","count","medium"],
+      "75-unbounded-knapsack": ["array","subsequence","optimize","count","medium"],
+      "76-subset-sum": ["array","subsequence","exists","medium"],
+      "77-coin-change": ["array","subsequence","optimize","count","medium"],
+      "78-longest-increasing-subsequence": ["array","subsequence","longest","large"],
+      "79-longest-common-subsequence": ["array","subsequence","longest","medium"],
+      "80-dp-on-strings": ["array","subsequence","optimize","medium"],
+      "81-dp-on-grids": ["graph","path","optimize","count","medium"],
+      "82-dp-on-trees": ["tree","optimize","count"],
+      "83-state-machine-dp": ["array","optimize","count","large"],
+      "84-digit-dp": ["number","count","optimize"],
+      "85-activity-selection": ["interval","cansort","optimize"],
+      "86-jump-game": ["array","exists","shortest","large"],
+      "87-gas-station": ["array","exists","large"],
+      "88-huffman-greedy": ["optimize","topk"],
+      "89-trie": ["array","exists","enumerate"],
+      "90-segment-tree": ["array","subarray","optimize","large"],
+      "91-fenwick-tree": ["array","count","optimize","large"],
+      "92-sparse-table": ["array","subarray","optimize","large"],
+      "93-bitmask-dp": ["enumerate","optimize","small"],
+      "94-meet-in-the-middle": ["array","subsequence","exists","small"],
+      "95-euler-tour": ["tree","subarray","optimize"],
+      "96-heavy-light-decomposition": ["tree","path","optimize","large"],
+      "97-network-flow": ["graph","optimize","large"],
+      "98-strongly-connected-components": ["graph","exists","order"],
+      "99-tarjan-algorithm": ["graph","exists","path"],
+      "100-mos-algorithm": ["array","subarray","count","large"]
+    };
+
+    var answers = {};
+
+    function renderQuestions() {
+      document.getElementById("questions").innerHTML = QUESTIONS.map(function (Q) {
+        return '<div class="q-card"><h3>' + Q.q + '</h3><div class="opt-grid">' +
+          Q.opts.map(function (o) {
+            return '<div class="opt" data-q="' + Q.id + '" data-tag="' + o[1] + '">' + o[0] + '</div>';
+          }).join("") + '</div></div>';
+      }).join("");
+      document.querySelectorAll(".opt").forEach(function (el) {
+        el.addEventListener("click", function () {
+          var q = el.dataset.q;
+          el.parentElement.querySelectorAll(".opt").forEach(function (x) { x.classList.remove("selected"); });
+          el.classList.add("selected");
+          answers[q] = el.dataset.tag;
+        });
+      });
+    }
+
+    function recommend() {
+      var chosen = Object.values(answers);
+      if (!chosen.length) { document.getElementById("results").innerHTML = '<div class="callout warn">Pick at least one option above.</div>'; return; }
+      var scored = Object.keys(TAGS).map(function (slug) {
+        var tags = TAGS[slug];
+        var score = chosen.reduce(function (a, t) { return a + (tags.indexOf(t) !== -1 ? 1 : 0); }, 0);
+        return { slug: slug, score: score };
+      }).filter(function (r) { return r.score > 0; });
+      scored.sort(function (a, b) { return b.score - a.score; });
+
+      if (!scored.length) { document.getElementById("results").innerHTML = '<div class="callout warn">No strong match — try the search bar or browse categories.</div>'; return; }
+
+      var top = scored.slice(0, 5);
+      var best = DSAApp.bySlug(top[0].slug);
+      var html = '<div class="result-box">';
+      html += '<div class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px">Best Match</div>';
+      html += '<div class="rec-name">' + DSAApp.pad(best.id) + ". " + best.name + '</div>';
+      html += '<p>' + best.summary + '</p>';
+      html += '<a class="btn primary" href="pattern.html?p=' + best.slug + '">Open Pattern →</a>';
+      html += '<h4 style="margin-top:20px">Similar / Related Patterns</h4><div class="chips">';
+      top.slice(1).forEach(function (r) {
+        var p = DSAApp.bySlug(r.slug);
+        html += '<a class="chip" href="pattern.html?p=' + p.slug + '">' + DSAApp.pad(p.id) + ". " + p.name + '</a>';
+      });
+      html += '</div>';
+      html += '<h4 style="margin-top:18px">Practice These LeetCode Problems</h4><div class="chips">';
+      best.leetcode.forEach(function (lc) { html += '<span class="chip">📝 ' + lc + '</span>'; });
+      html += '</div></div>';
+      document.getElementById("results").innerHTML = html;
+      document.getElementById("results").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    renderQuestions();
+    document.getElementById("recommend").onclick = recommend;
+    document.getElementById("reset").onclick = function () {
+      answers = {}; renderQuestions(); document.getElementById("results").innerHTML = "";
+    };
+  </script>
+</body>
+</html>
