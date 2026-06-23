@@ -236,13 +236,23 @@ def build(spec, root):
     md_dir = os.path.join(hb_dir, "markdown")
     os.makedirs(md_dir, exist_ok=True)
 
-    # tag items with handbook name (for footer) and write markdown + collect content
+    # tag items with handbook name (for footer) and write markdown + collect content.
+    # When spec["preserve_markdown"] is set, an existing hand/agent-authored
+    # markdown/<slug>.md is used verbatim (rich multi-section content) instead of
+    # being regenerated from the compact SPEC template; build_markdown() is only
+    # used as a fallback stub when no file exists yet.
+    preserve = spec.get("preserve_markdown", False)
     content = {}
     for it in spec["items"]:
         it["_hbname"] = spec["name"]
-        md = build_markdown(it)
-        with open(os.path.join(md_dir, it["slug"] + ".md"), "w", encoding="utf-8") as f:
-            f.write(md)
+        md_path = os.path.join(md_dir, it["slug"] + ".md")
+        if preserve and os.path.exists(md_path):
+            with open(md_path, encoding="utf-8") as f:
+                md = f.read()
+        else:
+            md = build_markdown(it)
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(md)
         content[it["slug"]] = md
 
     # data.js — meta only (no heavy content)
