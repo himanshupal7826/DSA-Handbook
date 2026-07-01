@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Night Revision — DSA Patterns Handbook</title>
+  <meta name="description" content="5-minute night revision: flash cards, rapid fire, complexity & recognition quizzes across today's patterns.">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/journey.css">
+  <link rel="icon" type="image/png" href="assets/images/03_favicon.png">
+  <script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+</head>
+<body>
+  <header class="topbar" id="topbar"></header>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="layout">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <main class="main">
+      <section class="j-hero" style="background:linear-gradient(135deg,#1e1b4b 0%,#4c1d95 60%,#831843 100%)">
+        <div class="j-hero-top"><div>
+          <div class="j-day-badge">🌙 5-Minute Night Revision</div>
+          <h1>Lock in what you learned today</h1>
+          <p class="j-quote" id="rev-intro">Spaced-repetition flash cards, rapid fire and quizzes drawn from today's patterns.</p>
+        </div>
+        <div class="j-hero-stats" id="rev-hero-stats"></div>
+        </div>
+      </section>
+
+      <!-- Tabs -->
+      <div class="chips" style="margin-top:18px" id="rev-tabs"></div>
+
+      <div id="rev-panel"></div>
+    </main>
+  </div>
+
+  <div class="j-toast" id="toast"></div>
+
+  <script src="assets/js/patterns-data.js"></script>
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/progress.js"></script>
+  <script src="assets/js/search.js"></script>
+  <script src="assets/js/markdown.js"></script>
+  <script src="assets/js/content.js" onerror="window.DSA_CONTENT=window.DSA_CONTENT||{}"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/journey.js"></script>
+  <script>
+  (function () {
+    DSAApp.initChrome(null);
+    var J = window.DSAJourney;
+    var el = function (id) { return document.getElementById(id); };
+    function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+    var toastTimer;
+    function toast(m) { var t = el("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove("show"); }, 1600); }
+
+    /* -------- Build today's revision pool --------
+       Combine (a) patterns whose spaced-repetition revision is due today and
+       (b) today's freshly-studied patterns, then pad to ~10 for the flash set. */
+    function revisionPool() {
+      var n = J.currentDayNumber();
+      var pool = [];
+      var seen = {};
+      J.revisionsForDay(n).forEach(function (r) { if (!seen[r.pattern.slug]) { seen[r.pattern.slug] = 1; pool.push(r.pattern); } });
+      var day = J.getDay(n);
+      if (day) day.patterns.forEach(function (p) { if (!seen[p.slug]) { seen[p.slug] = 1; pool.push(p); } });
+      // pad with earlier patterns so there's always a full deck
+      var all = window.DSA_PATTERNS;
+      for (var i = 0; i < all.length && pool.length < 12; i++) { if (!seen[all[i].slug]) { seen[all[i].slug] = 1; pool.push(all[i]); } }
+      return pool;
+    }
+    var POOL = revisionPool();
+
+    el("rev-hero-stats").innerHTML =
+      '<div class="j-hs"><div class="n">' + Math.min(10, POOL.length) + '</div><div class="l">Flash cards</div></div>' +
+      '<div class="j-hs"><div class="n">' + J.currentDayNumber() + '</div><div class="l">Journey day</div></div>' +
+      '<div class="j-hs"><div class="n">' + J.stats().streak.current + '</div><div class="l">Streak</div></div>';
+
+    /* -------- Tabs -------- */
+    var TABS = [
+      ["cards", "🃏 Flash Cards"],
+      ["rapid", "⚡ Rapid Fire"],
+      ["complexity", "⏱ Complexity Quiz"],
+      ["recognition", "🧠 Recognition Quiz"],
+      ["recall", "💻 Code Recall"],
+      ["models", "🧩 Mental Models"],
+      ["five", "⏳ 5-Minute Review"]
+    ];
+    var active = (location.hash.replace("#", "") === "quiz") ? "recognition" : "cards";
+    function renderTabs() {
+      el("rev-tabs").innerHTML = TABS.map(function (t) {
+        return '<button class="chip" data-tab="' + t[0] + '" style="' + (active === t[0] ? "background:var(--accent);color:#fff;border-color:var(--accent)" : "") + '">' + t[1] + '</button>';
+      }).join("");
+      el("rev-tabs").querySelectorAll("[data-tab]").forEach(function (b) {
+        b.onclick = function () { active = b.getAttribute("data-tab"); renderTabs(); renderPanel(); };
+      });
+    }
+
+    /* -------- 10 Flash cards (flip) -------- */
+    function renderCards() {
+      var deck = POOL.slice(0, 10);
+      return '<h2 class="j-section-title"><span class="bar"></span>10 Flash Cards</h2>' +
+        '<p class="j-muted">Click a card to reveal recognition signals, complexity and the key formula.</p>' +
+        '<div class="j-grid cols-3">' + deck.map(function (p, i) {
+          var c = J.revisionCard(p.slug);
+          var back = '<strong>' + esc(p.name) + '</strong>' +
+            '<div class="j-rev-field"><span class="k">Recognise</span>' + esc((c.recognition[0] || p.keywords[0] || "")) + '</div>' +
+            '<div class="j-rev-field"><span class="k">Complexity</span>' + esc(c.complexity) + '</div>' +
+            '<div class="j-rev-field"><span class="k">Formula</span>' + esc(c.formula) + '</div>';
+          return '<div class="j-flip" data-flip><div class="j-flip-inner">' +
+            '<div class="j-flip-face j-flip-front"><div class="j-day-badge">Card ' + (i + 1) + '</div><h3>' + esc(p.name) + '</h3><p>' + esc(p.category) + '</p><span class="j-flip-hint">tap to flip</span></div>' +
+            '<div class="j-flip-face j-flip-back">' + back + '<a class="j-btn small" style="margin-top:6px" href="pattern.html?p=' + p.slug + '#15-revision-notes">Open →</a></div>' +
+            '</div></div>';
+        }).join("") + '</div>';
+    }
+
+    /* -------- Rapid fire: name → recall, self-mark -------- */
+    var rapidIdx = 0, rapidRevealed = false;
+    function renderRapid() {
+      var deck = POOL.slice(0, 10);
+      var p = deck[rapidIdx % deck.length];
+      var c = J.revisionCard(p.slug);
+      return '<h2 class="j-section-title"><span class="bar"></span>Rapid Fire</h2>' +
+        '<div class="j-card" style="text-align:center;padding:30px">' +
+        '<div class="j-muted">' + (rapidIdx + 1) + ' / ' + deck.length + '</div>' +
+        '<h2 style="margin:10px 0">' + esc(p.name) + '</h2>' +
+        '<p class="j-muted">In one breath: what\'s the recognition signal and the move?</p>' +
+        (rapidRevealed ? '<div class="j-revcard" style="text-align:left;margin-top:14px"><div class="j-rev-field"><span class="k">Answer</span>' + esc(c.formula) + '</div><div class="j-rev-field"><span class="k">Recognise</span>' + esc(c.recognition.slice(0, 2).join("; ")) + '</div></div>' : "") +
+        '<div style="display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap">' +
+        (rapidRevealed
+          ? '<button class="j-btn success" data-rapid="got">✓ Got it</button><button class="j-btn" data-rapid="miss">✗ Review again</button>'
+          : '<button class="j-btn primary" data-rapid="reveal">Reveal answer</button>') +
+        '</div></div>';
+    }
+
+    /* -------- Quiz builder (complexity / recognition) -------- */
+    function shuffle(a, seed) {
+      // deterministic-ish shuffle so reloading a quiz is stable per session
+      a = a.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        seed = (seed * 9301 + 49297) % 233280;
+        var j = Math.floor((seed / 233280) * (i + 1));
+        var t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a;
+    }
+    function complexityGuess(p) {
+      var c = J.revisionCard(p.slug);
+      var m = c.complexity.match(/O\([^)]*\)/);
+      return m ? m[0] : "O(n)";
+    }
+    var COMPLEXITY_OPTS = ["O(1)", "O(log n)", "O(n)", "O(n log n)", "O(n²)", "O(2ⁿ)"];
+
+    var quizState = {};
+    function renderQuiz(kind) {
+      var deck = POOL.slice(0, 6);
+      var title = kind === "complexity" ? "Complexity Quiz" : "Recognition Quiz";
+      var html = '<h2 class="j-section-title"><span class="bar"></span>' + title + '</h2>';
+      html += '<div id="quiz-score" class="j-quiz-progress"></div>';
+      deck.forEach(function (p, qi) {
+        var opts, correct, q;
+        if (kind === "complexity") {
+          correct = complexityGuess(p);
+          var wrong = COMPLEXITY_OPTS.filter(function (o) { return o !== correct; });
+          opts = shuffle([correct].concat(shuffle(wrong, p.id).slice(0, 3)), p.id + 1);
+          q = "Typical optimal time complexity of <b>" + esc(p.name) + "</b>?";
+        } else {
+          correct = p.name;
+          var others = shuffle(window.DSA_PATTERNS.filter(function (x) { return x.slug !== p.slug; }), p.id).slice(0, 3).map(function (x) { return x.name; });
+          opts = shuffle([correct].concat(others), p.id + 2);
+          var signal = (p.keywords || []).slice(0, 3).join(", ");
+          q = "Which pattern fits these signals: <b>" + esc(signal) + "</b>?";
+        }
+        html += '<div class="j-card" style="margin-bottom:12px" data-q="' + qi + '" data-correct="' + esc(correct) + '">' +
+          '<div class="j-quiz-q">Q' + (qi + 1) + '. ' + q + '</div>' +
+          opts.map(function (o) { return '<button class="j-quiz-opt" data-opt="' + esc(o) + '">' + esc(o) + '</button>'; }).join("") +
+          '</div>';
+      });
+      return html;
+    }
+    function wireQuiz(kind) {
+      var total = el("rev-panel").querySelectorAll("[data-q]").length;
+      var answered = 0, correctCount = 0;
+      el("rev-panel").querySelectorAll("[data-q]").forEach(function (card) {
+        var correct = card.getAttribute("data-correct");
+        card.querySelectorAll("[data-opt]").forEach(function (btn) {
+          btn.onclick = function () {
+            if (card.getAttribute("data-done")) return;
+            card.setAttribute("data-done", "1");
+            answered++;
+            var chosen = btn.getAttribute("data-opt");
+            if (chosen === correct) { btn.classList.add("correct"); correctCount++; }
+            else {
+              btn.classList.add("wrong");
+              card.querySelectorAll("[data-opt]").forEach(function (b2) { if (b2.getAttribute("data-opt") === correct) b2.classList.add("correct"); });
+            }
+            var score = el("quiz-score");
+            score.textContent = "Score: " + correctCount + " / " + total + " (" + answered + " answered)";
+            if (answered === total) {
+              J.awardXP("quiz:" + kind + ":" + J.currentDayNumber(), 15, "Completed quiz");
+              toast("Quiz done! " + correctCount + "/" + total + " · +15 XP");
+            }
+          };
+        });
+      });
+    }
+
+    /* -------- Code recall -------- */
+    function renderRecall() {
+      var deck = POOL.slice(0, 6);
+      return '<h2 class="j-section-title"><span class="bar"></span>Code Recall</h2>' +
+        '<p class="j-muted">Write the template skeleton from memory, then check §5 on the pattern page.</p>' +
+        deck.map(function (p) {
+          return '<div class="j-card" style="margin-bottom:12px"><strong>' + esc(p.name) + '</strong>' +
+            '<div class="j-muted" style="margin:6px 0">' + esc(p.summary) + '</div>' +
+            '<textarea class="j-textarea" placeholder="// recall the core loop / recurrence here…"></textarea>' +
+            '<a class="j-btn small" style="margin-top:8px" href="pattern.html?p=' + p.slug + '#5-generic-templates">Check template →</a></div>';
+        }).join("");
+    }
+
+    /* -------- Mental models -------- */
+    function renderModels() {
+      var cats = {};
+      POOL.slice(0, 10).forEach(function (p) { cats[p.category] = J.keyFormula(p); });
+      return '<h2 class="j-section-title"><span class="bar"></span>Mental Models</h2>' +
+        '<div class="j-grid cols-2">' + Object.keys(cats).map(function (k) {
+          return '<div class="j-card"><strong>' + esc(k) + '</strong><div class="j-muted" style="margin-top:6px">' + esc(cats[k]) + '</div></div>';
+        }).join("") + '</div>';
+    }
+
+    /* -------- 5-minute review: condensed cards for all pool patterns ---- */
+    function renderFive() {
+      return '<h2 class="j-section-title"><span class="bar"></span>5-Minute Review</h2>' +
+        '<p class="j-muted">Skim these one-liners. Anything fuzzy? Open the pattern.</p>' +
+        POOL.slice(0, 10).map(function (p) {
+          var c = J.revisionCard(p.slug);
+          return '<div class="j-task"><span class="j-task-icon">⚡</span><div class="j-task-body">' +
+            '<div class="j-task-title"><a href="pattern.html?p=' + p.slug + '">' + esc(p.name) + '</a></div>' +
+            '<div class="j-task-sub">' + esc(c.oneLiner || p.summary) + ' &nbsp;·&nbsp; ' + esc(c.formula) + '</div></div></div>';
+        }).join("");
+    }
+
+    function renderPanel() {
+      var p = el("rev-panel");
+      if (active === "cards") { p.innerHTML = renderCards(); wireFlip(); }
+      else if (active === "rapid") { p.innerHTML = renderRapid(); wireRapid(); }
+      else if (active === "complexity") { p.innerHTML = renderQuiz("complexity"); wireQuiz("complexity"); }
+      else if (active === "recognition") { p.innerHTML = renderQuiz("recognition"); wireQuiz("recognition"); }
+      else if (active === "recall") { p.innerHTML = renderRecall(); }
+      else if (active === "models") { p.innerHTML = renderModels(); }
+      else if (active === "five") { p.innerHTML = renderFive(); }
+    }
+    function wireFlip() { el("rev-panel").querySelectorAll("[data-flip]").forEach(function (c) { c.onclick = function () { c.classList.toggle("flipped"); }; }); }
+    function wireRapid() {
+      el("rev-panel").querySelectorAll("[data-rapid]").forEach(function (b) {
+        b.onclick = function () {
+          var a = b.getAttribute("data-rapid");
+          if (a === "reveal") { rapidRevealed = true; }
+          else { rapidRevealed = false; rapidIdx++; if (a === "got") J.awardXP("rapid:" + J.currentDayNumber() + ":" + rapidIdx, 3, "Rapid fire"); }
+          renderPanel(); wireRapid();
+        };
+      });
+    }
+
+    renderTabs();
+    renderPanel();
+  })();
+  </script>
+</body>
+</html>

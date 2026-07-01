@@ -1,0 +1,365 @@
+/* =====================================================================
+ * journey.css — 30-Day DSA Journey UI.
+ * Layers on top of style.css, reusing its design tokens (--bg, --accent,
+ * --green, --radius, --shadow …). Fully dark-mode aware (all colors come
+ * from the same custom properties style.css redefines under
+ * html[data-theme="dark"]). Loaded by journey.html, night-revision.html,
+ * interview.html and pattern.html (for Listen + Quick Revision).
+ * ===================================================================== */
+
+/* ---- extra tokens layered on the existing palette ---- */
+:root {
+  --j-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 55%, #ec4899 100%);
+  --j-ring-track: var(--border-soft);
+}
+html[data-theme="dark"] {
+  --j-ring-track: #21262d;
+}
+
+/* ===================================================================== */
+/* Generic building blocks                                               */
+/* ===================================================================== */
+.j-section-title {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 19px; font-weight: 700; margin: 30px 0 14px;
+}
+.j-section-title .bar { width: 4px; height: 20px; border-radius: 3px; background: var(--accent); display: inline-block; }
+.j-muted { color: var(--text-soft); font-size: 14px; }
+.j-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); border: 1px solid transparent;
+}
+.j-pill.easy { background: var(--green-bg); color: var(--green); }
+.j-pill.medium { background: var(--amber-bg); color: var(--amber); }
+.j-pill.hard { background: var(--red-bg); color: var(--red); }
+.j-pill.ghost { background: transparent; border-color: var(--border); color: var(--text-soft); }
+
+.j-card {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow);
+}
+.j-grid { display: grid; gap: 16px; }
+.j-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.j-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.j-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 900px) { .j-grid.cols-3, .j-grid.cols-4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .j-grid.cols-2, .j-grid.cols-3, .j-grid.cols-4 { grid-template-columns: 1fr; } }
+
+.j-btn {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  font: inherit; font-weight: 600; font-size: 14px;
+  padding: 9px 16px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg-elev); color: var(--text);
+  transition: background .15s, border-color .15s, transform .05s;
+}
+.j-btn:hover { border-color: var(--accent); }
+.j-btn:active { transform: translateY(1px); }
+.j-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.j-btn.primary:hover { background: var(--accent-hover); }
+.j-btn.success { background: var(--green); border-color: var(--green); color: #fff; }
+.j-btn.small { padding: 5px 10px; font-size: 12.5px; }
+.j-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ===================================================================== */
+/* Hero — "Today's Plan"                                                 */
+/* ===================================================================== */
+.j-hero {
+  border-radius: 16px; padding: 26px 28px; color: #fff;
+  background: var(--j-gradient); position: relative; overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.j-hero::after {
+  content: ""; position: absolute; right: -60px; top: -60px;
+  width: 240px; height: 240px; border-radius: 50%;
+  background: rgba(255, 255, 255, .12);
+}
+.j-hero-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; position: relative; z-index: 1; }
+.j-hero h1 { font-size: 26px; margin: 0 0 4px; }
+.j-hero .j-day-badge {
+  font-size: 13px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  opacity: .9;
+}
+.j-hero .j-quote { margin: 14px 0 0; font-size: 15px; font-style: italic; max-width: 640px; position: relative; z-index: 1; opacity: .95; }
+.j-hero .j-hero-stats { display: flex; gap: 22px; flex-wrap: wrap; position: relative; z-index: 1; }
+.j-hero .j-hs { text-align: center; }
+.j-hero .j-hs .n { font-size: 24px; font-weight: 800; line-height: 1; }
+.j-hero .j-hs .l { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; opacity: .85; margin-top: 4px; }
+
+/* ===================================================================== */
+/* Progress rings (SVG)                                                  */
+/* ===================================================================== */
+.j-ring { position: relative; width: 84px; height: 84px; }
+.j-ring svg { transform: rotate(-90deg); }
+.j-ring .track { stroke: var(--j-ring-track); }
+.j-ring .fill { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
+.j-ring.green .fill { stroke: var(--green); }
+.j-ring.amber .fill { stroke: var(--amber); }
+.j-ring .j-ring-label {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; font-weight: 800; font-size: 18px;
+}
+.j-ring .j-ring-label small { font-size: 10px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; }
+
+/* ===================================================================== */
+/* Stat tiles                                                            */
+/* ===================================================================== */
+.j-tile {
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; text-align: center;
+}
+.j-tile .big { font-size: 26px; font-weight: 800; color: var(--accent); line-height: 1; }
+.j-tile .lbl { font-size: 12px; color: var(--text-soft); margin-top: 6px; text-transform: uppercase; letter-spacing: .4px; }
+.j-tile .sub { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+
+/* ===================================================================== */
+/* XP / Level bar                                                        */
+/* ===================================================================== */
+.j-level { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.j-level .badge-lvl { font-size: 30px; }
+.j-level .lvl-meta { flex: 1; min-width: 200px; }
+.j-level .lvl-name { font-weight: 800; font-size: 16px; }
+.j-xpbar { height: 10px; border-radius: 999px; background: var(--j-ring-track); overflow: hidden; margin: 7px 0 4px; }
+.j-xpbar > span { display: block; height: 100%; background: var(--j-gradient); border-radius: 999px; transition: width .6s ease; }
+
+/* ===================================================================== */
+/* Timeline (30 days)                                                    */
+/* ===================================================================== */
+.j-timeline { position: relative; margin-left: 8px; padding-left: 26px; }
+.j-timeline::before {
+  content: ""; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 2px;
+  background: var(--border);
+}
+.j-tl-day {
+  position: relative; margin-bottom: 10px;
+}
+.j-tl-dot {
+  position: absolute; left: -26px; top: 16px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--bg); border: 3px solid var(--border); z-index: 1;
+}
+.j-tl-day.done .j-tl-dot { background: var(--green); border-color: var(--green); }
+.j-tl-day.current .j-tl-dot { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.j-tl-head {
+  display: flex; align-items: center; gap: 12px; cursor: pointer;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg-elev); transition: border-color .15s;
+}
+.j-tl-head:hover { border-color: var(--accent); }
+.j-tl-day.current .j-tl-head { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.j-tl-daynum { font-weight: 800; font-size: 13px; color: var(--text-soft); min-width: 48px; }
+.j-tl-title { font-weight: 700; flex: 1; }
+.j-tl-title small { display: block; font-weight: 400; color: var(--text-soft); font-size: 12.5px; }
+.j-tl-meta { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+.j-tl-body { display: none; padding: 4px 0 8px 4px; }
+.j-tl-day.open .j-tl-body { display: block; }
+.j-tl-caret { transition: transform .2s; color: var(--text-faint); }
+.j-tl-day.open .j-tl-caret { transform: rotate(90deg); }
+
+/* ===================================================================== */
+/* Task rows / checklist                                                 */
+/* ===================================================================== */
+.j-task {
+  display: flex; align-items: flex-start; gap: 11px; padding: 11px 13px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg); margin-bottom: 8px;
+}
+.j-task .j-check {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 6px; margin-top: 1px;
+  border: 2px solid var(--border); cursor: pointer; display: inline-flex;
+  align-items: center; justify-content: center; font-size: 14px; color: #fff;
+  background: var(--bg-elev); transition: background .15s, border-color .15s;
+}
+.j-task .j-check.checked { background: var(--green); border-color: var(--green); }
+.j-task .j-task-body { flex: 1; min-width: 0; }
+.j-task .j-task-title { font-weight: 600; }
+.j-task .j-task-title.done { text-decoration: line-through; color: var(--text-faint); }
+.j-task .j-task-sub { font-size: 13px; color: var(--text-soft); margin-top: 2px; }
+.j-task .j-task-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.j-task-icon { font-size: 18px; margin-top: 1px; }
+
+/* ===================================================================== */
+/* Problem cards                                                         */
+/* ===================================================================== */
+.j-problem {
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elev);
+  padding: 15px; margin-bottom: 12px;
+}
+.j-problem-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.j-problem-head .num { font-family: var(--mono); font-size: 12px; color: var(--text-faint); }
+.j-problem-head h4 { margin: 0; font-size: 15.5px; flex: 1; min-width: 120px; }
+.j-problem-metrics { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-soft); margin: 9px 0; }
+.j-problem-metrics b { color: var(--text); font-weight: 600; }
+.j-problem details { margin-top: 8px; }
+.j-problem summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); }
+.j-problem .j-detail-block { font-size: 13.5px; color: var(--text-soft); margin: 8px 0; line-height: 1.55; }
+.j-problem .j-detail-block strong { color: var(--text); }
+.j-tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.j-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--bg-alt); color: var(--text-soft); border: 1px solid var(--border-soft); }
+.j-company { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
+
+/* ===================================================================== */
+/* Revision (flash) cards                                                */
+/* ===================================================================== */
+.j-revcard {
+  border: 1px solid var(--border); border-left: 4px solid var(--accent);
+  border-radius: var(--radius); background: var(--bg-elev); padding: 16px; margin-bottom: 12px;
+}
+.j-revcard h4 { margin: 0 0 4px; font-size: 16px; }
+.j-revcard .stage { font-size: 11px; font-weight: 700; color: var(--amber); text-transform: uppercase; letter-spacing: .5px; }
+.j-rev-field { margin: 9px 0; font-size: 13.5px; line-height: 1.55; }
+.j-rev-field .k { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-faint); font-weight: 700; display: block; margin-bottom: 3px; }
+.j-rev-field ul { margin: 4px 0 0; padding-left: 20px; }
+.j-rev-field li { margin: 2px 0; }
+
+/* Flip flashcard (night revision) */
+.j-flip { perspective: 1200px; height: 220px; cursor: pointer; }
+.j-flip-inner { position: relative; width: 100%; height: 100%; transition: transform .5s; transform-style: preserve-3d; }
+.j-flip.flipped .j-flip-inner { transform: rotateY(180deg); }
+.j-flip-face {
+  position: absolute; inset: 0; backface-visibility: hidden; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--bg-elev); padding: 20px;
+  display: flex; flex-direction: column; justify-content: center; box-shadow: var(--shadow);
+}
+.j-flip-front { background: var(--j-gradient); color: #fff; }
+.j-flip-front h3 { margin: 0; font-size: 20px; }
+.j-flip-front p { opacity: .9; margin: 8px 0 0; }
+.j-flip-back { transform: rotateY(180deg); overflow: auto; font-size: 13.5px; }
+.j-flip-hint { position: absolute; bottom: 10px; right: 14px; font-size: 11px; opacity: .8; }
+
+/* ===================================================================== */
+/* Quiz                                                                  */
+/* ===================================================================== */
+.j-quiz-q { font-weight: 600; margin-bottom: 10px; }
+.j-quiz-opt {
+  display: block; width: 100%; text-align: left; margin-bottom: 8px; cursor: pointer;
+  padding: 11px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-elev); color: var(--text); font: inherit; transition: border-color .15s;
+}
+.j-quiz-opt:hover { border-color: var(--accent); }
+.j-quiz-opt.correct { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+.j-quiz-opt.wrong { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+.j-quiz-progress { font-size: 13px; color: var(--text-soft); margin-bottom: 6px; }
+
+/* ===================================================================== */
+/* Heatmap                                                               */
+/* ===================================================================== */
+.j-heatmap { display: grid; grid-template-columns: repeat(auto-fill, 15px); gap: 4px; }
+.j-heat-cell { width: 15px; height: 15px; border-radius: 3px; background: var(--j-ring-track); }
+.j-heat-cell[data-l="1"] { background: #9be9a8; }
+.j-heat-cell[data-l="2"] { background: #40c463; }
+.j-heat-cell[data-l="3"] { background: #30a14e; }
+.j-heat-cell[data-l="4"] { background: #216e39; }
+html[data-theme="dark"] .j-heat-cell[data-l="1"] { background: #0e4429; }
+html[data-theme="dark"] .j-heat-cell[data-l="2"] { background: #006d32; }
+html[data-theme="dark"] .j-heat-cell[data-l="3"] { background: #26a641; }
+html[data-theme="dark"] .j-heat-cell[data-l="4"] { background: #39d353; }
+
+/* weekly bar chart */
+.j-bars { display: flex; align-items: flex-end; gap: 8px; height: 120px; }
+.j-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.j-bar { width: 100%; max-width: 34px; background: var(--j-gradient); border-radius: 6px 6px 0 0; min-height: 3px; transition: height .5s; }
+.j-bar-lbl { font-size: 10px; color: var(--text-faint); }
+.j-bar-val { font-size: 11px; font-weight: 700; color: var(--text-soft); }
+
+/* ===================================================================== */
+/* Video / resource cards                                                */
+/* ===================================================================== */
+.j-video {
+  display: flex; gap: 12px; padding: 12px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--bg-elev); margin-bottom: 10px; text-decoration: none; color: inherit;
+  transition: border-color .15s;
+}
+.j-video:hover { border-color: var(--accent); }
+.j-video .thumb {
+  flex: 0 0 120px; height: 68px; border-radius: var(--radius-sm); position: relative;
+  background: var(--bg-alt); display: flex; align-items: center; justify-content: center;
+  font-size: 26px; overflow: hidden; color: #fff; font-weight: 800;
+}
+.j-video .thumb .dur { position: absolute; bottom: 4px; right: 5px; font-size: 10px; background: rgba(0,0,0,.75); color: #fff; padding: 1px 5px; border-radius: 3px; font-weight: 600; }
+.j-video .v-body { flex: 1; min-width: 0; }
+.j-video .v-title { font-weight: 600; font-size: 14px; }
+.j-video .v-chan { font-size: 12px; color: var(--text-soft); }
+.j-video .v-why { font-size: 12.5px; color: var(--text-faint); margin-top: 4px; }
+.j-res-list { list-style: none; padding: 0; margin: 0; }
+.j-res-list li { padding: 9px 0; border-bottom: 1px solid var(--border-soft); display: flex; gap: 10px; align-items: center; }
+.j-res-list li:last-child { border-bottom: 0; }
+.j-res-list .r-ico { font-size: 18px; }
+
+/* ===================================================================== */
+/* Listen mode bar (pattern pages)                                       */
+/* ===================================================================== */
+.j-listen-bar {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  z-index: 120; width: min(720px, calc(100% - 32px));
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: var(--shadow-lg); padding: 12px 16px;
+  display: none; flex-direction: column; gap: 8px;
+}
+.j-listen-bar.show { display: flex; }
+.j-listen-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.j-listen-title { font-weight: 700; font-size: 13px; flex: 1; min-width: 120px; }
+.j-listen-title small { color: var(--text-soft); font-weight: 400; }
+.j-lb-btn {
+  width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); cursor: pointer; font-size: 15px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.j-lb-btn.play { background: var(--accent); border-color: var(--accent); color: #fff; width: 44px; height: 44px; font-size: 17px; }
+.j-lb-btn:hover { border-color: var(--accent); }
+.j-listen-bar select { font: inherit; font-size: 12px; padding: 5px 7px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+.j-listen-progress { height: 5px; border-radius: 999px; background: var(--j-ring-track); overflow: hidden; }
+.j-listen-progress > span { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+.j-listen-close { background: none; border: 0; color: var(--text-faint); cursor: pointer; font-size: 18px; }
+/* highlighted sentence while reading */
+.j-speaking { background: var(--amber-bg); border-radius: 3px; box-shadow: 0 0 0 3px var(--amber-bg); }
+
+/* ===================================================================== */
+/* Quick Revision floating widget (pattern pages)                        */
+/* ===================================================================== */
+.j-fab {
+  position: fixed; right: 20px; bottom: 84px; z-index: 115;
+  width: 54px; height: 54px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--j-gradient); color: #fff; font-size: 22px; box-shadow: var(--shadow-lg);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.j-fab:hover { transform: scale(1.06); }
+.j-drawer {
+  position: fixed; top: 0; right: 0; height: 100%; width: min(420px, 92vw); z-index: 200;
+  background: var(--bg-elev); border-left: 1px solid var(--border); box-shadow: var(--shadow-lg);
+  transform: translateX(100%); transition: transform .3s ease; overflow-y: auto; padding: 22px;
+}
+.j-drawer.open { transform: translateX(0); }
+.j-drawer h3 { margin: 0 0 3px; }
+.j-drawer-close { position: absolute; top: 16px; right: 18px; background: none; border: 0; font-size: 24px; cursor: pointer; color: var(--text-faint); }
+.j-drawer .j-rev-field { border-bottom: 1px solid var(--border-soft); padding-bottom: 10px; }
+
+/* decision-tree mini block */
+.j-tree { font-family: var(--mono); font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; background: var(--code-bg); padding: 12px; border-radius: var(--radius-sm); color: var(--code-text); }
+
+/* ===================================================================== */
+/* Interview mode                                                        */
+/* ===================================================================== */
+.j-timer { font-family: var(--mono); font-size: 40px; font-weight: 800; text-align: center; }
+.j-timer.warn { color: var(--amber); }
+.j-timer.over { color: var(--red); }
+.j-rating { display: flex; gap: 6px; }
+.j-star { font-size: 26px; cursor: pointer; color: var(--border); }
+.j-star.on { color: var(--amber); }
+
+/* toast */
+.j-toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; z-index: 300; opacity: 0; transition: opacity .25s, transform .25s;
+  box-shadow: var(--shadow-lg); pointer-events: none;
+}
+.j-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.j-empty { text-align: center; color: var(--text-soft); padding: 30px 16px; }
+.j-empty .ico { font-size: 40px; display: block; margin-bottom: 8px; }
+
+textarea.j-textarea {
+  width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text); font: inherit; font-size: 13.5px; padding: 10px;
+  resize: vertical; min-height: 60px;
+}

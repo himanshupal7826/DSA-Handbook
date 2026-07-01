@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>30-Day DSA Journey — DSA Patterns Handbook</title>
+  <meta name="description" content="Your personalized 30-day DSA study planner with spaced repetition, daily problems, XP, streaks and revision — fully offline.">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/journey.css">
+  <link rel="icon" type="image/png" href="assets/images/03_favicon.png">
+  <script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+</head>
+<body>
+  <header class="topbar" id="topbar"></header>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="layout">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <main class="main">
+      <!-- Today's Plan hero -->
+      <section id="hero-wrap"></section>
+
+      <!-- Dashboard -->
+      <h2 class="j-section-title"><span class="bar"></span>Daily Dashboard
+        <span style="flex:1"></span>
+        <button class="j-btn small" id="notify-toggle" style="font-weight:600"></button>
+        <a class="j-btn small" href="interview.html">🎤 Interview mode</a>
+      </h2>
+      <div class="j-grid cols-4" id="dash-rings"></div>
+      <div class="j-card" id="level-card" style="margin-top:16px"></div>
+
+      <div class="j-grid cols-2" style="margin-top:16px">
+        <div class="j-card">
+          <div class="j-section-title" style="margin-top:0;font-size:15px"><span class="bar"></span>Activity — last 15 weeks</div>
+          <div class="j-heatmap" id="heatmap"></div>
+        </div>
+        <div class="j-card">
+          <div class="j-section-title" style="margin-top:0;font-size:15px"><span class="bar"></span>XP this week</div>
+          <div class="j-bars" id="weekly-bars"></div>
+        </div>
+      </div>
+
+      <!-- Final report (shown near/after day 30) -->
+      <div id="report-wrap"></div>
+
+      <!-- 30-day timeline -->
+      <h2 class="j-section-title"><span class="bar"></span>Your 30-Day Schedule</h2>
+      <p class="j-muted">All 100 patterns, intelligently distributed with spaced-repetition revisions woven in. Click any day to expand its plan. Today is highlighted.</p>
+      <div class="j-timeline" id="timeline"></div>
+    </main>
+  </div>
+
+  <div class="j-toast" id="toast"></div>
+
+  <script src="assets/js/patterns-data.js"></script>
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/progress.js"></script>
+  <script src="assets/js/search.js"></script>
+  <script src="assets/js/markdown.js"></script>
+  <script src="assets/js/content.js" onerror="window.DSA_CONTENT=window.DSA_CONTENT||{}"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/journey.js"></script>
+  <script>
+  (function () {
+    DSAApp.initChrome(null);
+    var J = window.DSAJourney;
+
+    /* ---------- small helpers ---------- */
+    function el(id) { return document.getElementById(id); }
+    function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+    var toastTimer;
+    function toast(msg) {
+      var t = el("toast"); t.textContent = msg; t.classList.add("show");
+      clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove("show"); }, 1800);
+    }
+    function diffClass(d) { return d === "Easy" ? "easy" : d === "Medium" ? "medium" : "hard"; }
+
+    // SVG progress ring
+    function ring(pct, label, sub, cls) {
+      var r = 34, c = 2 * Math.PI * r, off = c * (1 - Math.max(0, Math.min(100, pct)) / 100);
+      return '<div class="j-tile" style="display:flex;flex-direction:column;align-items:center;gap:8px">' +
+        '<div class="j-ring ' + (cls || "") + '"><svg width="84" height="84">' +
+        '<circle class="track" cx="42" cy="42" r="' + r + '" fill="none" stroke-width="8"/>' +
+        '<circle class="fill" cx="42" cy="42" r="' + r + '" fill="none" stroke-width="8" stroke-dasharray="' + c + '" stroke-dashoffset="' + off + '"/>' +
+        '</svg><div class="j-ring-label">' + label + '<small>' + sub + '</small></div></div></div>';
+    }
+
+    /* ---------- HERO: Today's Plan ---------- */
+    function renderHero() {
+      var s = J.stats();
+      var n = s.currentDay;
+      var day = J.getDay(n);
+      var started = s.started;
+
+      if (!day) { el("hero-wrap").innerHTML = ""; return; }
+
+      var q = day.questions;
+      var revCount = day.revisions.length;
+
+      var html = '<div class="j-hero"><div class="j-hero-top">' +
+        '<div>' +
+        '<div class="j-day-badge">' + (started ? "Day " + n + " of 30" : "Preview · Day 1") + ' &nbsp;·&nbsp; Today\'s Plan</div>' +
+        '<h1>' + esc(day.primary.name) + '</h1>' +
+        '<div style="opacity:.9;font-size:14px">' + esc(day.primary.category) + ' · ' + esc(day.primary.level) +
+        ' &nbsp;·&nbsp; ~' + day.estimatedMinutes + ' min today</div>' +
+        '<p class="j-quote">“' + esc(day.quote) + '”</p>' +
+        '</div>' +
+        '<div class="j-hero-stats">' +
+        hs(day.patterns.length, "Patterns") +
+        hs(q.must.length + (q.stretch ? 1 : 0), "Problems") +
+        hs(revCount, "Revisions") +
+        hs(s.streak.current, "Day streak") +
+        '</div></div>' +
+        '<div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;position:relative;z-index:1">' +
+        (started
+          ? '<a class="j-btn" style="background:#fff;color:#4f46e5;border:none" href="pattern.html?p=' + day.primary.slug + '">▶ Study today\'s pattern</a>' +
+            '<button class="j-btn" style="background:rgba(255,255,255,.18);color:#fff;border:none" id="jump-today">↓ Open today in schedule</button>' +
+            '<a class="j-btn" style="background:rgba(255,255,255,.18);color:#fff;border:none" href="night-revision.html">🌙 Night revision</a>'
+          : '<button class="j-btn" style="background:#fff;color:#4f46e5;border:none;font-weight:700" id="start-journey">🚀 Start my 30-day journey</button>') +
+        '</div></div>';
+
+      el("hero-wrap").innerHTML = html;
+
+      if (!started) {
+        el("start-journey").onclick = function () { J.startJourney(); toast("Journey started — good luck! +5 XP"); renderAll(); };
+      } else {
+        var jt = el("jump-today");
+        if (jt) jt.onclick = function () { openDay(n, true); };
+      }
+    }
+    function hs(n, l) { return '<div class="j-hs"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>'; }
+
+    /* ---------- DASHBOARD ---------- */
+    function renderDashboard() {
+      var s = J.stats();
+      var dayPct = Math.round((s.daysDone / J.TOTAL_DAYS) * 100);
+      var patPct = Math.round((s.patternsDone / (window.DSA_PATTERNS.length || 100)) * 100);
+      el("dash-rings").innerHTML =
+        ring(dayPct, s.daysDone + "/30", "Days", "") +
+        ring(patPct, s.patternsDone, "Patterns", "green") +
+        ring(Math.min(100, s.consistency), s.consistency + "%", "Consistency", "amber") +
+        '<div class="j-tile"><div class="big">' + s.solved + '</div><div class="lbl">Problems Solved</div>' +
+        '<div class="sub">' + s.revisionDue + ' revisions due today</div></div>';
+
+      var lv = s.level;
+      el("level-card").innerHTML =
+        '<div class="j-level">' +
+        '<div class="badge-lvl">' + lv.level.icon + '</div>' +
+        '<div class="lvl-meta">' +
+        '<div class="lvl-name">' + lv.level.name + ' · ' + s.xp + ' XP</div>' +
+        '<div class="j-xpbar"><span style="width:' + lv.pct + '%"></span></div>' +
+        '<div class="j-muted">' + (lv.next ? (lv.toNext + " XP to " + lv.next.name + " " + lv.next.icon) : "Max level reached 🏆") + '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:22px;text-align:center">' +
+        '<div><div style="font-weight:800;font-size:18px">🔥 ' + s.streak.current + '</div><div class="j-muted">Streak</div></div>' +
+        '<div><div style="font-weight:800;font-size:18px">🏅 ' + s.streak.longest + '</div><div class="j-muted">Longest</div></div>' +
+        '<div><div style="font-weight:800;font-size:18px">⚡ ' + s.weeklyXp + '</div><div class="j-muted">Wk XP</div></div>' +
+        '</div></div>';
+    }
+
+    // GitHub-style heatmap of the last 105 days (15 weeks) using XP history.
+    function renderHeatmap() {
+      var hist = {};
+      try { hist = (JSON.parse(localStorage.getItem("dsa-journey")) || {}).history || {}; } catch (e) {}
+      var cells = "";
+      var DAYS = 105;
+      var now = new Date();
+      for (var i = DAYS - 1; i >= 0; i--) {
+        var d = new Date(now); d.setDate(now.getDate() - i);
+        var iso = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+        var xp = (hist[iso] && hist[iso].xp) || 0;
+        var lvl = xp === 0 ? 0 : xp < 20 ? 1 : xp < 45 ? 2 : xp < 80 ? 3 : 4;
+        cells += '<div class="j-heat-cell" data-l="' + lvl + '" title="' + iso + ' · ' + xp + ' XP"></div>';
+      }
+      el("heatmap").innerHTML = cells;
+    }
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+    function renderWeeklyBars() {
+      var hist = {};
+      try { hist = (JSON.parse(localStorage.getItem("dsa-journey")) || {}).history || {}; } catch (e) {}
+      var names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      var now = new Date();
+      var vals = [];
+      for (var i = 6; i >= 0; i--) {
+        var d = new Date(now); d.setDate(now.getDate() - i);
+        var iso = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+        vals.push({ name: names[d.getDay()], xp: (hist[iso] && hist[iso].xp) || 0 });
+      }
+      var max = Math.max(30, Math.max.apply(null, vals.map(function (v) { return v.xp; })));
+      el("weekly-bars").innerHTML = vals.map(function (v) {
+        var h = Math.round((v.xp / max) * 100);
+        return '<div class="j-bar-col"><div class="j-bar-val">' + v.xp + '</div>' +
+          '<div class="j-bar" style="height:' + h + '%"></div>' +
+          '<div class="j-bar-lbl">' + v.name + '</div></div>';
+      }).join("");
+    }
+
+    /* ---------- 30-DAY TIMELINE ---------- */
+    function renderTimeline() {
+      var plan = J.getPlan();
+      var cur = J.currentDayNumber();
+      var started = J.isStarted();
+      var html = plan.map(function (pd) {
+        var n = pd.day;
+        var done = J.isDayComplete(n);
+        var isCur = started && n === cur;
+        var day = J.getDay(n);
+        var qCount = day.questions.must.length + (day.questions.stretch ? 1 : 0);
+        var cls = "j-tl-day" + (done ? " done" : "") + (isCur ? " current" : "");
+        return '<div class="' + cls + '" data-day="' + n + '">' +
+          '<div class="j-tl-dot"></div>' +
+          '<div class="j-tl-head" data-toggle="' + n + '">' +
+          '<span class="j-tl-daynum">Day ' + n + '</span>' +
+          '<span class="j-tl-title">' + esc(pd.primary.name) +
+          '<small>' + esc(pd.primary.category) + (pd.secondary.length ? " · +" + pd.secondary.length + " more" : "") + '</small></span>' +
+          '<span class="j-tl-meta">' + (done ? "✅ done" : "~" + day.estimatedMinutes + "m · " + qCount + "Q · " + day.revisions.length + "↻") + '</span>' +
+          '<span class="j-tl-caret">▸</span>' +
+          '</div>' +
+          '<div class="j-tl-body" data-body="' + n + '"></div>' +
+          '</div>';
+      }).join("");
+      el("timeline").innerHTML = html;
+
+      // wire header toggles
+      el("timeline").querySelectorAll("[data-toggle]").forEach(function (h) {
+        h.addEventListener("click", function () { openDay(+h.getAttribute("data-toggle")); });
+      });
+    }
+
+    var _open = {};
+    function openDay(n, scroll) {
+      var wrap = el("timeline").querySelector('.j-tl-day[data-day="' + n + '"]');
+      if (!wrap) return;
+      var body = wrap.querySelector('[data-body="' + n + '"]');
+      var isOpen = wrap.classList.contains("open");
+      if (isOpen) { wrap.classList.remove("open"); _open[n] = false; return; }
+      body.innerHTML = renderDayDetail(n);
+      wireDayDetail(body, n);
+      wrap.classList.add("open"); _open[n] = true;
+      if (scroll) wrap.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function renderDayDetail(n) {
+      var day = J.getDay(n);
+      var p = day.primary;
+      var reflection = J.getReflection(n);
+      var ts = J.taskState(n);
+      var out = "";
+
+      // ---- checklist / tasks ----
+      out += '<div class="j-card" style="margin-bottom:12px">';
+      out += taskRow(n, "warmup", "🔥", "Warm-up recap", "5-min quick recap of " + esc(p.name) + " on the pattern page.", ts.warmup, 5,
+        '<a class="j-btn small" href="pattern.html?p=' + p.slug + '#2-recognition-signals">Open recap</a>');
+      out += taskRow(n, "pattern", "🎯", "Study today's pattern", esc(p.name) + " — read overview → optimal approach → templates.", ts.pattern, 20,
+        '<a class="j-btn small primary" href="pattern.html?p=' + p.slug + '">Study pattern</a>');
+      out += taskRow(n, "listen", "🎧", "Listen mode", "Hear the 2-minute audio summary while you commute.", ts.listen, 10,
+        '<a class="j-btn small" href="pattern.html?p=' + p.slug + '#listen">Listen</a>');
+      out += taskRow(n, "watch", "🎥", "Watch a free video", "Best free explainer for " + esc(p.name) + ".", ts.watch, 5,
+        '<a class="j-btn small" href="pattern.html?p=' + p.slug + '#resources">Watch</a>');
+      out += '</div>';
+
+      // ---- recognition quiz link ----
+      out += '<div class="j-card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">' +
+        '<div><strong>🧠 Recognition quiz</strong><div class="j-muted">3 quick questions on today\'s patterns.</div></div>' +
+        '<a class="j-btn small" href="night-revision.html#quiz">Take quiz</a></div>';
+
+      // ---- secondary patterns ----
+      if (day.secondary.length) {
+        out += '<div class="j-card" style="margin-bottom:12px"><strong>Also covered today</strong><div class="j-tag-row" style="margin-top:8px">' +
+          day.secondary.map(function (sp) {
+            return '<a class="j-tag" style="text-decoration:none" href="pattern.html?p=' + sp.slug + '">' + esc(sp.name) + '</a>';
+          }).join("") + '</div></div>';
+      }
+
+      // ---- revisions due (spaced repetition) ----
+      out += '<div class="j-section-title" style="font-size:15px"><span class="bar"></span>🔁 Revision due today (' + day.revisions.length + ')</div>';
+      if (!day.revisions.length) {
+        out += '<div class="j-muted" style="margin-bottom:12px">No spaced-repetition revisions scheduled for day ' + n + '. Enjoy the lighter load!</div>';
+      } else {
+        day.revisions.forEach(function (r) { out += revCard(n, r); });
+      }
+
+      // ---- questions ----
+      out += '<div class="j-section-title" style="font-size:15px"><span class="bar"></span>💻 Today\'s problems</div>';
+      day.questions.must.forEach(function (q, i) { out += problemCard(q, "Must solve #" + (i + 1)); });
+      if (day.questions.stretch) out += problemCard(day.questions.stretch, "🚀 Stretch goal (optional)");
+
+      // ---- reflection ----
+      out += '<div class="j-section-title" style="font-size:15px"><span class="bar"></span>📝 Reflection</div>' +
+        '<div class="j-card" style="margin-bottom:12px">' +
+        reflField(n, "learned", "What did I learn today?", reflection.learned) +
+        reflField(n, "confused", "What confused me?", reflection.confused) +
+        reflField(n, "revise", "What should I revise tomorrow?", reflection.revise) +
+        '<button class="j-btn small primary" data-save-reflect="' + n + '" style="margin-top:8px">Save reflection (+10 XP)</button>' +
+        '</div>';
+
+      // ---- complete day ----
+      var done = J.isDayComplete(n);
+      out += '<button class="j-btn ' + (done ? "success" : "primary") + '" data-complete="' + n + '" style="width:100%;justify-content:center;padding:13px">' +
+        (done ? "✅ Day " + n + " complete — click to undo" : "Mark Day " + n + " complete (+40 XP)") + '</button>';
+
+      return out;
+    }
+
+    function taskRow(day, key, icon, title, sub, checked, xp, actions) {
+      return '<div class="j-task">' +
+        '<span class="j-check ' + (checked ? "checked" : "") + '" data-task="' + key + '" data-day="' + day + '" data-xp="' + xp + '">' + (checked ? "✓" : "") + '</span>' +
+        '<span class="j-task-icon">' + icon + '</span>' +
+        '<div class="j-task-body"><div class="j-task-title ' + (checked ? "done" : "") + '">' + title + '</div>' +
+        '<div class="j-task-sub">' + sub + '</div>' +
+        '<div class="j-task-actions">' + (actions || "") + '</div></div></div>';
+    }
+
+    function revCard(day, r) {
+      var c = J.revisionCard(r.pattern.slug);
+      var done = J.isRevised(r.pattern.slug, r.stage);
+      var recog = c.recognition.slice(0, 3).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("");
+      var mistakes = c.mistakes.slice(0, 2).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("");
+      return '<div class="j-revcard">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">' +
+        '<div><span class="stage">Revision ' + r.stage + ' · +' + r.interval + 'd</span>' +
+        '<h4>' + esc(c.name) + '</h4></div>' +
+        '<span class="j-check ' + (done ? "checked" : "") + '" data-rev="' + r.pattern.slug + '" data-stage="' + r.stage + '">' + (done ? "✓" : "") + '</span>' +
+        '</div>' +
+        (c.oneLiner ? '<div class="j-rev-field"><span class="k">One-minute revision</span>' + esc(c.oneLiner) + '</div>' : "") +
+        (recog ? '<div class="j-rev-field"><span class="k">Recognition signals</span><ul>' + recog + '</ul></div>' : "") +
+        '<div class="j-rev-field"><span class="k">Complexity</span>' + esc(c.complexity) + '</div>' +
+        '<div class="j-rev-field"><span class="k">Key formula</span>' + esc(c.formula) + '</div>' +
+        (mistakes ? '<div class="j-rev-field"><span class="k">Top mistakes</span><ul>' + mistakes + '</ul></div>' : "") +
+        '<a class="j-btn small" style="margin-top:6px" href="pattern.html?p=' + r.pattern.slug + '#15-revision-notes">Full revision →</a>' +
+        '</div>';
+    }
+
+    function problemCard(q, badge) {
+      var solved = J.isSolved(q.id);
+      var saved = J.isSavedProblem(q.id);
+      return '<div class="j-problem">' +
+        '<div class="j-problem-head">' +
+        (q.num ? '<span class="num">#' + q.num + '</span>' : "") +
+        '<h4>' + esc(q.title) + '</h4>' +
+        '<span class="j-pill ' + diffClass(q.difficulty) + '">' + q.difficulty + '</span>' +
+        '<span class="j-pill ghost">' + badge + '</span>' +
+        '</div>' +
+        '<div class="j-problem-metrics">' +
+        '<span>✅ Acc <b>' + q.acceptance + '</b></span>' +
+        '<span>⏱ <b>' + q.estTime + ' min</b></span>' +
+        '<span>🎯 <b>' + esc(q.pattern) + '</b></span>' +
+        '</div>' +
+        '<div class="j-tag-row">' + q.companies.map(function (c) { return '<span class="j-company">' + esc(c) + '</span>'; }).join("") + '</div>' +
+        '<details><summary>Why this matters · hints · complexity · mistakes</summary>' +
+        '<div class="j-detail-block"><strong>Why it matters:</strong> ' + esc(q.why) + '</div>' +
+        '<div class="j-detail-block"><strong>Expected complexity:</strong> ' + esc(q.complexity) + '</div>' +
+        '<div class="j-detail-block"><strong>Hint:</strong> Ask “which pattern fits?” before coding — this is a ' + esc(q.pattern) + ' problem.</div>' +
+        '<div class="j-detail-block"><strong>Common mistakes:</strong> off-by-one bounds, unhandled empty input, and forgetting to update state when the window/pointer moves.</div>' +
+        '<div class="j-detail-block"><strong>When to revisit:</strong> ' + esc(q.revisit) + '</div>' +
+        '</details>' +
+        '<div class="j-task-actions" style="margin-top:10px">' +
+        '<a class="j-btn small" href="' + q.url + '" target="_blank" rel="noopener">Open on LeetCode ↗</a>' +
+        '<button class="j-btn small ' + (solved ? "success" : "") + '" data-solve="' + q.id + '">' + (solved ? "✓ Solved" : "Mark solved (+30)") + '</button>' +
+        '<button class="j-btn small" data-save="' + q.id + '">' + (saved ? "★ Saved" : "☆ Save") + '</button>' +
+        '</div></div>';
+    }
+
+    function reflField(day, key, label, val) {
+      return '<label class="j-muted" style="display:block;margin:6px 0 3px">' + label + '</label>' +
+        '<textarea class="j-textarea" data-reflect="' + key + '" data-day="' + day + '">' + esc(val || "") + '</textarea>';
+    }
+
+    function wireDayDetail(body, n) {
+      // task checkboxes
+      body.querySelectorAll("[data-task]").forEach(function (c) {
+        c.addEventListener("click", function () {
+          var on = J.toggleTask(+c.getAttribute("data-day"), c.getAttribute("data-task"), +c.getAttribute("data-xp"));
+          if (on) toast("Nice! +" + c.getAttribute("data-xp") + " XP");
+          refreshSoft(n);
+        });
+      });
+      // revision checkboxes
+      body.querySelectorAll("[data-rev]").forEach(function (c) {
+        c.addEventListener("click", function () {
+          var on = J.markRevised(c.getAttribute("data-rev"), +c.getAttribute("data-stage"));
+          if (on) toast("Revision done! +10 XP");
+          refreshSoft(n);
+        });
+      });
+      // solve / save
+      body.querySelectorAll("[data-solve]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var on = J.toggleSolved(b.getAttribute("data-solve"));
+          toast(on ? "Solved! +30 XP 🎉" : "Marked unsolved");
+          refreshSoft(n);
+        });
+      });
+      body.querySelectorAll("[data-save]").forEach(function (b) {
+        b.addEventListener("click", function () { J.toggleSavedProblem(b.getAttribute("data-save")); refreshSoft(n); });
+      });
+      // reflection save
+      var saveBtn = body.querySelector("[data-save-reflect]");
+      if (saveBtn) saveBtn.addEventListener("click", function () {
+        var obj = {};
+        body.querySelectorAll("[data-reflect]").forEach(function (t) { obj[t.getAttribute("data-reflect")] = t.value.trim(); });
+        J.setReflection(n, obj); toast("Reflection saved 📝 +10 XP"); renderDashTop();
+      });
+      // complete day
+      var cb = body.querySelector("[data-complete]");
+      if (cb) cb.addEventListener("click", function () {
+        var done = J.completeDay(n);
+        toast(done ? "Day " + n + " complete! +40 XP 🔥" : "Day reopened");
+        renderTimeline(); // refresh dots/meta
+        renderDashTop();
+        // keep this day open
+        openDay(n, false); openDay(n, false);
+        setTimeout(function () { openDay(n, true); }, 0);
+      });
+    }
+
+    // Re-render just the open day's body in place (keeps scroll).
+    function refreshSoft(n) {
+      var body = el("timeline").querySelector('[data-body="' + n + '"]');
+      if (body && body.closest(".j-tl-day").classList.contains("open")) {
+        body.innerHTML = renderDayDetail(n);
+        wireDayDetail(body, n);
+      }
+      renderDashTop();
+    }
+    function renderDashTop() { renderHero(); renderDashboard(); renderHeatmap(); renderWeeklyBars(); }
+
+    /* ---------- FINAL REPORT (Feature 21) ---------- */
+    function renderReport() {
+      var s = J.stats();
+      // Show once the user is on/after day 30 OR has completed all 30 days.
+      if (!s.started || (s.currentDay < J.TOTAL_DAYS && s.daysDone < J.TOTAL_DAYS)) {
+        el("report-wrap").innerHTML = ""; return;
+      }
+      var readiness = J.interviewReadiness();
+      var cats = J.categoryInsights();
+      var strong = cats.slice(0, 3), weak = cats.slice(-3).reverse();
+      el("report-wrap").innerHTML =
+        '<div class="j-card" style="margin-top:20px;border:2px solid var(--accent)">' +
+        '<div class="j-section-title" style="margin-top:0"><span class="bar"></span>🎓 30-Day Progress Report</div>' +
+        '<div class="j-grid cols-3">' +
+        '<div class="j-tile"><div class="big">' + readiness + '%</div><div class="lbl">Interview Readiness</div></div>' +
+        '<div class="j-tile"><div class="big">' + s.patternsDone + '/100</div><div class="lbl">Pattern Mastery</div></div>' +
+        '<div class="j-tile"><div class="big">' + s.solved + '</div><div class="lbl">Problems Solved</div></div>' +
+        '</div>' +
+        '<div class="j-grid cols-2" style="margin-top:14px">' +
+        '<div><strong>💪 Strongest categories</strong><ul class="j-muted">' + strong.map(function (c) { return '<li>' + esc(c.name) + ' — ' + c.pct + '%</li>'; }).join("") + '</ul></div>' +
+        '<div><strong>📌 Focus next</strong><ul class="j-muted">' + weak.map(function (c) { return '<li>' + esc(c.name) + ' — ' + c.pct + '%</li>'; }).join("") + '</ul></div>' +
+        '</div>' +
+        '<p class="j-muted" style="margin-top:12px">Recommended next 30-day plan: deepen your weak categories above with a Hard problem each day, and keep the spaced-repetition revisions running. Reset the schedule below to begin round two.</p>' +
+        '<button class="j-btn" id="reset-journey">↻ Start a fresh 30 days (keeps XP & streak)</button>' +
+        '</div>';
+      var rb = el("reset-journey");
+      if (rb) rb.onclick = function () { if (confirm("Restart the 30-day schedule? Your XP, streak and solved problems are kept.")) { J.resetJourney(); renderAll(); } };
+    }
+
+    /* ---------- keyboard shortcuts ---------- */
+    document.addEventListener("keydown", function (e) {
+      if (/input|textarea|select/i.test((e.target.tagName || ""))) return;
+      if (e.key === "t" || e.key === "T") { openDay(J.currentDayNumber(), true); }
+      if (e.key === "n" || e.key === "N") { location.href = "night-revision.html"; }
+    });
+
+    // ---- Notifications toggle (Feature 17) ----
+    function renderNotify() {
+      var btn = el("notify-toggle");
+      if (!J.notifySupported()) { btn.style.display = "none"; return; }
+      btn.textContent = J.notifyEnabled() ? "🔔 Reminders on" : "🔕 Enable reminders";
+      btn.onclick = function () {
+        if (J.notifyEnabled()) { J.setPref("notify", false); renderNotify(); toast("Reminders off"); }
+        else J.requestNotify().then(function (ok) { renderNotify(); if (ok) { toast("Reminders enabled"); J.runReminders(); } });
+      };
+    }
+
+    function renderAll() { renderHero(); renderDashboard(); renderHeatmap(); renderWeeklyBars(); renderReport(); renderTimeline(); renderNotify(); }
+    renderAll();
+    J.runReminders();
+    // auto-open today's plan on first load
+    if (J.isStarted()) setTimeout(function () { openDay(J.currentDayNumber(), false); }, 60);
+  })();
+  </script>
+</body>
+</html>

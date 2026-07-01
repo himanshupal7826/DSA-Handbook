@@ -76,6 +76,9 @@
     });
 
     html += '<div style="margin-top:18px;padding:0 8px">' +
+      '<a class="nav-link" href="journey.html">📅 30-Day Journey</a>' +
+      '<a class="nav-link" href="night-revision.html">🌙 Night Revision</a>' +
+      '<a class="nav-link" href="interview.html">🎤 Interview Mode</a>' +
       '<a class="nav-link" href="view.html?f=roadmap/000-ROADMAP.md">🗺️ Full Roadmap</a>' +
       '<a class="nav-link" href="pattern-selector.html">🧭 Pattern Selector</a>' +
       '<a class="nav-link" href="dsa.html#dashboard">📊 Progress Dashboard</a>' +

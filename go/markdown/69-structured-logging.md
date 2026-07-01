@@ -1,19 +1,19 @@
-# 69 · Structured Logging
+# 69 - Structured Logging
 
-> **In one line:** log/slog, JSON logs, correlation IDs, and log-based observability.
+Structured logging is a technique where log messages are output in a structured format, such as JSON, rather than as plain, unstructured text. This allows log aggregation systems (like ELK stack, Grafana Loki, etc.) to easily parse, index, and query logs based on specific fields.
 
----
+## Why Use Structured Logging?
 
-## 1. Overview
+1.  **Queryability:** Instead of searching for a string like `"User ID 123 failed login"`, you can query for `level: "error" AND user_id: 123`.
+2.  **Consistency:** It enforces a consistent schema across all log entries, making parsing reliable.
+3.  **Machine Readability:** It is inherently designed for consumption by machines.
 
-log/slog, JSON logs, correlation IDs, and log-based observability.
+## Implementing Structured Logging in Go
 
-## 9. Quick Revision
+While Go's standard `log` package produces unstructured output, external libraries are used to achieve structured logging. The most popular choices include `zap`, `zerolog`, and `logrus`.
 
-log/slog, JSON logs, correlation IDs, and log-based observability.
+### Example using Zerolog
 
-**References:** log/slog docs
+`zerolog` is known for its high performance and minimal overhead.
 
----
-
-*Go Engineering Handbook — topic 69.*
+**Installation:**

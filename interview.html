@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interview Mode — DSA Patterns Handbook</title>
+  <meta name="description" content="Simulate a coding interview: random pattern + problem, timer, staged hints, self-rating and notes.">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/journey.css">
+  <link rel="icon" type="image/png" href="assets/images/03_favicon.png">
+  <script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+</head>
+<body>
+  <header class="topbar" id="topbar"></header>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="layout">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <main class="main">
+      <section class="j-hero" style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 55%,#334155 100%)">
+        <div class="j-hero-top"><div>
+          <div class="j-day-badge">🎤 Interview Mode</div>
+          <h1>Mock coding interview</h1>
+          <p class="j-quote">Random pattern, random problem, a ticking clock and staged hints — just like the real thing. Rate yourself honestly to feed your insights.</p>
+        </div>
+        <div class="j-hero-stats" id="iv-stats"></div>
+        </div>
+      </section>
+
+      <div class="chips" style="margin-top:18px">
+        <button class="chip" id="iv-new" style="background:var(--accent);color:#fff;border-color:var(--accent)">🎲 New random question</button>
+        <button class="chip" id="iv-mode">Difficulty: Any</button>
+        <a class="chip" href="journey.html">← Back to Journey</a>
+      </div>
+
+      <div id="iv-panel" style="margin-top:16px"></div>
+    </main>
+  </div>
+
+  <div class="j-toast" id="toast"></div>
+
+  <script src="assets/js/patterns-data.js"></script>
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/progress.js"></script>
+  <script src="assets/js/search.js"></script>
+  <script src="assets/js/markdown.js"></script>
+  <script src="assets/js/content.js" onerror="window.DSA_CONTENT=window.DSA_CONTENT||{}"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/journey.js"></script>
+  <script>
+  (function () {
+    DSAApp.initChrome(null);
+    var J = window.DSAJourney;
+    var el = function (id) { return document.getElementById(id); };
+    function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+    var toastTimer;
+    function toast(m) { var t = el("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove("show"); }, 1600); }
+
+    var MODES = ["Any", "Easy", "Medium", "Hard"];
+    var modeIdx = 0;
+    var HIST_KEY = "dsa-interview-log";
+    function loadLog() { try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; } catch (e) { return []; } }
+    function saveLog(l) { localStorage.setItem(HIST_KEY, JSON.stringify(l)); }
+
+    var session = null;  // {pattern, question, startMs, revealedHints, timerId, elapsed}
+
+    function pick() {
+      var all = window.DSA_PATTERNS;
+      // pick a random pattern, then a problem from it matching the mode
+      var candidates = [];
+      all.forEach(function (p) {
+        J.problemsFor(p).forEach(function (q) {
+          if (MODES[modeIdx] === "Any" || q.difficulty === MODES[modeIdx]) candidates.push({ p: p, q: q });
+        });
+      });
+      if (!candidates.length) candidates = all.map(function (p) { return { p: p, q: J.problemsFor(p)[0] }; }).filter(function (x) { return x.q; });
+      var choice = candidates[Math.floor(Math.random() * candidates.length)];
+      session = {
+        pattern: choice.p, question: choice.q,
+        startMs: Date.now(), revealed: 0, elapsed: 0, timerId: null, running: true, rating: 0
+      };
+      startTimer();
+      render();
+    }
+
+    function startTimer() {
+      stopTimer();
+      session.timerId = setInterval(function () {
+        if (!session.running) return;
+        session.elapsed = Math.floor((Date.now() - session.startMs) / 1000);
+        updateTimer();
+      }, 1000);
+    }
+    function stopTimer() { if (session && session.timerId) { clearInterval(session.timerId); session.timerId = null; } }
+    function fmt(s) { var m = Math.floor(s / 60), r = s % 60; return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r; }
+    function updateTimer() {
+      var t = el("iv-timer"); if (!t) return;
+      t.textContent = fmt(session.elapsed);
+      var budget = (session.question.estTime || 30) * 60;
+      t.className = "j-timer" + (session.elapsed > budget ? " over" : session.elapsed > budget * 0.75 ? " warn" : "");
+    }
+
+    function hints(q, p) {
+      return [
+        "Identify the pattern: which of the 100 does this smell like? (It's " + p.category + ".)",
+        "Brute force first: what's the naive O(n²)/exponential solution? State it out loud.",
+        "The pattern move: " + J.keyFormula(p),
+        "Target complexity: " + q.complexity + " Watch the edge cases: empty input, single element, duplicates."
+      ];
+    }
+
+    function render() {
+      if (!session) { el("iv-panel").innerHTML = '<div class="j-empty"><span class="ico">🎤</span>Click “New random question” to begin a mock interview.</div>'; return; }
+      var q = session.question, p = session.pattern;
+      el("iv-panel").innerHTML =
+        '<div class="j-card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">' +
+        '<div><span class="j-pill ' + (q.difficulty === "Easy" ? "easy" : q.difficulty === "Medium" ? "medium" : "hard") + '">' + q.difficulty + '</span> ' +
+        '<span class="j-pill ghost">' + esc(p.category) + '</span></div>' +
+        '<div class="j-timer" id="iv-timer">00:00</div>' +
+        '</div>' +
+        '<h2 style="margin:12px 0 4px">' + (q.num ? "#" + q.num + " · " : "") + esc(q.title) + '</h2>' +
+        '<div class="j-muted">Governing pattern: <a href="pattern.html?p=' + p.slug + '">' + esc(p.name) + '</a> · Budget ~' + q.estTime + ' min · Acc ' + q.acceptance + '</div>' +
+        '<div class="j-tag-row" style="margin-top:8px">' + q.companies.map(function (c) { return '<span class="j-company">' + esc(c) + '</span>'; }).join("") + '</div>' +
+
+        '<div style="display:flex;gap:8px;margin:16px 0;flex-wrap:wrap">' +
+        '<button class="j-btn" id="iv-pause">⏸ Pause</button>' +
+        '<button class="j-btn" id="iv-hint">💡 Reveal hint (' + session.revealed + '/4)</button>' +
+        '<a class="j-btn" href="' + q.url + '" target="_blank" rel="noopener">Open on LeetCode ↗</a>' +
+        '<button class="j-btn" id="iv-solution">👁 Reveal approach</button>' +
+        '</div>' +
+
+        '<div id="iv-hints"></div>' +
+        '<div id="iv-solution-box"></div>' +
+
+        '<label class="j-muted" style="display:block;margin:14px 0 4px">📝 Your notes / scratchpad</label>' +
+        '<textarea class="j-textarea" id="iv-notes" style="min-height:120px" placeholder="Approach, complexity, edge cases…"></textarea>' +
+
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px">' +
+        '<div><div class="j-muted" style="margin-bottom:4px">Self-rating</div><div class="j-rating" id="iv-rating">' +
+        [1, 2, 3, 4, 5].map(function (i) { return '<span class="j-star" data-star="' + i + '">★</span>'; }).join("") + '</div></div>' +
+        '<button class="j-btn primary" id="iv-finish">✔ Finish & log</button>' +
+        '</div></div>' +
+
+        logView();
+
+      wire();
+      updateTimer();
+    }
+
+    function logView() {
+      var log = loadLog().slice(-8).reverse();
+      if (!log.length) return "";
+      return '<h2 class="j-section-title"><span class="bar"></span>Recent mock sessions</h2>' +
+        '<div class="j-card"><ul class="j-res-list">' + log.map(function (e) {
+          return '<li><span class="r-ico">' + (e.rating >= 4 ? "🟢" : e.rating >= 2 ? "🟡" : "🔴") + '</span>' +
+            '<div style="flex:1"><strong>' + esc(e.title) + '</strong> <span class="j-muted">· ' + esc(e.pattern) + ' · ' + fmt(e.time) + ' · ' + "★".repeat(e.rating) + '</span></div></li>';
+        }).join("") + '</ul></div>';
+    }
+
+    function wire() {
+      el("iv-pause").onclick = function () {
+        session.running = !session.running;
+        if (session.running) { session.startMs = Date.now() - session.elapsed * 1000; }
+        el("iv-pause").textContent = session.running ? "⏸ Pause" : "▶ Resume";
+      };
+      el("iv-hint").onclick = function () {
+        var hs = hints(session.question, session.pattern);
+        if (session.revealed >= hs.length) return;
+        session.revealed++;
+        el("iv-hint").textContent = "💡 Reveal hint (" + session.revealed + "/4)";
+        el("iv-hints").innerHTML = hs.slice(0, session.revealed).map(function (h, i) {
+          return '<div class="j-revcard" style="border-left-color:var(--amber)"><span class="stage">Hint ' + (i + 1) + '</span><div style="margin-top:4px">' + esc(h) + '</div></div>';
+        }).join("");
+      };
+      el("iv-solution").onclick = function () {
+        var c = J.revisionCard(session.pattern.slug);
+        el("iv-solution-box").innerHTML =
+          '<div class="j-revcard"><h4>Approach — ' + esc(session.pattern.name) + '</h4>' +
+          '<div class="j-rev-field"><span class="k">Core move</span>' + esc(c.formula) + '</div>' +
+          '<div class="j-rev-field"><span class="k">Complexity</span>' + esc(c.complexity) + '</div>' +
+          '<a class="j-btn small" href="pattern.html?p=' + session.pattern.slug + '#4-optimal-approach">Full solution →</a></div>';
+      };
+      el("iv-rating").querySelectorAll("[data-star]").forEach(function (st) {
+        st.onclick = function () {
+          session.rating = +st.getAttribute("data-star");
+          el("iv-rating").querySelectorAll("[data-star]").forEach(function (s2) {
+            s2.classList.toggle("on", +s2.getAttribute("data-star") <= session.rating);
+          });
+        };
+      });
+      el("iv-finish").onclick = function () {
+        stopTimer();
+        var log = loadLog();
+        log.push({
+          title: session.question.title, pattern: session.pattern.name,
+          slug: session.pattern.slug, time: session.elapsed,
+          rating: session.rating || 1, hints: session.revealed,
+          notes: (el("iv-notes").value || "").slice(0, 500)
+        });
+        saveLog(log);
+        J.awardXP("interview:" + Date.now(), 25, "Completed mock interview");
+        // a strong self-rating nudges the pattern's revision status
+        if (session.rating >= 4 && window.DSAProgress) window.DSAProgress.setRevision(session.pattern.slug, "mastered");
+        toast("Session logged · +25 XP");
+        session = null;
+        renderStats();
+        render();
+      };
+    }
+
+    function renderStats() {
+      var log = loadLog();
+      var avg = log.length ? Math.round(log.reduce(function (a, e) { return a + e.time; }, 0) / log.length) : 0;
+      var avgRating = log.length ? (log.reduce(function (a, e) { return a + e.rating; }, 0) / log.length).toFixed(1) : "—";
+      el("iv-stats").innerHTML =
+        '<div class="j-hs"><div class="n">' + log.length + '</div><div class="l">Sessions</div></div>' +
+        '<div class="j-hs"><div class="n">' + (avg ? fmt(avg) : "—") + '</div><div class="l">Avg time</div></div>' +
+        '<div class="j-hs"><div class="n">' + avgRating + '</div><div class="l">Avg rating</div></div>' +
+        '<div class="j-hs"><div class="n">' + J.interviewReadiness() + '%</div><div class="l">Readiness</div></div>';
+    }
+
+    el("iv-new").onclick = pick;
+    el("iv-mode").onclick = function () { modeIdx = (modeIdx + 1) % MODES.length; el("iv-mode").textContent = "Difficulty: " + MODES[modeIdx]; };
+
+    renderStats();
+    render();
+  })();
+  </script>
+</body>
+</html>
