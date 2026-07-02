@@ -27,6 +27,7 @@
 <script src="../assets/js/hb-progress.js"></script>
 <script src="../assets/js/hb-search.js"></script>
 <script src="../assets/js/markdown.js"></script>
+<script src="../assets/js/hb-listen.js"></script>
 <script src="content.js" onerror="window.HANDBOOK_CONTENT=window.HANDBOOK_CONTENT||{}"></script>
 <script src="../assets/js/hb-engine.js"></script>
 <script>
@@ -57,6 +58,7 @@ if(!topic){
     var c=document.getElementById("content"); c.innerHTML=DSAMarkdown.render(md);
     var toc=DSAMarkdown.buildTOC(c); if(toc){var h1=c.querySelector("h1"); if(h1) h1.insertAdjacentHTML("afterend",toc);}
     DSAMarkdown.wire(c);
+    if(window.DSAListen) DSAListen.attach(c);
     if(location.hash){var t=document.getElementById(location.hash.slice(1)); if(t) setTimeout(function(){t.scrollIntoView();},60);}
   }).catch(function(){
     document.getElementById("content").innerHTML='<h1>'+DSAApp.pad(topic.id)+". "+topic.name+'</h1>'+

@@ -14,6 +14,7 @@ ENGINE_SCRIPTS = ("\n".join([
     '<script src="../assets/js/hb-progress.js"></script>',
     '<script src="../assets/js/hb-search.js"></script>',
     '<script src="../assets/js/markdown.js"></script>',
+    '<script src="../assets/js/hb-listen.js"></script>',
     '<script src="content.js" onerror="window.HANDBOOK_CONTENT=window.HANDBOOK_CONTENT||{}"></script>',
     '<script src="../assets/js/hb-engine.js"></script>',
 ]))
@@ -115,6 +116,7 @@ __THEME__
     </div>
     <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
       <a class="btn primary" id="start-btn" href="#">▶ Start learning</a>
+      __EXTRANAV__
       <a class="btn" href="../index.html">⌂ All handbooks</a>
     </div>
   </section>
@@ -213,6 +215,7 @@ if(!topic){
     var c=document.getElementById("content"); c.innerHTML=DSAMarkdown.render(md);
     var toc=DSAMarkdown.buildTOC(c); if(toc){var h1=c.querySelector("h1"); if(h1) h1.insertAdjacentHTML("afterend",toc);}
     DSAMarkdown.wire(c);
+    if(window.DSAListen) DSAListen.attach(c);
     if(location.hash){var t=document.getElementById(location.hash.slice(1)); if(t) setTimeout(function(){t.scrollIntoView();},60);}
   }).catch(function(){
     document.getElementById("content").innerHTML='<h1>'+DSAApp.pad(topic.id)+". "+topic.name+'</h1>'+
@@ -273,11 +276,13 @@ def build(spec, root):
                 json.dumps(content, ensure_ascii=False) + ";\n")
 
     cats = len({it["category"] for it in spec["items"]})
+    extranav = "\n      ".join(
+        '<a class="btn" href="%s">%s</a>' % (n["href"], n["label"]) for n in spec.get("extraNav", []))
     def fill(t):
         return (t.replace("__NAME__", spec["name"]).replace("__ICON__", spec.get("icon", "📘"))
                  .replace("__TAGLINE__", spec.get("tagline", "")).replace("__COUNT__", str(len(spec["items"])))
                  .replace("__CATS__", str(cats)).replace("__THEME__", THEME_INLINE)
-                 .replace("__ENGINE__", ENGINE_SCRIPTS))
+                 .replace("__EXTRANAV__", extranav).replace("__ENGINE__", ENGINE_SCRIPTS))
     with open(os.path.join(hb_dir, "index.html"), "w", encoding="utf-8") as f:
         f.write(fill(INDEX_TMPL))
     with open(os.path.join(hb_dir, "topic.html"), "w", encoding="utf-8") as f:

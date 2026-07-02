@@ -348,3 +348,53 @@ a:hover { text-decoration: underline; }
   .hero h1 { font-size: 26px; }
   .pager a { max-width: 100%; }
 }
+
+/* ============================================================
+ * Diagrams — raw SVG passthrough (```svg blocks). The card is
+ * always light so fixed-palette diagrams read in both themes.
+ * ============================================================ */
+.content .diagram {
+  margin: 20px 0;
+  padding: 18px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+  text-align: center;
+}
+.content .diagram-inner { min-width: min-content; }
+.content .diagram svg { max-width: 100%; height: auto; display: inline-block; }
+
+/* ============================================================
+ * Listen mode player (hb-listen.js)
+ * ============================================================ */
+.listen-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 4px 0 20px; padding: 10px 14px;
+  background: var(--bg-alt); border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.listen-bar .listen-play { display: inline-flex; align-items: center; gap: 7px; }
+.listen-bar .listen-play .i { font-size: 12px; width: 1em; text-align: center; }
+.listen-bar .listen-play.is-playing { animation: listenPulse 1.6s ease-in-out infinite; }
+@keyframes listenPulse { 0%,100% { box-shadow: 0 0 0 0 var(--accent-soft); } 50% { box-shadow: 0 0 0 5px var(--accent-soft); } }
+.listen-bar .listen-stop { padding: 6px 12px; }
+.listen-prog { flex: 1 1 90px; min-width: 60px; height: 5px; background: var(--border); border-radius: 999px; overflow: hidden; }
+.listen-prog-fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }
+.listen-ctl { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--text-soft); }
+.listen-ctl select {
+  background: var(--bg-elev); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 4px 6px; font-size: 12.5px; max-width: 150px;
+}
+.content .listen-active {
+  background: var(--amber-bg);
+  box-shadow: -6px 0 0 0 var(--amber);
+  border-radius: 3px;
+  transition: background .2s ease;
+}
+@media (max-width: 640px) {
+  .listen-bar { border-radius: var(--radius); }
+  .listen-ctl select { max-width: 110px; }
+}
