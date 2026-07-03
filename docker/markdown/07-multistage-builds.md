@@ -147,7 +147,7 @@ Each stage builds in isolation. `COPY --from` reaches into a finished stage's fi
   <text x="180" y="254" text-anchor="middle" fill="#64748b">~11MB static binary</text>
   <text x="180" y="288" text-anchor="middle" fill="#b91c1c">everything else discarded ✗</text>
 
-  <!-- COPY --from arrow -->
+  <!-- COPY from builder -->
   <line x1="330" y1="240" x2="440" y2="200" stroke="#059669" stroke-width="2" marker-end="url(#m)"/>
   <text x="385" y="205" text-anchor="middle" fill="#059669" font-weight="600">COPY --from=builder</text>
 

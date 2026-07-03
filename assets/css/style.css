@@ -398,3 +398,17 @@ a:hover { text-decoration: underline; }
   .listen-bar { border-radius: var(--radius); }
   .listen-ctl select { max-width: 110px; }
 }
+
+/* "Watch" free-video button on topic pages */
+.page-actions .btn.watch { border-color: #ff000033; }
+.page-actions .btn.watch:hover { border-color: #ff0000; color: #ff0000; }
+
+/* "Learn from video" per-chapter CTA (below the H1 on topic pages) */
+.content .video-cta {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin: 4px 0 18px; padding: 9px 15px;
+  background: linear-gradient(135deg, #ff000010, transparent);
+  border: 1px solid #ff000033; border-radius: 999px;
+  color: var(--text); font-size: 13.5px; font-weight: 600;
+}
+.content .video-cta:hover { border-color: #ff0000; color: #ff0000; text-decoration: none; }

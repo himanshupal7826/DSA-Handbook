@@ -152,7 +152,7 @@ Same `docker stop`, wildly different behavior — decided entirely by whether PI
 
   <rect x="150" y="60" width="150" height="40" rx="8" fill="#fff7ed" stroke="#d97706"/>
   <text x="225" y="79" text-anchor="middle" fill="#1e293b">1. SIGTERM → PID 1</text>
-  <text x="225" y="94" text-anchor="middle" fill="#64748b" font-size="11">please drain & exit</text>
+  <text x="225" y="94" text-anchor="middle" fill="#64748b" font-size="11">please drain &amp; exit</text>
 
   <rect x="330" y="60" width="150" height="40" rx="8" fill="#eff6ff" stroke="#2563eb"/>
   <text x="405" y="79" text-anchor="middle" fill="#1e293b">2. wait grace (10s)</text>

@@ -200,12 +200,15 @@ if(!topic){
   document.getElementById("cat-tag").textContent=topic.category;
   (function(){
     var el=document.getElementById("page-actions");
+    var vq=encodeURIComponent(topic.name+" "+(HANDBOOK.videoTag||HANDBOOK.name)+" tutorial");
+    var vurl="https://www.youtube.com/results?search_query="+vq;
     function r(){
       var d=DSAProgress.isComplete(slug), m=DSAProgress.isBookmarked(slug), rv=DSAProgress.getRevision(slug);
       var rl={"new":"🔲 New",learning:"📖 Learning",mastered:"✅ Mastered"}[rv];
       el.innerHTML='<button class="btn '+(d?"done":"")+'" id="bd">'+(d?"✓ Completed":"Mark Complete")+'</button>'+
         '<button class="btn" id="bm">'+(m?"★ Bookmarked":"☆ Bookmark")+'</button>'+
-        '<button class="btn" id="br">'+rl+'</button>';
+        '<button class="btn" id="br">'+rl+'</button>'+
+        '<a class="btn watch" href="'+vurl+'" target="_blank" rel="noopener" title="Free videos for this topic on YouTube">📺 Watch</a>';
       document.getElementById("bd").onclick=function(){DSAProgress.toggleComplete(slug);r();};
       document.getElementById("bm").onclick=function(){DSAProgress.toggleBookmark(slug);r();};
       document.getElementById("br").onclick=function(){DSAProgress.cycleRevision(slug);r();};
@@ -214,6 +217,8 @@ if(!topic){
   DSAApp.loadContent(slug).then(function(md){
     var c=document.getElementById("content"); c.innerHTML=DSAMarkdown.render(md);
     var toc=DSAMarkdown.buildTOC(c); if(toc){var h1=c.querySelector("h1"); if(h1) h1.insertAdjacentHTML("afterend",toc);}
+    var _h1=c.querySelector("h1"); if(_h1){var _vq=encodeURIComponent(topic.name+" "+(HANDBOOK.videoTag||HANDBOOK.name)+" tutorial");
+      _h1.insertAdjacentHTML("afterend",'<a class="video-cta" href="https://www.youtube.com/results?search_query='+_vq+'" target="_blank" rel="noopener">🎥 Learn this chapter from free videos on YouTube →</a>');}
     DSAMarkdown.wire(c);
     if(window.DSAListen) DSAListen.attach(c);
     if(location.hash){var t=document.getElementById(location.hash.slice(1)); if(t) setTimeout(function(){t.scrollIntoView();},60);}
@@ -264,6 +269,7 @@ def build(spec, root):
     data = {
         "id": spec["id"], "name": spec["name"], "icon": spec.get("icon", "📘"),
         "tagline": spec.get("tagline", ""), "itemNoun": spec.get("itemNoun", "Topic"),
+        "videoTag": spec.get("videoTag", spec["name"].replace(" Handbook", "").strip()),
         "levels": spec["levels"], "categories": spec["categories"], "items": meta_items,
     }
     with open(os.path.join(hb_dir, "data.js"), "w", encoding="utf-8") as f:

@@ -68,6 +68,8 @@
 
     function renderActions() {
       var el = document.getElementById("page-actions");
+      var vurl = "https://www.youtube.com/results?search_query=" +
+        encodeURIComponent(pattern.name + " algorithm pattern DSA tutorial");
       function refresh() {
         var done = DSAProgress.isComplete(slug);
         var marked = DSAProgress.isBookmarked(slug);
@@ -76,6 +78,7 @@
         el.innerHTML =
           '<button class="btn ' + (done ? "done" : "") + '" id="b-done">' + (done ? "✓ Completed" : "Mark Complete") + '</button>' +
           '<button class="btn" id="b-mark">' + (marked ? "★ Bookmarked" : "☆ Bookmark") + '</button>' +
+          '<a class="btn watch" href="' + vurl + '" target="_blank" rel="noopener" title="Free videos for this pattern on YouTube">📺 Watch</a>' +
           '<button class="btn" id="b-rev" title="Cycle revision status">' + revLabel + '</button>';
         document.getElementById("b-done").onclick = function () { DSAProgress.toggleComplete(slug); refresh(); };
         document.getElementById("b-mark").onclick = function () { DSAProgress.toggleBookmark(slug); refresh(); };
@@ -94,6 +97,11 @@
         if (toc) {
           var h1 = container.querySelector("h1");
           if (h1) h1.insertAdjacentHTML("afterend", toc);
+        }
+        var _h1 = container.querySelector("h1");
+        if (_h1) {
+          var _vq = encodeURIComponent(pattern.name + " algorithm pattern DSA tutorial");
+          _h1.insertAdjacentHTML("afterend", '<a class="video-cta" href="https://www.youtube.com/results?search_query=' + _vq + '" target="_blank" rel="noopener">🎥 Learn this pattern from free videos on YouTube →</a>');
         }
         DSAMarkdown.wire(container);
         // smooth-scroll if a hash is present

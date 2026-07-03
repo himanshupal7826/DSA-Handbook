@@ -191,7 +191,7 @@ Compose builds the effective config by loading each file in order and deep-mergi
   <line x1="180" y1="160" x2="288" y2="160" stroke="#475569" marker-end="url(#a3)"/>
   <line x1="180" y1="250" x2="288" y2="180" stroke="#475569" marker-end="url(#a3)"/>
   <line x1="450" y1="160" x2="538" y2="160" stroke="#475569" marker-end="url(#a3)"/>
-  <text x="235" y="30" text-anchor="middle" fill="#64748b">later files & vars override earlier</text>
+  <text x="235" y="30" text-anchor="middle" fill="#64748b">later files &amp; vars override earlier</text>
 </svg>
 ```
 
