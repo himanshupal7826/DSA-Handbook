@@ -238,15 +238,18 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Search Insert (LeetCode 35)
-A representative **Upper Bound** problem. The signal: first index with value > target — the bisect_right primitive.
+Given a sorted array of **distinct** integers and a target, return the index if the target is found, else the index where it would be inserted to keep the array sorted.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (upper bound, first >, bisect right, count, insert).
-2. Reach for the Upper Bound template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. The insert position is exactly the leftmost index `i` with `nums[i] >= target` — this is a lower-bound query on the sorted array.
+2. Because the values are distinct, if the target is present the lower bound lands on it; if absent, it lands on the first larger element, i.e. the correct insertion slot.
+3. Run the half-open `[lo, hi)` binary search: move `lo` past every element strictly less than target, and the surviving `lo` is the answer.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [1, 3, 5, 6], target = 4`
+- `lo=0, hi=4 → mid=2, nums[2]=5 >= 4 → hi=2`
+- `lo=0, hi=2 → mid=1, nums[1]=3 < 4 → lo=2`
+- `lo == hi == 2` → return `2` (4 inserts between 3 and 5). Correct.
 
 ### Visualization
 ```
@@ -257,32 +260,34 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def searchInsert(nums, target):
+    lo, hi = 0, len(nums)             # half-open [lo, hi)
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
+        if nums[mid] < target:        # strictly less → discard left half
             lo = mid + 1
         else:
             hi = mid
-    return lo                     # first index with a[i] >= target
+    return lo                         # first index with nums[i] >= target
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n), Space O(1) — one binary search over the sorted array.
 
 ## 10. Solved Example 2
 
 ### Problem — Range Frequency (LeetCode 2080)
-A representative **Upper Bound** problem. The signal: first index with value > target — the bisect_right primitive.
+Build a structure over a fixed array that answers many `query(left, right, value)` calls: how many times does `value` occur in the subarray `arr[left..right]`?
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (upper bound, first >, bisect right, count, insert).
-2. Reach for the Upper Bound template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. For each distinct value, store the **sorted list of indices** where it appears (indices are naturally increasing as we scan left to right).
+2. A count within `[left, right]` is a count of indices in that band — the classic `upper_bound - lower_bound` trick on the value's index list.
+3. `bisect_right(idxs, right)` gives how many indices are `<= right`; `bisect_left(idxs, left)` gives how many are `< left`. Their difference is the occurrences inside `[left, right]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`arr = [12, 33, 4, 56, 22, 2, 34, 33, 22, 12, 34, 56]`; indices of `33` are `[1, 7]`.
+- `query(4, 8, 33)`: `bisect_right([1,7], 8) = 2`, `bisect_left([1,7], 4) = 1`
+- count = `2 - 1 = 1` (only index 7 lies in [4,8]). Correct.
 
 ### Visualization
 ```
@@ -293,32 +298,40 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
-        else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+from bisect import bisect_left, bisect_right
+from collections import defaultdict
+
+class RangeFreqQuery:
+    def __init__(self, arr):
+        self.pos = defaultdict(list)
+        for i, v in enumerate(arr):     # indices per value, already sorted
+            self.pos[v].append(i)
+
+    def query(self, left, right, value):
+        idxs = self.pos.get(value)
+        if not idxs:
+            return 0
+        # upper_bound(right) - lower_bound(left) = count in [left, right]
+        return bisect_right(idxs, right) - bisect_left(idxs, left)
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Build O(n); each query O(log k) where k is that value's frequency. Space O(n).
 
 ## 11. Solved Example 3
 
 ### Problem — Time Map (LeetCode 981)
-A representative **Upper Bound** problem. The signal: first index with value > target — the bisect_right primitive.
+Design a key-value store where `set(key, value, timestamp)` records a value at a time, and `get(key, timestamp)` returns the value stored at the greatest `timestamp_prev <= timestamp` (or `""` if none).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (upper bound, first >, bisect right, count, insert).
-2. Reach for the Upper Bound template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. `set` is always called with strictly increasing timestamps per key, so each key's list of `(timestamp, value)` pairs is kept sorted by timestamp automatically.
+2. `get` needs the last entry whose timestamp is `<= t` — take the **upper bound** (`bisect_right`) of `t` in the timestamp list, which is the first index strictly greater than `t`.
+3. Step back one index: `i - 1` is the largest timestamp `<= t`. If `i == 0`, nothing qualifies, so return `""`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`set(foo,bar,1)`, `set(foo,baz,4)` → `foo` timestamps `[1, 4]`.
+- `get(foo, 3)`: `bisect_right([1,4], 3) = 1` → index `1-1 = 0` → value at ts 1 = `"bar"`. Correct.
+- `get(foo, 4)`: `bisect_right([1,4], 4) = 2` → index `1` → `"baz"`. Correct.
 
 ### Visualization
 ```
@@ -329,19 +342,25 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
-        else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+from bisect import bisect_right
+from collections import defaultdict
+
+class TimeMap:
+    def __init__(self):
+        self.store = defaultdict(list)   # key -> [(timestamp, value), ...]
+
+    def set(self, key, value, timestamp):
+        self.store[key].append((timestamp, value))   # timestamps increasing
+
+    def get(self, key, timestamp):
+        arr = self.store.get(key, [])
+        # upper_bound on timestamp, then step back one
+        i = bisect_right(arr, (timestamp, chr(127)))
+        return arr[i - 1][1] if i else ""
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+`set` O(1) amortized; `get` O(log n) via binary search. Space O(n) total entries.
 
 
 ## 12. LeetCode Practice Set

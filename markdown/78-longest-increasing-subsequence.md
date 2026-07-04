@@ -232,101 +232,129 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — LIS (LeetCode 300)
-A representative **Longest Increasing Subsequence** problem. The signal: o(n²) dp or o(n log n) patience sorting for longest increasing run.
+Given an integer array `nums`, return the **length** of the longest strictly increasing subsequence.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (lis, longest increasing, dp, patience, binary search).
-2. Reach for the Longest Increasing Subsequence template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Maintain `tails`, where `tails[k]` is the smallest possible tail value of an increasing subsequence of length `k+1`.
+2. For each `x`, binary-search the leftmost `tails[i] >= x`; replacing it keeps tails minimal, extending only when `x` is larger than every tail.
+3. If no such position exists, `x` extends the sequence (append); the final answer is `len(tails)`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [10,9,2,5,3,7]`
+- 10 → tails=[10]; 9 replaces → [9]; 2 replaces → [2]
+- 5 appends → [2,5]; 3 replaces 5 → [2,3]; 7 appends → [2,3,7]
+- `len(tails) = 3` ✓ (e.g. 2,3,7)
 
 ### Visualization
 ```
-input  ──▶ [ apply Longest Increasing Subsequence step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+input  ──▶ [ scan each x, binary-search into tails[] ]
+state  ──▶ tails[] holds minimal tail per length, updated in place
+output ──▶ len(tails) = LIS length
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+from bisect import bisect_left
+
+def lengthOfLIS(nums):
+    tails = []                       # tails[k] = min tail of an LIS of length k+1
+    for x in nums:
+        i = bisect_left(tails, x)    # leftmost tail >= x (strictly increasing)
+        if i == len(tails):
+            tails.append(x)          # x extends the longest subsequence
+        else:
+            tails[i] = x             # x becomes a smaller tail for that length
+    return len(tails)
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n log n) — one binary search per element; Space O(n) for `tails`.
 
 ## 10. Solved Example 2
 
 ### Problem — Russian Dolls (LeetCode 354)
-A representative **Longest Increasing Subsequence** problem. The signal: o(n²) dp or o(n log n) patience sorting for longest increasing run.
+Given envelopes `[w, h]`, one fits inside another only if both its width and height are strictly larger. Return the max number that can be nested.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (lis, longest increasing, dp, patience, binary search).
-2. Reach for the Longest Increasing Subsequence template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Sort by width ascending; for equal widths, sort height **descending** — this prevents two same-width envelopes from ever nesting via the height LIS.
+2. With widths handled by the sort, the answer reduces to the length of the strictly increasing subsequence of the **heights**.
+3. Run the O(n log n) patience/binary-search LIS on the height sequence.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`[[5,4],[6,4],[6,7],[2,3]]` → sort → `[[2,3],[5,4],[6,7],[6,4]]`
+- heights = `[3,4,7,4]`
+- LIS on heights: 3→[3], 4→[3,4], 7→[3,4,7], 4 replaces → [3,4,7]
+- answer = `3` ✓ ([2,3]→[5,4]→[6,7])
 
 ### Visualization
 ```
-input  ──▶ [ apply Longest Increasing Subsequence step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+input  ──▶ [ sort (w asc, h desc), then LIS on heights ]
+state  ──▶ tails[] over heights, same-width envelopes can't chain
+output ──▶ len(tails) = max nested envelopes
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+from bisect import bisect_left
+
+def maxEnvelopes(envelopes):
+    envelopes.sort(key=lambda e: (e[0], -e[1]))   # w asc, h desc on ties
+    tails = []                                     # LIS over heights
+    for _, h in envelopes:
+        i = bisect_left(tails, h)
+        if i == len(tails):
+            tails.append(h)
+        else:
+            tails[i] = h
+    return len(tails)
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n log n) — sort plus binary-search LIS; Space O(n) for `tails`.
 
 ## 11. Solved Example 3
 
 ### Problem — Number of LIS (LeetCode 673)
-A representative **Longest Increasing Subsequence** problem. The signal: o(n²) dp or o(n log n) patience sorting for longest increasing run.
+Given `nums`, return **how many** longest strictly increasing subsequences exist.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (lis, longest increasing, dp, patience, binary search).
-2. Reach for the Longest Increasing Subsequence template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Keep two arrays: `length[i]` = length of the LIS ending at `i`, and `count[i]` = number of such LIS ending at `i`.
+2. For each `j < i` with `nums[j] < nums[i]`: if it yields a longer chain (`length[j]+1 > length[i]`), reset `length[i]` and copy `count[j]`; if it ties (`length[j]+1 == length[i]`), add `count[j]`.
+3. Find the global max length, then sum `count[i]` over every `i` whose `length[i]` equals it.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [1,3,5,4,7]`
+- length=[1,2,3,3,4], count=[1,1,1,1,2] (index 4: from both 5 and 4)
+- max length = 4, achieved only at index 4
+- answer = `count[4] = 2` ✓ (1,3,5,7 and 1,3,4,7)
 
 ### Visualization
 ```
-input  ──▶ [ apply Longest Increasing Subsequence step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+input  ──▶ [ for each i, scan j<i, update length[i] & count[i] ]
+state  ──▶ length[] tracks LIS end-length, count[] tracks tallies
+output ──▶ sum count[i] where length[i] == max length
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def findNumberOfLIS(nums):
+    n = len(nums)
+    length = [1] * n                  # LIS length ending at i
+    count = [1] * n                   # number of such LIS ending at i
+    for i in range(n):
+        for j in range(i):
+            if nums[j] < nums[i]:
+                if length[j] + 1 > length[i]:
+                    length[i] = length[j] + 1
+                    count[i] = count[j]        # new longer chain: inherit
+                elif length[j] + 1 == length[i]:
+                    count[i] += count[j]        # tie: accumulate ways
+    best = max(length)
+    return sum(c for l, c in zip(length, count) if l == best)
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n²) — nested scan over pairs; Space O(n) for `length` and `count`.
 
 
 ## 12. LeetCode Practice Set

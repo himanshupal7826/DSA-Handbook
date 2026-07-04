@@ -248,12 +248,15 @@ vector<int> nextGreater(vector<int>& nums) {
 A representative **Histogram Pattern** problem. The signal: monotonic stack finds the largest rectangle under a histogram.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (histogram, largest rectangle, monotonic stack, area, maximal).
-2. Reach for the Histogram Pattern template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. Keep a stack of bar indices whose heights are strictly increasing.
+2. When the current bar is shorter than the stack top, pop it: the popped bar is the limiting height of a rectangle whose left edge is the new stack top and right edge is the current index.
+3. Append a sentinel height of 0 so every bar gets popped and measured at the end.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`heights = [2,1,5,6,2]` (append 0 → `[2,1,5,6,2,0]`).
+- i=0 push 2. i=1 h=1<2: pop 2 → area 2*1=2; push 1.
+- i=2 push 5. i=3 push 6. i=4 h=2: pop 6 → 6*1=6; pop 5 → 5*2=10 (best); push 2.
+- i=5 h=0: pop 2 → 2*3=6; pop 1 → 1*5=5. Answer = **10**.
 
 ### Visualization
 ```
@@ -264,18 +267,20 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
+def largestRectangleArea(heights):
+    stack = []                      # indices, heights increasing
+    best = 0
+    for i, h in enumerate(heights + [0]):
+        while stack and heights[stack[-1]] >= h:
+            height = heights[stack.pop()]
+            left = stack[-1] if stack else -1
+            best = max(best, height * (i - left - 1))
         stack.append(i)
-    return res
+    return best
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(n), Space O(n). Each index is pushed and popped exactly once.
 
 ## 10. Solved Example 2
 
@@ -283,12 +288,15 @@ Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved ind
 A representative **Histogram Pattern** problem. The signal: monotonic stack finds the largest rectangle under a histogram.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (histogram, largest rectangle, monotonic stack, area, maximal).
-2. Reach for the Histogram Pattern template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. Scan the matrix row by row, maintaining a `heights` array of consecutive 1s ending at the current row for each column (reset to 0 on a '0').
+2. After building each row's histogram, run the LeetCode 84 largest-rectangle routine on it.
+3. The overall answer is the maximum rectangle area found across all rows.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`matrix = [["1","0","1"],["1","1","1"]]`.
+- Row 0 heights `[1,0,1]` → best rectangle area 1.
+- Row 1 heights `[2,1,2]` → columns all ≥1, width 3 height 1 → area 3 (beats 2).
+- Answer = **3**.
 
 ### Visualization
 ```
@@ -299,18 +307,27 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
-        stack.append(i)
-    return res
+def maximalRectangle(matrix):
+    if not matrix:
+        return 0
+    n = len(matrix[0])
+    heights = [0] * n
+    best = 0
+    for row in matrix:
+        for j in range(n):
+            heights[j] = heights[j] + 1 if row[j] == '1' else 0
+        stack = []
+        for i, h in enumerate(heights + [0]):
+            while stack and heights[stack[-1]] >= h:
+                height = heights[stack.pop()]
+                left = stack[-1] if stack else -1
+                best = max(best, height * (i - left - 1))
+            stack.append(i)
+    return best
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(rows × cols), Space O(cols) for the heights array and stack.
 
 ## 11. Solved Example 3
 
@@ -318,12 +335,15 @@ Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved ind
 A representative **Histogram Pattern** problem. The signal: monotonic stack finds the largest rectangle under a histogram.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (histogram, largest rectangle, monotonic stack, area, maximal).
-2. Reach for the Histogram Pattern template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. For each row, keep a `heights[j]` counting consecutive 1s ending at this row in column j (reset to 0 on a 0).
+2. Sweep left-to-right with a monotonic increasing stack; for each column j compute `cur`, the number of all-ones submatrices whose bottom-right corner is (row, j), by extending the previous shorter bar's running sum.
+3. Add every `cur` into a global total across all rows.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`mat = [[1,1],[1,1]]`.
+- Row 0 heights `[1,1]`: j=0 cur=1 (total 1); j=1 pops equal bar, cur=1*2=2 (total 3).
+- Row 1 heights `[2,2]`: j=0 cur=2 (total 5); j=1 pops, cur=2*2=4 (total 9).
+- Answer = **9**.
 
 ### Visualization
 ```
@@ -334,18 +354,30 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
-        stack.append(i)
-    return res
+def numSubmat(mat):
+    n = len(mat[0])
+    heights = [0] * n
+    total = 0
+    for row in mat:
+        for j in range(n):
+            heights[j] = heights[j] + 1 if row[j] == 1 else 0
+        stack = []                  # (index, height, running submatrix count)
+        for j in range(n):
+            h = heights[j]
+            while stack and stack[-1][1] >= h:
+                stack.pop()
+            if stack:
+                prev_idx, _, prev_sum = stack[-1]
+                cur = prev_sum + h * (j - prev_idx)
+            else:
+                cur = h * (j + 1)
+            stack.append((j, h, cur))
+            total += cur
+    return total
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(rows × cols), Space O(cols) for the heights array and stack.
 
 
 ## 12. LeetCode Practice Set

@@ -259,122 +259,122 @@ int longestWindow(const string& s) {
 ## 9. Solved Example 1
 
 ### Problem — Longest Substring (LeetCode 3)
-A representative **Distinct Character Window** problem. The signal: track distinct-count in window to bound by ≤k or all-unique.
+Find the length of the longest substring of `s` with **no repeating characters**.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (distinct, unique, k distinct, without repeating, char set).
-2. Reach for the Distinct Character Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. Keep a map `last` from a character to the most recent index where it appeared.
+2. Expand `right` over the string; when the current char was seen inside the window, jump `left` to `last[ch] + 1` so the window stays all-unique.
+3. After each step the window `[left, right]` has all distinct chars — record its length.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`s = "abcabcbb"`
+- r=0 'a' → window "a", best 1; r=1 'b' → "ab", best 2; r=2 'c' → "abc", best 3.
+- r=3 'a': last['a']=0 ≥ left → left=1, window "bca", best 3.
+- r=4 'b': last['b']=1 ≥ left → left=2, window "cab", best 3.
+- Continues at length 3 → answer **3**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Distinct Character Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+"abcabcbb": window slides right; on a repeat, left jumps past the prior copy.
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
+def length_of_longest_substring(s):
+    last = {}
     left = best = 0
     for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
+        if ch in last and last[ch] >= left:
+            left = last[ch] + 1
+        last[ch] = right
         best = max(best, right - left + 1)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n), Space O(min(n, alphabet)). Each index is visited once; the map holds at most one entry per distinct char.
 
 ## 10. Solved Example 2
 
 ### Problem — K Distinct (LeetCode 340)
-A representative **Distinct Character Window** problem. The signal: track distinct-count in window to bound by ≤k or all-unique.
+Find the length of the longest substring of `s` that contains **at most `k` distinct** characters.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (distinct, unique, k distinct, without repeating, char set).
-2. Reach for the Distinct Character Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. Maintain a frequency `count` of chars in the current window plus a `left` pointer.
+2. Expand `right`, incrementing `count[ch]`; the window is invalid while it holds more than `k` distinct keys.
+3. Shrink from `left`, decrementing counts and deleting keys that hit zero, until `len(count) <= k`; record the window length each step.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`s = "eceba", k = 2`
+- r=0 'e' {e:1}; r=1 'c' {e:1,c:1}; r=2 'e' {e:2,c:1} → best 3 ("ece").
+- r=3 'b' {e:2,c:1,b:1} → 3 distinct > 2, shrink: drop 'e'→{e:1,c:1,b:1} still 3, drop 'c'→{e:1,b:1}, left=3.
+- r=4 'a' {e:1,b:1,a:1} > 2, shrink drop 'e','b' → {a:1}, left=... best stays **3**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Distinct Character Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+"eceba", k=2: shrink left whenever the count map has more than k keys.
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
+def length_of_longest_substring_k_distinct(s, k):
+    if k == 0:
+        return 0
+    count = {}
     left = best = 0
     for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
+        count[ch] = count.get(ch, 0) + 1
+        while len(count) > k:
+            lc = s[left]
+            count[lc] -= 1
+            if count[lc] == 0:
+                del count[lc]
             left += 1
         best = max(best, right - left + 1)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n), Space O(k). Each index enters and leaves the window once; the map holds at most k+1 keys.
 
 ## 11. Solved Example 3
 
 ### Problem — Two Distinct (LeetCode 159)
-A representative **Distinct Character Window** problem. The signal: track distinct-count in window to bound by ≤k or all-unique.
+Find the length of the longest substring of `s` with **at most two distinct** characters.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (distinct, unique, k distinct, without repeating, char set).
-2. Reach for the Distinct Character Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. This is the k-distinct problem fixed at `k = 2`, so track only a tiny map `last` of char → its most recent index (at most 3 keys live).
+2. Expand `right`; when a third distinct char appears, find the other char whose last-seen index is smallest — that char must fully leave the window.
+3. Set `left` to that evicted char's index + 1 and delete it, keeping exactly two distinct chars; record the length.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`s = "ccaabbb"`
+- "cc" last{c}; "cca" last{c:1,a:2}; "ccaa" best 4.
+- r=4 'b': third char → evict 'c' (smallest last idx 1), left=2, window "aab", last{a,b}.
+- r=5,6 'b': window "aabbb" best **5**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Distinct Character Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+"ccaabbb": on a 3rd char, drop the char whose last index is furthest left.
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
+def length_of_longest_substring_two_distinct(s):
+    last = {}          # char -> most recent index, at most 2 kept
     left = best = 0
     for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
+        last[ch] = right
+        if len(last) > 2:
+            evict = min(last, key=last.get)   # char last seen furthest back
+            left = last[evict] + 1
+            del last[evict]
         best = max(best, right - left + 1)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n), Space O(1). The `last` map never exceeds three entries, so each step is constant work.
 
 
 ## 12. LeetCode Practice Set

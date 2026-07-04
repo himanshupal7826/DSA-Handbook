@@ -251,12 +251,16 @@ ListNode* reverseList(ListNode* head) {
 A representative **Cycle Detection** problem. The signal: floyd's tortoise & hare detects and locates cycles in o(1) space.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (cycle, floyd, linked list, loop, fast slow).
-2. Reach for the Cycle Detection template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. Run a slow pointer one step and a fast pointer two steps per iteration.
+2. If the list ends (`fast` or `fast.next` is None) there is no cycle.
+3. If the two pointers ever meet, the fast one lapped the slow one inside a loop — return True.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `3→2→0→-4→(back to 2)`.
+- start slow=fast=3
+- slow=2, fast=0
+- slow=0, fast=2
+- slow=-4, fast=-4 → pointers meet → True
 
 ### Visualization
 ```
@@ -267,22 +271,18 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+def hasCycle(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow = slow.next          # one step
+        fast = fast.next.next     # two steps
+        if slow is fast:          # lapped -> cycle
+            return True
+    return False
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(n), Space O(1). Fast pointer meets slow within one lap of the cycle.
 
 ## 10. Solved Example 2
 
@@ -290,12 +290,14 @@ Time O(n), Space O(1). In-place pointer manipulation, single traversal.
 A representative **Cycle Detection** problem. The signal: floyd's tortoise & hare detects and locates cycles in o(1) space.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (cycle, floyd, linked list, loop, fast slow).
-2. Reach for the Cycle Detection template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. Detect the meeting point with the standard tortoise/hare loop.
+2. Floyd's theorem: the distance from head to the cycle entrance equals the distance from the meeting point to the entrance.
+3. So reset one pointer to head and advance both one step at a time; where they meet is the cycle start.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `3→2→0→-4→(back to 2)`.
+- slow/fast meet at node `-4`
+- reset ptr=head(3); step both: ptr=2, slow=2 → meet at node `2` → cycle entrance
 
 ### Visualization
 ```
@@ -306,22 +308,22 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+def detectCycle(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow = slow.next
+        fast = fast.next.next
+        if slow is fast:              # meeting point found
+            ptr = head
+            while ptr is not slow:    # walk to entrance
+                ptr = ptr.next
+                slow = slow.next
+            return ptr
+    return None
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(n), Space O(1). Two linear passes with constant extra pointers.
 
 ## 11. Solved Example 3
 
@@ -329,12 +331,14 @@ Time O(n), Space O(1). In-place pointer manipulation, single traversal.
 A representative **Cycle Detection** problem. The signal: floyd's tortoise & hare detects and locates cycles in o(1) space.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (cycle, floyd, linked list, loop, fast slow).
-2. Reach for the Cycle Detection template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. Treat the array as a function `i → nums[i]`; with n+1 values in range `[1, n]` the mapping must contain a cycle, and its entrance is the duplicate.
+2. Phase 1: run tortoise/hare over `nums[x]` until they meet inside the cycle.
+3. Phase 2: reset one pointer to `nums[0]` and step both one at a time; they meet at the duplicate value.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[1,3,4,2,2]`.
+- phase 1: slow=1→3→2, fast=1→2→2… meet at value `2`
+- phase 2: slow=nums[0]=1, fast=2; step → slow=3,fast=4 → slow=2,fast=2 → meet at `2`
 
 ### Visualization
 ```
@@ -345,22 +349,22 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+def findDuplicate(nums):
+    slow = fast = nums[0]
+    while True:                     # phase 1: find meeting point
+        slow = nums[slow]
+        fast = nums[nums[fast]]
+        if slow == fast:
+            break
+    slow = nums[0]                  # phase 2: find entrance
+    while slow != fast:
+        slow = nums[slow]
+        fast = nums[fast]
+    return slow
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(n), Space O(1). Read-only array, no extra structures.
 
 
 ## 12. LeetCode Practice Set

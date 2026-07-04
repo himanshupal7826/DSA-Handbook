@@ -239,15 +239,17 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Binary Search (LeetCode 704)
-A representative **Classic Binary Search** problem. The signal: halve a sorted search space each step for o(log n) lookup.
+Given a sorted array `nums` and a `target`, return the index of `target`, or `-1` if it is absent.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (binary search, sorted, logn, mid, divide).
-2. Reach for the Classic Binary Search template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. Keep a closed interval `[lo, hi]` of indices that could still hold the target.
+2. Compare `nums[mid]` to `target`: equal → return `mid`; smaller → search right (`lo = mid+1`); larger → search left (`hi = mid-1`).
+3. When `lo > hi` the interval is empty, so the target is absent → return `-1`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [-1,0,3,5,9,12], target = 9`
+- lo=0, hi=5, mid=2 → nums[2]=3 < 9 → lo=3
+- lo=3, hi=5, mid=4 → nums[4]=9 == 9 → return 4
 
 ### Visualization
 ```
@@ -258,32 +260,37 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
-    while lo < hi:
+def search(nums, target):
+    lo, hi = 0, len(nums) - 1        # closed interval [lo, hi]
+    while lo <= hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
+        if nums[mid] == target:
+            return mid
+        elif nums[mid] < target:
             lo = mid + 1
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            hi = mid - 1
+    return -1
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n), Space O(1). Each step halves the candidate interval.
 
 ## 10. Solved Example 2
 
 ### Problem — Guess Number (LeetCode 374)
-A representative **Classic Binary Search** problem. The signal: halve a sorted search space each step for o(log n) lookup.
+Pick a number in `[1, n]`; the `guess(num)` API returns `-1` (too high), `1` (too low), or `0` (correct). Find the picked number.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (binary search, sorted, logn, mid, divide).
-2. Reach for the Classic Binary Search template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. The candidate answers `1..n` form a sorted space, so binary search over the value itself.
+2. Call `guess(mid)`: `0` means found; `-1` means the pick is lower, so drop the upper half; `1` means higher, so drop the lower half.
+3. Repeat over the closed interval `[lo, hi]` until `guess` returns `0`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`n = 10`, pick = 6
+- lo=1, hi=10, mid=5 → guess(5)=1 (too low) → lo=6
+- lo=6, hi=10, mid=8 → guess(8)=-1 (too high) → hi=7
+- lo=6, hi=7, mid=6 → guess(6)=0 → return 6
 
 ### Visualization
 ```
@@ -294,32 +301,38 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
-    while lo < hi:
+def guessNumber(n):
+    lo, hi = 1, n
+    while lo <= hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        res = guess(mid)             # -1 too high, 1 too low, 0 correct
+        if res == 0:
+            return mid
+        elif res < 0:
+            hi = mid - 1
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            lo = mid + 1
+    return -1                        # unreachable given a valid pick
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n), Space O(1). Each `guess` call halves the value range.
 
 ## 11. Solved Example 3
 
 ### Problem — Search Insert (LeetCode 35)
-A representative **Classic Binary Search** problem. The signal: halve a sorted search space each step for o(log n) lookup.
+Given a sorted array of distinct integers and a `target`, return the index where it is (or where it should be inserted to keep the array sorted).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (binary search, sorted, logn, mid, divide).
-2. Reach for the Classic Binary Search template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. This is exactly the lower-bound query: the first index `i` with `nums[i] >= target`.
+2. Use a half-open interval `[lo, hi)` and shrink it: if `nums[mid] < target`, the answer is to the right (`lo = mid+1`); otherwise `hi = mid`.
+3. When `lo == hi` the loop ends and `lo` is the insertion index — it naturally handles a target larger than every element (returns `len`).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [1,3,5,6], target = 5`
+- lo=0, hi=4, mid=2 → nums[2]=5, not < 5 → hi=2
+- lo=0, hi=2, mid=1 → nums[1]=3 < 5 → lo=2
+- lo=2, hi=2 → stop → return 2
 
 ### Visualization
 ```
@@ -330,19 +343,19 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def searchInsert(nums, target):
+    lo, hi = 0, len(nums)            # half-open [lo, hi)
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
+        if nums[mid] < target:
             lo = mid + 1
         else:
             hi = mid
-    return lo                     # first index with a[i] >= target
+    return lo                        # first index with nums[i] >= target
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n), Space O(1). Lower-bound search over the half-open interval.
 
 
 ## 12. LeetCode Practice Set

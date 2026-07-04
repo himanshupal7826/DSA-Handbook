@@ -255,12 +255,14 @@ vector<int> topK(vector<int>& nums, int k) {
 A representative **Top K Elements** problem. The signal: maintain a size-k heap to track the k best elements in o(n log k).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (top k, heap, priority queue, k largest, frequency).
-2. Reach for the Top K Elements template below and map the problem's entities onto it.
-3. A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
+1. Keep a min-heap holding only the k largest values seen so far; its root is the k-th largest.
+2. Push each number, and whenever the heap exceeds size k, pop the smallest to evict it.
+3. After scanning all numbers, `heap[0]` is the answer.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums=[3,2,1,5,6,4], k=2. Push 3,2 → [2,3]. Push 1 → pop 1 → [2,3].
+Push 5 → pop 2 → [3,5]. Push 6 → pop 3 → [5,6]. Push 4 → pop 4 → [5,6].
+Root `heap[0]` = `5` → 2nd largest.
 
 ### Visualization
 ```
@@ -272,17 +274,17 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
+def findKthLargest(nums, k):
+    heap = []                        # min-heap of the k largest so far
     for v in nums:
         heapq.heappush(heap, v)
         if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+            heapq.heappop(heap)      # drop smallest -> keep k largest
+    return heap[0]                   # k-th largest sits at the root
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
+Time O(n log k), Space O(k). Each of n pushes/pops on a k-sized heap costs O(log k).
 
 ## 10. Solved Example 2
 
@@ -290,12 +292,14 @@ Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
 A representative **Top K Elements** problem. The signal: maintain a size-k heap to track the k best elements in o(n log k).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (top k, heap, priority queue, k largest, frequency).
-2. Reach for the Top K Elements template below and map the problem's entities onto it.
-3. A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
+1. Count every number's frequency with a hash map in one pass.
+2. Treat "top k" as a heap-selection over the (num, count) pairs keyed by count.
+3. `heapq.nlargest(k, ...)` keeps only the k highest-count entries — return their keys.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums=[1,1,1,2,2,3], k=2. Counts = {1:3, 2:2, 3:1}.
+nlargest(2) by count → picks (1,3) then (2,2).
+Answer → `[1, 2]`.
 
 ### Visualization
 ```
@@ -307,17 +311,15 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+from collections import Counter
+def topKFrequent(nums, k):
+    counts = Counter(nums)
+    top = heapq.nlargest(k, counts.items(), key=lambda pair: pair[1])
+    return [num for num, _ in top]
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
+Time O(n log k), Space O(n). Counting is O(n); the size-k heap selection is O(n log k).
 
 ## 11. Solved Example 3
 
@@ -325,12 +327,14 @@ Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
 A representative **Top K Elements** problem. The signal: maintain a size-k heap to track the k best elements in o(n log k).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (top k, heap, priority queue, k largest, frequency).
-2. Reach for the Top K Elements template below and map the problem's entities onto it.
-3. A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
+1. Count word frequencies, then rank by higher count first, breaking ties by lexicographically smaller word.
+2. Encode that ordering as the sort key `(-count, word)` so "smallest" means best.
+3. `heapq.nsmallest(k, ...)` on that key returns the k best words already in output order.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+words=["i","love","leetcode","i","love","coding"], k=2. Counts = {i:2, love:2, leetcode:1, coding:1}.
+Keys: i→(-2,"i"), love→(-2,"love"). nsmallest(2) → "i" before "love" (tie broken lexicographically).
+Answer → `["i", "love"]`.
 
 ### Visualization
 ```
@@ -342,17 +346,15 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+from collections import Counter
+def topKFrequent(words, k):
+    counts = Counter(words)
+    # higher frequency first; ties broken by smaller lexicographic word
+    return heapq.nsmallest(k, counts.keys(), key=lambda w: (-counts[w], w))
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
+Time O(n log k), Space O(n). Counting is O(n); the size-k selection over unique words is O(n log k).
 
 
 ## 12. LeetCode Practice Set

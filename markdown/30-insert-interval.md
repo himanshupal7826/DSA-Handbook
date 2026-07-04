@@ -246,15 +246,19 @@ vector<vector<int>> merge(vector<vector<int>>& intervals) {
 ## 9. Solved Example 1
 
 ### Problem — Insert Interval (LeetCode 57)
-A representative **Insert Interval** problem. The signal: insert one interval into a sorted set, merging overlaps around it.
+Given a sorted list of non-overlapping intervals, insert a new interval, merging as needed, and return the still-sorted result.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (insert interval, merge, overlap, before after, sorted intervals).
-2. Reach for the Insert Interval template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. The input is already sorted and disjoint, so a single three-phase pass avoids re-sorting.
+2. Emit every interval strictly left of the new one; then absorb all overlapping intervals by widening the new interval's bounds.
+3. Push the widened interval, then emit the remaining strictly-right intervals.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`intervals=[[1,2],[3,5],[6,7],[8,10],[12,16]]`, `newInterval=[4,8]`.
+- Left: `[1,2]` (2 < 4) emitted.
+- Overlap: `[3,5]`,`[6,7]`,`[8,10]` → new grows to `[3,10]`; push `[3,10]`.
+- Right: `[12,16]` emitted.
+- Result `[[1,2],[3,10],[12,16]]`.
 
 ### Visualization
 ```
@@ -265,32 +269,39 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
-        else:
-            res.append([s, e])
+def insert(intervals, newInterval):
+    res, i, n = [], 0, len(intervals)
+    s, e = newInterval
+    while i < n and intervals[i][1] < s:      # left of new
+        res.append(intervals[i]); i += 1
+    while i < n and intervals[i][0] <= e:     # overlapping
+        s = min(s, intervals[i][0])
+        e = max(e, intervals[i][1]); i += 1
+    res.append([s, e])
+    while i < n:                              # right of new
+        res.append(intervals[i]); i += 1
     return res
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n), Space O(n). One linear pass; no sort needed.
 
 ## 10. Solved Example 2
 
 ### Problem — Merge Intervals (LeetCode 56)
-A representative **Insert Interval** problem. The signal: insert one interval into a sorted set, merging overlaps around it.
+Given an unsorted array of intervals, merge all overlapping ones into non-overlapping intervals covering the same span.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (insert interval, merge, overlap, before after, sorted intervals).
-2. Reach for the Insert Interval template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. Sort by start; then any interval overlapping the running block appears right after it.
+2. Track the last block in the result. If the next start is ≤ the last end, extend the block's end.
+3. If there is a gap, the next interval opens a new block.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[[1,4],[4,5],[2,3]]`. Sort by start → `[[1,4],[2,3],[4,5]]`.
+- `[1,4]` → res `[[1,4]]`.
+- `[2,3]`: 2 ≤ 4, extend end max(4,3)=4 → `[[1,4]]`.
+- `[4,5]`: 4 ≤ 4, extend → `[[1,5]]`.
+- Result `[[1,5]]`.
 
 ### Visualization
 ```
@@ -318,15 +329,18 @@ Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
 ## 11. Solved Example 3
 
 ### Problem — Range Module (LeetCode 715)
-A representative **Insert Interval** problem. The signal: insert one interval into a sorted set, merging overlaps around it.
+Design a structure over disjoint half-open ranges `[left, right)` supporting `addRange`, `queryRange`, and `removeRange`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (insert interval, merge, overlap, before after, sorted intervals).
-2. Reach for the Insert Interval template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. Keep the tracked ranges as a sorted list of disjoint intervals — exactly the Insert-Interval invariant.
+2. `addRange` is insert-and-merge: swallow every interval touching `[left,right)` and widen the bounds, just like inserting one interval.
+3. `removeRange` is the mirror: split any overlapping interval into the surviving left/right pieces; `queryRange` finds the covering interval by binary search.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`addRange(10,20)` → ranges `[[10,20]]`.
+- `addRange(30,40)` → `[[10,20],[30,40]]`.
+- `queryRange(10,19)` → covered by `[10,20]` → True.
+- `removeRange(14,16)` → split `[10,20]` into `[10,14],[16,20]` → `[[10,14],[16,20],[30,40]]`.
 
 ### Visualization
 ```
@@ -337,19 +351,46 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
-        else:
-            res.append([s, e])
-    return res
+import bisect
+
+class RangeModule:
+    def __init__(self):
+        self.ranges = []  # sorted disjoint [start, end)
+
+    def addRange(self, left, right):
+        res, placed = [], False
+        for s, e in self.ranges:
+            if e < left:            # strictly left
+                res.append([s, e])
+            elif right < s:         # strictly right
+                if not placed:
+                    res.append([left, right]); placed = True
+                res.append([s, e])
+            else:                   # overlap: absorb
+                left, right = min(left, s), max(right, e)
+        if not placed:
+            res.append([left, right])
+        self.ranges = res
+
+    def queryRange(self, left, right):
+        i = bisect.bisect_right([s for s, _ in self.ranges], left) - 1
+        return i >= 0 and self.ranges[i][0] <= left and right <= self.ranges[i][1]
+
+    def removeRange(self, left, right):
+        res = []
+        for s, e in self.ranges:
+            if e <= left or s >= right:
+                res.append([s, e])
+            else:
+                if s < left:
+                    res.append([s, left])
+                if e > right:
+                    res.append([right, e])
+        self.ranges = res
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n) per add/remove, O(log n) per query; Space O(n) for the stored ranges.
 
 
 ## 12. LeetCode Practice Set

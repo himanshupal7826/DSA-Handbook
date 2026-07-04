@@ -258,12 +258,15 @@ vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
 A representative **Graph DFS** problem. The signal: recursive/stack exploration for connectivity, components, and cycles.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (graph dfs, connected components, recursion, visited, islands).
-2. Reach for the Graph DFS template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Scan the grid; each unvisited `'1'` cell is the start of a new island, so increment the count and launch a DFS from it.
+2. The DFS floods the whole connected land mass, sinking every reachable `'1'` to `'0'` so it is never counted again — this marks the component visited in place.
+3. When the scan finishes, the number of DFS launches equals the number of islands.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+grid `[[1,1,0],[0,1,0],[0,0,1]]`.
+- (0,0)=='1' → count=1, DFS sinks (0,0),(0,1),(1,1) → those become '0'.
+- continue scan: (2,2)=='1' → count=2, DFS sinks (2,2).
+- no more '1' cells → answer **2**.
 
 ### Visualization
 ```
@@ -274,22 +277,29 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+def numIslands(grid):
+    rows, cols = len(grid), len(grid[0])
+
+    def dfs(r, c):
+        if r < 0 or r >= rows or c < 0 or c >= cols or grid[r][c] != '1':
+            return
+        grid[r][c] = '0'               # sink visited land
+        dfs(r + 1, c)
+        dfs(r - 1, c)
+        dfs(r, c + 1)
+        dfs(r, c - 1)
+
+    count = 0
+    for r in range(rows):
+        for c in range(cols):
+            if grid[r][c] == '1':
+                count += 1
+                dfs(r, c)
+    return count
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(R·C), Space O(R·C) worst-case recursion depth on a full-land grid.
 
 ## 10. Solved Example 2
 
@@ -297,12 +307,16 @@ Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
 A representative **Graph DFS** problem. The signal: recursive/stack exploration for connectivity, components, and cycles.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (graph dfs, connected components, recursion, visited, islands).
-2. Reach for the Graph DFS template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Keep a hash map from each original node to its freshly-made copy; this map doubles as the visited set that breaks cycles.
+2. DFS from the entry node: if a node is already in the map, return its clone immediately; otherwise create the clone, record it, then recurse into every neighbour and attach the returned clones.
+3. Returning the entry node's clone yields a deep copy with identical structure.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Graph: 1—2, 1—3, 2—3 (undirected), start at node 1.
+- dfs(1): create 1'; recurse neighbour 2.
+- dfs(2): create 2'; neighbour 1 already mapped → attach 1'; neighbour 3 → dfs(3).
+- dfs(3): create 3'; neighbours 1',2' attached. Unwind → 1'.neighbors=[2',3'].
+- return **1'** (full clone).
 
 ### Visualization
 ```
@@ -313,22 +327,25 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+# class Node: def __init__(self, val=0, neighbors=None): ...
+
+def cloneGraph(node):
+    clones = {}
+
+    def dfs(cur):
+        if cur in clones:
+            return clones[cur]
+        copy = Node(cur.val)
+        clones[cur] = copy             # record before recursing (breaks cycles)
+        for nei in cur.neighbors:
+            copy.neighbors.append(dfs(nei))
+        return copy
+
+    return dfs(node) if node else None
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(V + E), Space O(V) for the map plus recursion stack.
 
 ## 11. Solved Example 3
 
@@ -336,12 +353,15 @@ Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
 A representative **Graph DFS** problem. The signal: recursive/stack exploration for connectivity, components, and cycles.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (graph dfs, connected components, recursion, visited, islands).
-2. Reach for the Graph DFS template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. The `isConnected` matrix is an adjacency matrix over n cities; a province is one connected component, so the answer is the number of components.
+2. Loop over cities; each unvisited city starts a new province — increment the counter and DFS to every city reachable through direct/indirect connections, marking them visited.
+3. The count of DFS launches is the number of provinces.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`isConnected = [[1,1,0],[1,1,0],[0,0,1]]`, n=3.
+- city 0 unvisited → provinces=1; DFS visits 0, then 1 (edge 0-1). visited={0,1}.
+- city 1 already visited → skip.
+- city 2 unvisited → provinces=2; DFS visits 2. → answer **2**.
 
 ### Visualization
 ```
@@ -352,22 +372,27 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+def findCircleNum(isConnected):
+    n = len(isConnected)
+    visited = [False] * n
+
+    def dfs(i):
+        for j in range(n):
+            if isConnected[i][j] == 1 and not visited[j]:
+                visited[j] = True
+                dfs(j)
+
+    provinces = 0
+    for i in range(n):
+        if not visited[i]:
+            provinces += 1
+            visited[i] = True
+            dfs(i)
+    return provinces
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(N²) to scan the matrix, Space O(N) for the visited array and stack.
 
 
 ## 12. LeetCode Practice Set

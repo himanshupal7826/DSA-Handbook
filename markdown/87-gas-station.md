@@ -238,15 +238,17 @@ int maxNonOverlap(vector<vector<int>>& intervals) {
 ## 9. Solved Example 1
 
 ### Problem — Gas Station (LeetCode 134)
-A representative **Gas Station** problem. The signal: single pass: reset start when the running tank goes negative.
+gas[i] and cost[i] around a circular route; return the start index that completes the loop, or -1.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (gas station, greedy, circular, running total, reset start).
-2. Reach for the Gas Station template below and map the problem's entities onto it.
-3. When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
+1. If total gas is less than total cost the trip is impossible, so return -1 immediately.
+2. Track a running tank; whenever it dips below zero, no start in the current segment works, so reset the candidate start to i+1.
+3. When the totals allow a solution, the surviving start is guaranteed to complete the circuit.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+gas=[1,2,3,4,5], cost=[3,4,5,1,2]
+i0 tank -2 reset start=1; i1 -2 reset start=2; i2 -2 reset start=3; i3 +3; i4 +6.
+total gas 15 >= cost 15 → answer start = 3.
 
 ### Visualization
 ```
@@ -257,31 +259,36 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
-            end = e
-    return count
+def canCompleteCircuit(gas, cost):
+    if sum(gas) < sum(cost):
+        return -1
+    start, tank = 0, 0
+    for i in range(len(gas)):
+        tank += gas[i] - cost[i]
+        if tank < 0:                          # can't reach i+1 from start
+            start = i + 1
+            tank = 0
+    return start
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
+Time O(n), Space O(1). One circular sweep with a running tank.
 
 ## 10. Solved Example 2
 
 ### Problem — Jump Game II (LeetCode 45)
-A representative **Gas Station** problem. The signal: single pass: reset start when the running tank goes negative.
+Every position is reachable via nums[i] max jumps; return the minimum jumps to the last index.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (gas station, greedy, circular, running total, reset start).
-2. Reach for the Gas Station template below and map the problem's entities onto it.
-3. When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
+1. Process the array in levels defined by how far the current number of jumps can carry you.
+2. Within each level, track the farthest index the next jump could reach.
+3. When the scan hits the level's end, spend one jump and extend the boundary to that farthest.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums = [2,3,0,1,4]
+i0 farthest=2, i==cur_end(0) → jumps=1 cur_end=2
+i1 farthest=max(2,4)=4; i2==cur_end(2) → jumps=2 cur_end=4 reaches last.
+answer = 2.
 
 ### Visualization
 ```
@@ -292,31 +299,33 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
-            end = e
-    return count
+def jump(nums):
+    jumps = cur_end = farthest = 0
+    for i in range(len(nums) - 1):
+        farthest = max(farthest, i + nums[i])
+        if i == cur_end:                      # exhausted this jump's range
+            jumps += 1
+            cur_end = farthest
+    return jumps
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
+Time O(n), Space O(1). One pass tracking level boundaries.
 
 ## 11. Solved Example 3
 
 ### Problem — Min Refuel (LeetCode 871)
-A representative **Gas Station** problem. The signal: single pass: reset start when the running tank goes negative.
+Reach target with startFuel; each station gives fuel at a position. Return the fewest stops, or -1.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (gas station, greedy, circular, running total, reset start).
-2. Reach for the Gas Station template below and map the problem's entities onto it.
-3. When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
+1. Drive as far as the current fuel allows, banking each passed station's fuel into a max-heap.
+2. When you can't reach the next station or the target, refuel from the largest banked station — the greediest gain per stop.
+3. If the heap is empty and you still fall short, the target is unreachable.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+target=100, startFuel=10, stations=[[10,60],[20,30],[30,30],[60,40]]
+fuel10 banks 60; can't pass 20 → pop 60 stops=1 fuel70; banks 30,30,40;
+fuel70<100 → pop 40 stops=2 fuel110>=100. answer = 2.
 
 ### Visualization
 ```
@@ -327,18 +336,24 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
-            end = e
-    return count
+import heapq
+
+def minRefuelStops(target, startFuel, stations):
+    heap = []                                 # max-heap of reachable fuels
+    fuel, stops, i, n = startFuel, 0, 0, len(stations)
+    while fuel < target:
+        while i < n and stations[i][0] <= fuel:
+            heapq.heappush(heap, -stations[i][1])
+            i += 1
+        if not heap:
+            return -1
+        fuel += -heapq.heappop(heap)          # take the biggest tank
+        stops += 1
+    return stops
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
+Time O(n log n), Space O(n). Each station is pushed and popped at most once.
 
 
 ## 12. LeetCode Practice Set

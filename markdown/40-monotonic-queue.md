@@ -247,12 +247,17 @@ vector<int> maxSlidingWindow(vector<int>& nums, int k) {
 A representative **Monotonic Queue** problem. The signal: a deque kept monotone yields o(1) window min/max amortized.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (monotonic queue, deque, window max, window min, amortized).
-2. Reach for the Monotonic Queue template below and map the problem's entities onto it.
-3. A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier.
+1. Keep a deque of **indices** whose values are strictly decreasing, so the front is always the current window's maximum.
+2. Before appending index `i`, pop from the back every index whose value is `<= nums[i]` — they can never be the max while `nums[i]` is in the window.
+3. Pop from the front once it falls outside the window (`dq[0] <= i - k`); record `nums[dq[0]]` as soon as the first full window forms (`i >= k - 1`).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [1,3,-1,-3,5]`, `k = 3`.
+- i=0 (1): dq=[0].
+- i=1 (3): pop 0 (1<3), dq=[1].
+- i=2 (-1): dq=[1,2]; window full → max=nums[1]=3.
+- i=3 (-3): dq=[1,2,3]; front 1 still in window → max=3.
+- i=4 (5): pop 3,2,1 (all <5), dq=[4]; front 1<4-3? handled → max=nums[4]=5. Result `[3,3,5]`.
 
 ### Visualization
 ```
@@ -264,13 +269,14 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def max_sliding_window(nums, k):
-    dq, res = deque(), []          # dq holds indices, values decreasing
+
+def maxSlidingWindow(nums, k):
+    dq, res = deque(), []          # dq holds indices, nums decreasing front→back
     for i, v in enumerate(nums):
-        while dq and nums[dq[-1]] < v:
+        while dq and nums[dq[-1]] <= v:
             dq.pop()
         dq.append(i)
-        if dq[0] <= i - k:
+        if dq[0] <= i - k:         # drop index that left the window
             dq.popleft()
         if i >= k - 1:
             res.append(nums[dq[0]])
@@ -278,7 +284,7 @@ def max_sliding_window(nums, k):
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits each node/edge once.
+Time O(n), Space O(k). Each index is pushed and popped from the deque at most once.
 
 ## 10. Solved Example 2
 
@@ -286,12 +292,16 @@ Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits eac
 A representative **Monotonic Queue** problem. The signal: a deque kept monotone yields o(1) window min/max amortized.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (monotonic queue, deque, window max, window min, amortized).
-2. Reach for the Monotonic Queue template below and map the problem's entities onto it.
-3. A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier.
+1. Build prefix sums `P` where `P[j] - P[i]` is the sum of `nums[i:j]`; we want the smallest `j - i` with `P[j] - P[i] >= k` (negatives make plain sliding window fail).
+2. Keep a deque of prefix indices with **increasing** `P`. For each `j`, pop from the front while `P[j] - P[dq[0]] >= k`, recording the length — that front index is optimal and never needed again.
+3. Pop from the back while `P[dq[-1]] >= P[j]`: a later index with a smaller prefix always dominates an earlier larger one.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [2,-1,2]`, `k = 3`. Prefix `P = [0,2,1,3]`.
+- j=0: dq=[0].
+- j=1 (P=2): 2-0<3; dq=[0,1].
+- j=2 (P=1): pop back 1 (2>=1), pop 0? 0<1 keep; dq=[0,2].
+- j=3 (P=3): 3-P[0]=3>=3 → len 3, popleft; 3-P[2]=2<3 stop. Answer `3`.
 
 ### Visualization
 ```
@@ -303,21 +313,25 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def max_sliding_window(nums, k):
-    dq, res = deque(), []          # dq holds indices, values decreasing
+
+def shortestSubarray(nums, k):
+    n = len(nums)
+    prefix = [0] * (n + 1)
     for i, v in enumerate(nums):
-        while dq and nums[dq[-1]] < v:
+        prefix[i + 1] = prefix[i] + v
+
+    dq, best = deque(), n + 1       # dq holds indices with increasing prefix
+    for j, pj in enumerate(prefix):
+        while dq and pj - prefix[dq[0]] >= k:
+            best = min(best, j - dq.popleft())
+        while dq and prefix[dq[-1]] >= pj:
             dq.pop()
-        dq.append(i)
-        if dq[0] <= i - k:
-            dq.popleft()
-        if i >= k - 1:
-            res.append(nums[dq[0]])
-    return res
+        dq.append(j)
+    return best if best <= n else -1
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits each node/edge once.
+Time O(n), Space O(n). Each prefix index enters and leaves the deque once.
 
 ## 11. Solved Example 3
 
@@ -325,12 +339,16 @@ Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits eac
 A representative **Monotonic Queue** problem. The signal: a deque kept monotone yields o(1) window min/max amortized.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (monotonic queue, deque, window max, window min, amortized).
-2. Reach for the Monotonic Queue template below and map the problem's entities onto it.
-3. A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier.
+1. Maintain a sliding window `[left, right]` and two deques over its values: `max_dq` (decreasing, front = window max) and `min_dq` (increasing, front = window min).
+2. Extend `right` by pushing `nums[right]` into both deques with the usual monotonic pops.
+3. While `max_dq[0] - min_dq[0] > limit`, shrink from `left`, popping whichever deque front equals `nums[left]`. Track the largest valid window width.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [8,2,4,7]`, `limit = 4`.
+- r=0 (8): max=[8] min=[8], diff 0 → best 1.
+- r=1 (2): max=[8,2] min=[2], diff 8-2=6>4 → shrink left=1, drop 8; max=[2] min=[2] → best 1.
+- r=2 (4): max=[4] min=[2,4], diff 2 → best 2.
+- r=3 (7): max=[7] min=[2,4,7], diff 5>4 → shrink: left=2 drops 2, diff 7-4=3 → best 2. Answer `2`.
 
 ### Visualization
 ```
@@ -342,21 +360,29 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def max_sliding_window(nums, k):
-    dq, res = deque(), []          # dq holds indices, values decreasing
-    for i, v in enumerate(nums):
-        while dq and nums[dq[-1]] < v:
-            dq.pop()
-        dq.append(i)
-        if dq[0] <= i - k:
-            dq.popleft()
-        if i >= k - 1:
-            res.append(nums[dq[0]])
-    return res
+
+def longestSubarray(nums, limit):
+    max_dq, min_dq = deque(), deque()   # values: decreasing / increasing
+    left = best = 0
+    for right, v in enumerate(nums):
+        while max_dq and max_dq[-1] < v:
+            max_dq.pop()
+        max_dq.append(v)
+        while min_dq and min_dq[-1] > v:
+            min_dq.pop()
+        min_dq.append(v)
+        while max_dq[0] - min_dq[0] > limit:
+            if max_dq[0] == nums[left]:
+                max_dq.popleft()
+            if min_dq[0] == nums[left]:
+                min_dq.popleft()
+            left += 1
+        best = max(best, right - left + 1)
+    return best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits each node/edge once.
+Time O(n), Space O(n). Each value enters and leaves each deque at most once.
 
 
 ## 12. LeetCode Practice Set

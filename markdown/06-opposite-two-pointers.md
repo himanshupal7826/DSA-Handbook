@@ -245,15 +245,18 @@ pair<int,int> twoSumSorted(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Two Sum II (LeetCode 167)
-A representative **Opposite Direction Two Pointers** problem. The signal: shrink a window from both ends toward the middle on sorted/symmetric data.
+The array is sorted; return the 1-indexed positions of the two numbers that add up to `target`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (two pointer, left right, converge, sorted, pair sum, palindrome).
-2. Reach for the Opposite Direction Two Pointers template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. Sorted input means the sum is monotonic: moving `l` right only raises it, moving `r` left only lowers it.
+2. Start with `l` at the front and `r` at the back and compare the pair sum against `target`.
+3. If the sum is too small advance `l`; if too large retreat `r`; on a match return `[l+1, r+1]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+numbers = [2,7,11,15], target = 9.
+- l=0 (2), r=3 (15): sum 17 > 9 → r=2.
+- l=0 (2), r=2 (11): sum 13 > 9 → r=1.
+- l=0 (2), r=1 (7): sum 9 == 9 → return [1, 2].
 
 ### Visualization
 ```
@@ -264,34 +267,36 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
+def twoSum(numbers, target):
+    l, r = 0, len(numbers) - 1
     while l < r:
-        s = a[l] + a[r]
+        s = numbers[l] + numbers[r]
         if s == target:
-            return (l, r)
+            return [l + 1, r + 1]
         elif s < target:
-            l += 1          # increase sum
+            l += 1          # need a larger sum
         else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+            r -= 1          # need a smaller sum
+    return []
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time O(n), Space O(1) — a single converging scan over the sorted array.
 
 ## 10. Solved Example 2
 
 ### Problem — Valid Palindrome (LeetCode 125)
-A representative **Opposite Direction Two Pointers** problem. The signal: shrink a window from both ends toward the middle on sorted/symmetric data.
+Considering only alphanumeric characters and ignoring case, decide whether the string reads the same forwards and backwards.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (two pointer, left right, converge, sorted, pair sum, palindrome).
-2. Reach for the Opposite Direction Two Pointers template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. Converge two pointers from both ends toward the middle.
+2. Skip any non-alphanumeric character so only letters and digits are compared.
+3. Compare the two characters case-insensitively; a mismatch means it is not a palindrome.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+s = "A man, a plan" (abbreviated). Focus on ends.
+- l points to 'A', r points to 'n' (skipping the comma/space) → 'a' == 'n'? no in full string, but for "aba": l='a', r='a' → match, move inward.
+- l='b', r='b' (middle) → l >= r, loop ends → return True.
 
 ### Visualization
 ```
@@ -302,34 +307,38 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
+def isPalindrome(s):
+    l, r = 0, len(s) - 1
     while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+        while l < r and not s[l].isalnum():
+            l += 1
+        while l < r and not s[r].isalnum():
+            r -= 1
+        if s[l].lower() != s[r].lower():
+            return False
+        l += 1
+        r -= 1
+    return True
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time O(n), Space O(1) — each character is visited at most once by the two pointers.
 
 ## 11. Solved Example 3
 
 ### Problem — Container Water (LeetCode 11)
-A representative **Opposite Direction Two Pointers** problem. The signal: shrink a window from both ends toward the middle on sorted/symmetric data.
+Given wall heights, pick two lines that with the x-axis form a container holding the most water.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (two pointer, left right, converge, sorted, pair sum, palindrome).
-2. Reach for the Opposite Direction Two Pointers template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. Area = width × min(height[l], height[r]); start with the widest possible container (l=0, r=n-1).
+2. The shorter wall caps the area, so shrinking width only helps if we replace the shorter wall.
+3. Move the pointer at the shorter wall inward each step, tracking the best area seen.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+height = [1,8,6,2,5,4,8,3,7].
+- l=0(1), r=8(7): area 8×1=8, move l (shorter).
+- l=1(8), r=8(7): area 7×7=49, move r (shorter).
+- continue; max area stays 49 → return 49.
 
 ### Visualization
 ```
@@ -340,21 +349,20 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
+def maxArea(height):
+    l, r = 0, len(height) - 1
+    best = 0
     while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
+        best = max(best, (r - l) * min(height[l], height[r]))
+        if height[l] < height[r]:
+            l += 1          # discard the shorter left wall
         else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+            r -= 1          # discard the shorter right wall
+    return best
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time O(n), Space O(1) — one converging pass, no extra storage.
 
 
 ## 12. LeetCode Practice Set

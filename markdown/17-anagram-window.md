@@ -260,122 +260,167 @@ int longestWindow(const string& s) {
 ## 9. Solved Example 1
 
 ### Problem — Find Anagrams (LeetCode 438)
-A representative **Anagram Window** problem. The signal: fixed window + char-count match to find anagrams/permutations.
+Return the start indices of every substring of `s` that is an anagram of `p`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (anagram, permutation, fixed window, char count, find all).
-2. Reach for the Anagram Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. Any anagram of `p` has length `len(p)` and identical character counts, so use a **fixed window** of size `len(p)`.
+2. Build a `Counter` for `p` and a running `Counter` for the current window.
+3. Slide the window one char right each step: add the entering char, drop the char that fell off the left. When the two counters match, record the window's start index.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`s = "cbaebabacd", p = "abc"` (window size 3, need `{a:1,b:1,c:1}`):
+- window `cba` (i=0) → counts match → record `0`.
+- windows `bae, aeb, eba, bab, aba` → no match.
+- window `bac` (i=6) → counts match → record `6`.
+- Result `[0, 6]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Anagram Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+"cbaebabacd" ──▶ slide fixed window of len(p)=3, compare counts to p
+match at index 0 ("cba") and index 6 ("bac") ──▶ [0, 6]
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
-        best = max(best, right - left + 1)
-    return best
+from collections import Counter
+
+def findAnagrams(s: str, p: str) -> list[int]:
+    if len(p) > len(s):
+        return []
+    need = Counter(p)
+    window = Counter(s[:len(p)])
+    res = []
+    if window == need:
+        res.append(0)
+    for right in range(len(p), len(s)):
+        window[s[right]] += 1               # char enters on the right
+        left = right - len(p)
+        window[s[left]] -= 1                # char leaves on the left
+        if window[s[left]] == 0:
+            del window[s[left]]
+        if window == need:
+            res.append(left + 1)
+    return res
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n) with a 26-way count compare per step; Space O(1) (at most 26 keys).
 
 ## 10. Solved Example 2
 
 ### Problem — Permutation in String (LeetCode 567)
-A representative **Anagram Window** problem. The signal: fixed window + char-count match to find anagrams/permutations.
+Return `True` if `s2` contains any permutation of `s1` as a contiguous substring.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (anagram, permutation, fixed window, char count, find all).
-2. Reach for the Anagram Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. A permutation of `s1` is just an anagram, so we need a **fixed window** of size `len(s1)` whose char counts equal those of `s1`.
+2. Track how many of the 26 letters currently have the *exact* required count with a single `matches` integer, so each slide is O(1) instead of comparing whole maps.
+3. When `matches == 26`, the window is a permutation → return `True`. Return `False` if we run off the end.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`s1 = "ab", s2 = "eidbaooo"` (window size 2):
+- windows `ei, id, db` → counts differ, no match.
+- window `ba` → counts `{b:1,a:1}` equal `s1` → return `True`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Anagram Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+"eidbaooo" ──▶ slide window of len(s1)=2, keep 26-letter match count
+window "ba" matches counts of "ab" ──▶ True
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
-        best = max(best, right - left + 1)
-    return best
+def checkInclusion(s1: str, s2: str) -> bool:
+    if len(s1) > len(s2):
+        return False
+    need = [0] * 26
+    window = [0] * 26
+    for ch in s1:
+        need[ord(ch) - 97] += 1
+    matches = sum(1 for i in range(26) if need[i] == window[i])
+    for right in range(len(s2)):
+        r = ord(s2[right]) - 97
+        window[r] += 1
+        if window[r] == need[r]:
+            matches += 1
+        elif window[r] == need[r] + 1:
+            matches -= 1
+        if right >= len(s1):
+            l = ord(s2[right - len(s1)]) - 97
+            window[l] -= 1
+            if window[l] == need[l]:
+                matches += 1
+            elif window[l] == need[l] - 1:
+                matches -= 1
+        if matches == 26:
+            return True
+    return False
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n) with O(1) work per slide; Space O(1) (two fixed 26-length arrays).
 
 ## 11. Solved Example 3
 
 ### Problem — Substring Concat (LeetCode 30)
-A representative **Anagram Window** problem. The signal: fixed window + char-count match to find anagrams/permutations.
+All words in `words` share length `L`. Find every start index in `s` where a substring is a concatenation of **every** word exactly once (in any order).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (anagram, permutation, fixed window, char count, find all).
-2. Reach for the Anagram Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. A valid substring has length `total = L * len(words)` and is a sequence of back-to-back `L`-sized chunks whose multiset of chunks equals `Counter(words)`.
+2. Since words are all length `L`, any valid start is congruent mod `L`; run `L` independent sliding windows, one per offset `0..L-1`, stepping by `L` words at a time.
+3. In each offset window keep a running `seen` count; when a chunk's count exceeds the need, shrink from the left by whole words. When the window holds exactly `len(words)` words, record its start.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`s = "barfoothefoobarman", words = ["foo","bar"]` (`L=3, total=6`):
+- offset 0: chunks `bar,foo` → both needed, count 2 → record start `0`; then `the` not a word → reset.
+- later chunks `foo,bar` at index 9 → count 2 → record start `9`.
+- Result `[0, 9]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Anagram Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+"barfoothefoobarman" ──▶ L=3 offset windows, match chunk multiset to words
+"barfoo" @0 and "foobar" @9 ──▶ [0, 9]
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
-        best = max(best, right - left + 1)
-    return best
+from collections import Counter
+
+def findSubstring(s: str, words: list[str]) -> list[int]:
+    if not words or not s:
+        return []
+    L, n = len(words[0]), len(words)
+    total = L * n
+    need = Counter(words)
+    res = []
+    for offset in range(L):
+        left = offset
+        seen = Counter()
+        count = 0                              # words currently in window
+        for right in range(offset, len(s) - L + 1, L):
+            word = s[right:right + L]
+            if word in need:
+                seen[word] += 1
+                count += 1
+                while seen[word] > need[word]: # too many of this word → shrink
+                    lw = s[left:left + L]
+                    seen[lw] -= 1
+                    count -= 1
+                    left += L
+                if count == n:
+                    res.append(left)
+                    lw = s[left:left + L]       # slide past one word to keep searching
+                    seen[lw] -= 1
+                    count -= 1
+                    left += L
+            else:
+                seen.clear()                   # invalid word breaks the run
+                count = 0
+                left = right + L
+    return res
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(len(s) · L) — each of the `L` offsets scans the string once; Space O(len(words) · L) for the counters.
 
 
 ## 12. LeetCode Practice Set

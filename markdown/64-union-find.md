@@ -253,16 +253,20 @@ vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
 
 ## 9. Solved Example 1
 
-### Problem — Provinces (LeetCode 547)
-A representative **Union Find** problem. The signal: disjoint set union answers connectivity in near-constant amortized time.
+### Problem — Number of Provinces (LeetCode 547)
+Given an `n x n` adjacency matrix `isConnected` where `isConnected[i][j] = 1` means cities i and j are directly connected, return the number of provinces (connected components).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (union find, disjoint set, dsu, connectivity, path compression).
-2. Reach for the Union Find template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Each city is its own set initially, so there are `n` provinces to start.
+2. Scan the upper triangle of the matrix; whenever `isConnected[i][j] == 1`, union i and j.
+3. Every successful union (two different roots merged) reduces the province count by one.
+4. Return the remaining count.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input: `isConnected=[[1,1,0],[1,1,0],[0,0,1]]`, count=3.
+- i=0,j=1 → 1: union(0,1), roots differ → count=2.
+- i=0,j=2 → 0: skip. i=1,j=2 → 0: skip.
+- No more edges → return 2.
 
 ### Visualization
 ```
@@ -273,35 +277,46 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+def findCircleNum(isConnected):
+    n = len(isConnected)
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]   # path compression
+            x = parent[x]
+        return x
+
+    count = n
+    for i in range(n):
+        for j in range(i + 1, n):
+            if isConnected[i][j]:
+                ri, rj = find(i), find(j)
+                if ri != rj:
+                    parent[ri] = rj
+                    count -= 1
+    return count
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(n^2 · α(n)) to scan the matrix; Space O(n) for the parent array.
 
 ## 10. Solved Example 2
 
 ### Problem — Redundant Connection (LeetCode 684)
-A representative **Union Find** problem. The signal: disjoint set union answers connectivity in near-constant amortized time.
+A tree of `n` nodes had one extra edge added, making exactly one cycle. Given the `edges` in order, return the edge that can be removed — the last one that closes a cycle.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (union find, disjoint set, dsu, connectivity, path compression).
-2. Reach for the Union Find template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Start with every node in its own set (nodes are 1-indexed).
+2. Process edges in input order; for `[u, v]` find the roots of u and v.
+3. If the roots already match, u and v are connected, so this edge closes the cycle → it is the answer.
+4. Otherwise union them and continue.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input: `edges=[[1,2],[1,3],[2,3]]`.
+- [1,2]: roots 1,2 differ → union → {1,2}.
+- [1,3]: roots 1,3 differ → union → {1,2,3}.
+- [2,3]: find(2)=find(3)=same root → cycle → return `[2,3]`.
 
 ### Visualization
 ```
@@ -312,35 +327,42 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+def findRedundantConnection(edges):
+    parent = list(range(len(edges) + 1))   # nodes are 1..n
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]   # path compression
+            x = parent[x]
+        return x
+
+    for u, v in edges:
+        ru, rv = find(u), find(v)
+        if ru == rv:
+            return [u, v]                    # this edge closes a cycle
+        parent[ru] = rv
+    return []
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(n · α(n)) over the edges; Space O(n) for the parent array.
 
 ## 11. Solved Example 3
 
-### Problem — Num Islands (LeetCode 200)
-A representative **Union Find** problem. The signal: disjoint set union answers connectivity in near-constant amortized time.
+### Problem — Number of Islands (LeetCode 200)
+Given a grid of `'1'` (land) and `'0'` (water), count the islands (groups of land connected horizontally/vertically). Solve it with union-find here.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (union find, disjoint set, dsu, connectivity, path compression).
-2. Reach for the Union Find template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Give each land cell a linear id `r * cols + c`; count starts as the number of land cells.
+2. Scan the grid; for each land cell, union it with its right and down land neighbors (covers all adjacencies without double counting).
+3. Each successful union of two distinct components decrements the island count.
+4. Return the remaining count.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Grid `[["1","1","0"],["0","1","0"],["0","0","1"]]`, land cells = 4 → count=4.
+- (0,0)-(0,1): union → count=3. (0,1)-(1,1): union → count=2.
+- (1,1) down is (2,1)="0": skip. (2,2) has no land right/down neighbor.
+- Remaining components: {(0,0),(0,1),(1,1)} and {(2,2)} → return 2.
 
 ### Visualization
 ```
@@ -351,22 +373,39 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+def numIslands(grid):
+    if not grid or not grid[0]:
+        return 0
+    rows, cols = len(grid), len(grid[0])
+    parent = list(range(rows * cols))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]   # path compression
+            x = parent[x]
+        return x
+
+    count = sum(grid[r][c] == '1' for r in range(rows) for c in range(cols))
+
+    def union(a, b):
+        nonlocal count
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+            count -= 1
+
+    for r in range(rows):
+        for c in range(cols):
+            if grid[r][c] == '1':
+                if r + 1 < rows and grid[r + 1][c] == '1':
+                    union(r * cols + c, (r + 1) * cols + c)
+                if c + 1 < cols and grid[r][c + 1] == '1':
+                    union(r * cols + c, r * cols + c + 1)
+    return count
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(rows · cols · α) for the grid scan and unions; Space O(rows · cols) for the parent array.
 
 
 ## 12. LeetCode Practice Set

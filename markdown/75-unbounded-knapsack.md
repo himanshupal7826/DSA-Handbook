@@ -237,101 +237,119 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — Coin Change (LeetCode 322)
-A representative **Unbounded Knapsack** problem. The signal: items reusable any number of times; iterate capacity forward.
+Find the **minimum** number of coins to make `amount`, coins reusable any number of times. Minimization over an unbounded knapsack.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (unbounded knapsack, dp, reuse, coin change, repeat items).
-2. Reach for the Unbounded Knapsack template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. `dp[a]` = fewest coins to make amount `a`; seed `dp[0] = 0`, all others `inf`.
+2. Fill `a` from 1 to `amount`; for each coin `c ≤ a`, `dp[a] = min(dp[a], dp[a - c] + 1)`.
+3. Because we sweep amounts **upward** and reuse `dp[a - c]`, each coin may be used repeatedly.
+4. Return `dp[amount]`, or `-1` if it stayed `inf`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `coins = [1, 2, 5]`, amount = 11.
+- `dp[1]=1, dp[2]=1, dp[3]=2, dp[4]=2, dp[5]=1`.
+- `dp[6]=2, dp[10]=2` (5+5).
+- `dp[11] = min(dp[10]+1, dp[9]+1, dp[6]+1) = 3` (5+5+1).
+- Answer `3`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Unbounded Knapsack step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+amount = 11 ──▶ [ dp[a] = min(dp[a-c]+1), a ascending -> coins reused ]
+dp[11] = 3  ──▶ 5 + 5 + 1
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def coinChange(coins, amount):
+    INF = float('inf')
+    dp = [0] + [INF] * amount           # dp[a] = min coins for amount a
+    for a in range(1, amount + 1):
+        for c in coins:
+            if c <= a:
+                dp[a] = min(dp[a], dp[a - c] + 1)
+    return -1 if dp[amount] == INF else dp[amount]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(amount × len(coins)), Space O(amount).
 
 ## 10. Solved Example 2
 
 ### Problem — Coin Change II (LeetCode 518)
-A representative **Unbounded Knapsack** problem. The signal: items reusable any number of times; iterate capacity forward.
+Count the number of **combinations** of coins that make `amount`, coins reusable. Order does not matter, so the coin loop goes **outside**.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (unbounded knapsack, dp, reuse, coin change, repeat items).
-2. Reach for the Unbounded Knapsack template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. `dp[a]` = number of combinations summing to `a`; seed `dp[0] = 1` (one way: pick nothing).
+2. Put the **coin loop outermost**; for each coin sweep `a` **upward** from `coin` to `amount`: `dp[a] += dp[a - coin]`.
+3. Coin-outer ordering counts each combination once (no permutations), and upward sweep allows reuse.
+4. Return `dp[amount]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `amount = 5`, coins = [1, 2, 5].
+- After coin 1: `dp = [1,1,1,1,1,1]` (all-ones way).
+- After coin 2: `dp[2..5] += dp[a-2]` → `dp = [1,1,2,2,3,3]`.
+- After coin 5: `dp[5] += dp[0]` → `dp[5] = 4`.
+- Answer `4` (5; 1+2+2; 1+1+1+2; 1+1+1+1+1).
 
 ### Visualization
 ```
-input  ──▶ [ apply Unbounded Knapsack step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+coins outer ──▶ [ dp[a] += dp[a-coin], a ascending ]
+each combination counted once  ──▶ dp[5] = 4
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def change(amount, coins):
+    dp = [0] * (amount + 1)
+    dp[0] = 1                           # one way to make 0: empty selection
+    for coin in coins:                  # coin outer -> combinations, not permutations
+        for a in range(coin, amount + 1):   # ascending -> coin reusable
+            dp[a] += dp[a - coin]
+    return dp[amount]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(amount × len(coins)), Space O(amount).
 
 ## 11. Solved Example 3
 
 ### Problem — Combination Sum IV (LeetCode 377)
-A representative **Unbounded Knapsack** problem. The signal: items reusable any number of times; iterate capacity forward.
+Count ordered sequences (**permutations**) of `nums` that sum to `target`, numbers reusable. Because order matters, the target loop goes **outside** and nums inner.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (unbounded knapsack, dp, reuse, coin change, repeat items).
-2. Reach for the Unbounded Knapsack template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. `dp[a]` = number of ordered sequences summing to `a`; seed `dp[0] = 1`.
+2. Put the **target loop outermost**; for each amount `a` from 1 to `target`, add `dp[a - n]` for every `n ≤ a`.
+3. Target-outer ordering lets the same amount be reached by different last-picked numbers, so `[1,2]` and `[2,1]` both count.
+4. Return `dp[target]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `nums = [1, 2, 3]`, target = 4.
+- `dp[0]=1`.
+- `dp[1]=dp[0]=1`.
+- `dp[2]=dp[1]+dp[0]=2`.
+- `dp[3]=dp[2]+dp[1]+dp[0]=4`.
+- `dp[4]=dp[3]+dp[2]+dp[1]=4+2+1=7`. Answer `7`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Unbounded Knapsack step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+target outer ──▶ [ dp[a] += dp[a-n] for n in nums, a ascending ]
+order matters -> [1,2] and [2,1] both counted  ──▶ dp[4] = 7
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def combinationSum4(nums, target):
+    dp = [0] * (target + 1)
+    dp[0] = 1                           # empty sequence sums to 0
+    for a in range(1, target + 1):      # amount outer -> permutations
+        for n in nums:
+            if n <= a:
+                dp[a] += dp[a - n]
+    return dp[target]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(target × len(nums)), Space O(target).
 
 
 ## 12. LeetCode Practice Set

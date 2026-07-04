@@ -251,15 +251,18 @@ pair<int,int> twoSumSorted(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Sort Colors (LeetCode 75)
-A representative **Dutch National Flag** problem. The signal: three-way partition into <, =, > a pivot in a single o(n) pass.
+Sort an array of 0s, 1s, and 2s in place in a single pass (the classic Dutch National Flag problem).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (three way partition, sort colors, 0 1 2, pivot, quicksort partition).
-2. Reach for the Dutch National Flag template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. Keep three regions via `lo` (end of 0s), `mid` (scanner), and `hi` (start of 2s).
+2. At `nums[mid]`: 0 → swap into the `lo` region and advance both `lo` and `mid`; 1 → just advance `mid`.
+3. 2 → swap to the `hi` region and shrink `hi`, but do NOT advance `mid` (the swapped-in value is unexamined).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums = [2,0,1].
+- lo=0,mid=0,hi=2: nums[0]=2 → swap with hi → [1,0,2], hi=1.
+- mid=0: nums[0]=1 → mid=1.
+- mid=1: nums[1]=0 → swap with lo → [0,1,2], lo=1,mid=2 → mid>hi, done.
 
 ### Visualization
 ```
@@ -270,34 +273,39 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
+def sortColors(nums):
+    lo, mid, hi = 0, 0, len(nums) - 1
+    while mid <= hi:
+        if nums[mid] == 0:
+            nums[lo], nums[mid] = nums[mid], nums[lo]
+            lo += 1
+            mid += 1
+        elif nums[mid] == 1:
+            mid += 1
         else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+            nums[mid], nums[hi] = nums[hi], nums[mid]
+            hi -= 1
+    return nums
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time O(n), Space O(1) — one three-way-partition pass.
 
 ## 10. Solved Example 2
 
 ### Problem — Kth Largest (LeetCode 215)
-A representative **Dutch National Flag** problem. The signal: three-way partition into <, =, > a pivot in a single o(n) pass.
+Find the kth largest element in an unsorted array without fully sorting it.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (three way partition, sort colors, 0 1 2, pivot, quicksort partition).
-2. Reach for the Dutch National Flag template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. The kth largest sits at index `n-k` in ascending order — target that index with quickselect.
+2. Partition around a random pivot using a three-way (Dutch flag) split into `< = >` regions.
+3. Compare the target index to the equal region `[lt, gt]`; recurse into only the side that contains it.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums = [3,2,1,5,6,4], k = 2 → target index 4.
+- Pivot say 4: partition → [3,2,1,4,5,6] with equal region at index 3.
+- target 4 > gt(3) → search right half [5,6].
+- Pivot 5: 6 is largest, target index 4 lands on 5 → return 5.
 
 ### Visualization
 ```
@@ -308,21 +316,34 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
+import random
+
+def findKthLargest(nums, k):
+    target = len(nums) - k          # index in ascending order
+    lo, hi = 0, len(nums) - 1
+    while True:
+        pivot = nums[random.randint(lo, hi)]
+        lt, i, gt = lo, lo, hi       # Dutch-flag three-way partition
+        while i <= gt:
+            if nums[i] < pivot:
+                nums[lt], nums[i] = nums[i], nums[lt]
+                lt += 1
+                i += 1
+            elif nums[i] > pivot:
+                nums[i], nums[gt] = nums[gt], nums[i]
+                gt -= 1
+            else:
+                i += 1
+        if target < lt:
+            hi = lt - 1
+        elif target > gt:
+            lo = gt + 1
         else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+            return nums[target]
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time O(n) average (O(n^2) worst), Space O(1) — in-place quickselect.
 
 ## 11. Solved Example 3
 

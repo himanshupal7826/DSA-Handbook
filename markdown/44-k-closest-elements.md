@@ -255,12 +255,14 @@ vector<int> topK(vector<int>& nums, int k) {
 A representative **K Closest Elements** problem. The signal: heap (or binary search) selects the k nearest items by distance.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (k closest, heap, distance, origin, binary search).
-2. Reach for the K Closest Elements template below and map the problem's entities onto it.
-3. A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
+1. Rank each point by its squared distance to the origin — no square root needed, order is preserved.
+2. "K closest" is a top-k selection by smallest distance, exactly what a size-k heap solves.
+3. `heapq.nsmallest(k, ...)` keyed by squared distance returns the k nearest points.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+points=[[1,3],[-2,2],[5,8],[0,1]], k=2. Squared distances: 10, 8, 89, 1.
+nsmallest(2) by distance → [0,1] (d=1) then [-2,2] (d=8).
+Answer → `[[0,1], [-2,2]]`.
 
 ### Visualization
 ```
@@ -272,17 +274,12 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+def kClosest(points, k):
+    return heapq.nsmallest(k, points, key=lambda p: p[0] * p[0] + p[1] * p[1])
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
+Time O(n log k), Space O(k). Selecting k of n points with a size-k heap costs O(n log k).
 
 ## 10. Solved Example 2
 
@@ -290,12 +287,14 @@ Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
 A representative **K Closest Elements** problem. The signal: heap (or binary search) selects the k nearest items by distance.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (k closest, heap, distance, origin, binary search).
-2. Reach for the K Closest Elements template below and map the problem's entities onto it.
-3. A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
+1. The answer is a contiguous length-k window of the sorted array — find its left boundary.
+2. Binary search over candidate starts `lo..len-k`; compare the two window edges against x.
+3. If `x - arr[mid] > arr[mid+k] - x`, the left edge is farther, so slide right; else move left.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+arr=[1,2,3,4,5], k=4, x=3. lo=0, hi=1. mid=0: x-arr[0]=2 vs arr[4]-x=2 → not greater → hi=0.
+Loop ends, lo=0.
+Window `arr[0:4]` = `[1,2,3,4]`.
 
 ### Visualization
 ```
@@ -306,18 +305,19 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+def findClosestElements(arr, k, x):
+    lo, hi = 0, len(arr) - k
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if x - arr[mid] > arr[mid + k] - x:
+            lo = mid + 1               # left edge too far -> shift window right
+        else:
+            hi = mid
+    return arr[lo:lo + k]
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
+Time O(log(n - k) + k), Space O(k) for the returned slice. Binary search locates the window start.
 
 ## 11. Solved Example 3
 
@@ -325,12 +325,14 @@ Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
 A representative **K Closest Elements** problem. The signal: heap (or binary search) selects the k nearest items by distance.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (k closest, heap, distance, origin, binary search).
-2. Reach for the K Closest Elements template below and map the problem's entities onto it.
-3. A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
+1. Sort the array so the median is the element at index `(n-1)//2`.
+2. "Strength" is distance from that median: `|v - m|`, ties broken by the larger value.
+3. The k strongest are the k *farthest* from the median — sort by `(|v-m|, v)` descending and take k.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+arr=[1,2,3,4,5], k=2. Sorted, m = arr[2] = 3. Strengths: |1-3|=2,|2-3|=1,0,1,2.
+Rank by (|v-m|, v) desc → 5 (2,5) beats 1 (2,1); then 4 (1,4) beats 2.
+Answer → `[5, 4]`.
 
 ### Visualization
 ```
@@ -341,18 +343,15 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+def getStrongest(arr, k):
+    arr.sort()
+    m = arr[(len(arr) - 1) // 2]                 # median after sorting
+    arr.sort(key=lambda v: (abs(v - m), v), reverse=True)
+    return arr[:k]                               # k farthest from the median
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
+Time O(n log n), Space O(n) for sorting. The two sorts dominate.
 
 
 ## 12. LeetCode Practice Set

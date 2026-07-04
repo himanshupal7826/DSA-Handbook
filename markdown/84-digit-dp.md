@@ -237,101 +237,141 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — Number of Digit One (LeetCode 233)
-A representative **Digit DP** problem. The signal: count numbers in a range satisfying digit constraints via tight-flag dp.
+Count how many times the digit `1` appears across every number from `1` to `n`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (digit dp, count numbers, tight, bounds, constraints).
-2. Reach for the Digit DP template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Count 1s contributed by each digit position independently, sweeping place value `i = 1, 10, 100, …`.
+2. At position `i` split `n` into `high = n // (i*10)`, `cur = (n // i) % 10`, `low = n % i` — `cur` is the digit currently sitting in that place.
+3. That place shows a `1` for `high * i` full cycles, plus an extra partial block: `0` more if `cur == 0`, `low + 1` more if `cur == 1`, and a whole extra `i` if `cur >= 2`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`n = 13`, expect `6` (ones in 1,10,11,11,12,13).
+- `i = 1`: high=1, cur=3 (>=2) ⇒ add `(1+1)*1 = 2`.
+- `i = 10`: high=0, cur=1 ⇒ add `0*10 + low(3) + 1 = 4`.
+- Total `2 + 4 = 6`. ✔
 
 ### Visualization
 ```
-input  ──▶ [ apply Digit DP step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+place ──▶ [ high | cur | low ] evaluated per power of 10
+state  ──▶ running count of 1s accumulated place by place
+output ──▶ sum over all places
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def countDigitOne(n):
+    count, i = 0, 1
+    while i <= n:
+        high, cur, low = n // (i * 10), (n // i) % 10, n % i
+        if cur == 0:
+            count += high * i
+        elif cur == 1:
+            count += high * i + low + 1
+        else:
+            count += (high + 1) * i
+        i *= 10
+    return count
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(log₁₀ n) — one pass per digit position; Space O(1).
 
 ## 10. Solved Example 2
 
-### Problem — Numbers At Most N (LeetCode 902)
-A representative **Digit DP** problem. The signal: count numbers in a range satisfying digit constraints via tight-flag dp.
+### Problem — Numbers At Most N Given Digit Set (LeetCode 902)
+Given a sorted set of digit characters, count positive integers `<= n` whose every digit comes from that set (digits may repeat).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (digit dp, count numbers, tight, bounds, constraints).
-2. Reach for the Digit DP template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Any number with **fewer** digits than `n` is automatically valid: with `K` allowed digits there are `K^length` of each shorter length.
+2. For numbers with the **same** length as `n`, walk `n` left to right keeping a *tight* bound: at each position, digits strictly smaller than `n`'s digit free up all remaining positions ⇒ add `K^(remaining)`.
+3. Continue tight only if the exact digit of `n` is in the set; if it is, and we reach the end still tight, `n` itself is formable ⇒ add 1.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`digits = ["1","3","5","7"], n = 100`, expect `20`.
+- Shorter lengths: length 1 ⇒ `4`, length 2 ⇒ `16`, total `20`.
+- Same length (3): first digit of `n` is `1`; no allowed digit is `< 1`, and `1` is in the set (stay tight). Next digit `0` has no allowed digit `<= 0`, so we stop: no 3-digit numbers. Total `20`. ✔
 
 ### Visualization
 ```
-input  ──▶ [ apply Digit DP step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+length ──▶ [ shorter: K^len each | equal: tight prefix scan ]
+state  ──▶ tight flag drops once a smaller digit is chosen
+output ──▶ shorter counts + tight-bounded same-length counts
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def atMostNGivenDigitSet(digits, n):
+    s = str(n)
+    L, K = len(s), len(digits)
+    total = sum(K ** length for length in range(1, L))  # fewer digits
+    for i, ch in enumerate(s):
+        has_same = False
+        for d in digits:
+            if d < ch:
+                total += K ** (L - i - 1)
+            elif d == ch:
+                has_same = True
+        if not has_same:
+            return total          # cannot stay tight -> done
+    return total + 1              # n itself is formable
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(L · K) where L = number of digits of n; Space O(1).
 
 ## 11. Solved Example 3
 
-### Problem — Repeated Digit (LeetCode 1012)
-A representative **Digit DP** problem. The signal: count numbers in a range satisfying digit constraints via tight-flag dp.
+### Problem — Numbers With Repeated Digits (LeetCode 1012)
+Count integers in `[1, n]` that have **at least one repeated digit**. Easier to count the complement (all-distinct-digit numbers) and subtract: `answer = n - distinct`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (digit dp, count numbers, tight, bounds, constraints).
-2. Reach for the Digit DP template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Count all-distinct-digit numbers with **fewer** digits than `n`: for length `L`, `9 · P(9, L-1)` (leading digit 1–9, then falling permutations of the rest).
+2. For the **same** length, scan `n` left to right with a `seen` set (used-digit mask): at each position, each unused digit smaller than `n`'s digit frees the tail ⇒ add `P(10-(i+1), L-(i+1))`.
+3. Stop the tight scan the moment `n`'s own digit repeats; if it never repeats, `n` itself is all-distinct ⇒ add 1. Return `n - distinct`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`n = 20`, expect `1` (only `11`).
+- Fewer digits (length 1): `9` distinct numbers.
+- Same length, i=0 digit `2`, smaller unused `{1}` ⇒ `P(9,1)=9`; mark `2`. i=1 digit `0`, no smaller digit; `0` unused so append ⇒ `n` distinct ⇒ `+1`.
+- distinct `= 9 + 9 + 1 = 19`; answer `= 20 - 19 = 1`. ✔
 
 ### Visualization
 ```
-input  ──▶ [ apply Digit DP step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+mask  ──▶ [ seen digits chosen so far ] guards distinctness
+state  ──▶ falling-permutation counts for free tail positions
+output ──▶ n - (distinct-digit numbers in [1, n])
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def numDupDigitsAtMostN(n):
+    digits = list(map(int, str(n)))
+    L = len(digits)
+
+    def perm(m, k):                    # m * (m-1) * ... (k factors)
+        res = 1
+        for j in range(k):
+            res *= (m - j)
+        return res
+
+    distinct = sum(9 * perm(9, length - 1) for length in range(1, L))
+
+    seen = set()
+    for i, d in enumerate(digits):
+        for x in range(0 if i else 1, d):
+            if x not in seen:
+                distinct += perm(10 - (i + 1), L - (i + 1))
+        if d in seen:
+            break
+        seen.add(d)
+    else:
+        distinct += 1                  # n itself has all-distinct digits
+
+    return n - distinct
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(L · 10) where L = number of digits of n; Space O(L) for the seen mask.
 
 
 ## 12. LeetCode Practice Set

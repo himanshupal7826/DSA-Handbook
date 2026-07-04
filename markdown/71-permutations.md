@@ -260,113 +260,144 @@ vector<vector<int>> subsets(vector<int>& nums) {
 ## 9. Solved Example 1
 
 ### Problem — Permutations (LeetCode 46)
-A representative **Permutations** problem. The signal: place each unused element in each position to enumerate orderings.
+Return every ordering of a list of distinct integers.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (permutations, arrange, backtracking, used array, swap).
-2. Reach for the Permutations template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Order matters, so at each level we may place any element that has not been used yet — track this with a `used` boolean array.
+2. When `len(path) == len(nums)` we have a full permutation; snapshot it.
+3. Loop over all indices, skip the used ones, choose → recurse → un-choose (resetting `used[i]`).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `nums = [1,2,3]`:
+- place 1 → place 2 → place 3 → `[1,2,3]` ✓; back up, `[1,3,2]` ✓.
+- place 2 → `[2,1,3]`, `[2,3,1]` ✓.
+- place 3 → `[3,1,2]`, `[3,2,1]` ✓.
+- Result: 6 permutations.
 
 ### Visualization
 ```
-input  ──▶ [ apply Permutations step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[1,2,3] ──▶ pick any unused index each level (used[] flags them)
+record when len(path)==len(nums) ──▶ 3! = 6 orderings
 ```
 
 ### Code
 ```python
-def subsets(nums):
+def permute(nums):
     res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
+    used = [False] * len(nums)
+    def dfs():
+        if len(path) == len(nums):
+            res.append(path[:])
+            return
+        for i in range(len(nums)):
+            if used[i]:
+                continue
+            used[i] = True
+            path.append(nums[i])                # choose
+            dfs()                               # explore
             path.pop()                          # un-choose
-    dfs(0)
+            used[i] = False
+    dfs()
     return res
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(n · n!) to build every permutation, Space O(n) for the path and `used` array.
 
 ## 10. Solved Example 2
 
 ### Problem — Permutations II (LeetCode 47)
-A representative **Permutations** problem. The signal: place each unused element in each position to enumerate orderings.
+Return every **unique** ordering of a list that may contain duplicate integers.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (permutations, arrange, backtracking, used array, swap).
-2. Reach for the Permutations template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Sort `nums` first so equal values are adjacent, enabling a clean duplicate skip.
+2. Use a `used` array as before, recording when `len(path) == len(nums)`.
+3. Skip a duplicate at the same level with `if i > 0 and nums[i] == nums[i-1] and not used[i-1]: continue` — only the first unused copy in a group may start a branch.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `nums = [1,1,2]` (already sorted):
+- place first 1 → place second 1 → place 2 → `[1,1,2]` ✓; back up → `[1,2,1]` ✓.
+- place 2 → place 1 → `[2,1,1]` ✓.
+- the second leading 1 is skipped (its previous equal is unused), avoiding a repeat.
+- Result: `[[1,1,2],[1,2,1],[2,1,1]]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Permutations step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+sorted [1,1,2] ──▶ skip nums[i]==nums[i-1] when used[i-1] is False
+record full path ──▶ [1,1,2] [1,2,1] [2,1,1]  (no duplicates)
 ```
 
 ### Code
 ```python
-def subsets(nums):
+def permuteUnique(nums):
+    nums.sort()
     res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
+    used = [False] * len(nums)
+    def dfs():
+        if len(path) == len(nums):
+            res.append(path[:])
+            return
+        for i in range(len(nums)):
+            if used[i]:
+                continue
+            if i > 0 and nums[i] == nums[i - 1] and not used[i - 1]:
+                continue                        # skip duplicate at this level
+            used[i] = True
+            path.append(nums[i])                # choose
+            dfs()                               # explore
             path.pop()                          # un-choose
-    dfs(0)
+            used[i] = False
+    dfs()
     return res
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(n · n!) worst case, Space O(n) for the path and `used` array.
 
 ## 11. Solved Example 3
 
 ### Problem — Next Permutation (LeetCode 31)
-A representative **Permutations** problem. The signal: place each unused element in each position to enumerate orderings.
+Rearrange `nums` in place into the lexicographically next greater permutation (or the smallest ordering if none exists).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (permutations, arrange, backtracking, used array, swap).
-2. Reach for the Permutations template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Scan from the right for the first index `i` where `nums[i] < nums[i+1]` — the pivot that can be increased. If none, the array is the last permutation; reverse it to the first.
+2. Find the rightmost `j` with `nums[j] > nums[i]` and swap `i` and `j` — the smallest increase to the pivot.
+3. The suffix after `i` is descending; reverse it to make it ascending, giving the smallest tail. This is the standard array algorithm, not backtracking.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `nums = [1,3,2]`:
+- from the right, `nums[0]=1 < nums[1]=3` → pivot `i = 0`.
+- rightmost `j` with `nums[j] > 1` is `j = 2` (`nums[2]=2`); swap → `[2,3,1]`.
+- reverse suffix from index 1 → `[2,1,3]`.
+- Result: `[2,1,3]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Permutations step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[1,3,2] ──▶ pivot i where nums[i]<nums[i+1], swap with rightmost bigger j
+reverse suffix after i ──▶ [2,1,3]   (if no pivot, reverse whole array)
 ```
 
 ### Code
 ```python
-def subsets(nums):
-    res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
-            path.pop()                          # un-choose
-    dfs(0)
-    return res
+def nextPermutation(nums):
+    n = len(nums)
+    i = n - 2
+    while i >= 0 and nums[i] >= nums[i + 1]:    # find pivot
+        i -= 1
+    if i >= 0:
+        j = n - 1
+        while nums[j] <= nums[i]:               # rightmost value > pivot
+            j -= 1
+        nums[i], nums[j] = nums[j], nums[i]
+    left, right = i + 1, n - 1                   # reverse the suffix
+    while left < right:
+        nums[left], nums[right] = nums[right], nums[left]
+        left += 1
+        right -= 1
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(n) single passes, Space O(1) in place.
 
 
 ## 12. LeetCode Practice Set

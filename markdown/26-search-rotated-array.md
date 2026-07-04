@@ -242,110 +242,135 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Search Rotated (LeetCode 33)
-A representative **Search in Rotated Array** problem. The signal: identify the sorted half each step to binary-search a rotated array.
+Given a rotated sorted array of **distinct** values and a `target`, return its index or `-1`. Do it in O(log n).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (rotated, pivot, sorted rotated, binary search, find min).
-2. Reach for the Search in Rotated Array template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. Take `mid`. At least one half `[lo..mid]` or `[mid..hi]` is fully sorted — detect which by comparing `nums[lo] <= nums[mid]`.
+2. If the sorted half contains `target` (within its endpoint range), move into it; otherwise move to the other half.
+3. Standard closed-interval binary search with `lo <= hi`; return `mid` on a direct hit.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[4,5,6,7,0,1,2], target=0`
+- lo=0,hi=6,mid=3 → nums[3]=7≠0. Left `[4..7]` sorted; 0∉[4,7] → lo=4.
+- lo=4,hi=6,mid=5 → nums[5]=1≠0. Left `[0..1]` sorted; 0∈[0,1] → hi=4.
+- lo=4,hi=4,mid=4 → nums[4]=0 → return **4**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Search in Rotated Array step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+sorted half found ──▶ target in its range? go there : go other half
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
-    while lo < hi:
+def search(nums, target):
+    lo, hi = 0, len(nums) - 1
+    while lo <= hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
-        else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+        if nums[mid] == target:
+            return mid
+        if nums[lo] <= nums[mid]:          # left half sorted
+            if nums[lo] <= target < nums[mid]:
+                hi = mid - 1
+            else:
+                lo = mid + 1
+        else:                              # right half sorted
+            if nums[mid] < target <= nums[hi]:
+                lo = mid + 1
+            else:
+                hi = mid - 1
+    return -1
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n), Space O(1) — one half is discarded each iteration.
 
 ## 10. Solved Example 2
 
 ### Problem — Search Rotated II (LeetCode 81)
-A representative **Search in Rotated Array** problem. The signal: identify the sorted half each step to binary-search a rotated array.
+Same as LC33 but the array may contain **duplicates**. Return `True`/`False` for whether `target` exists.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (rotated, pivot, sorted rotated, binary search, find min).
-2. Reach for the Search in Rotated Array template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. Duplicates break the "which half is sorted" test when `nums[lo] == nums[mid] == nums[hi]` — you can't tell which side to keep.
+2. In that ambiguous case, shrink both ends (`lo += 1; hi -= 1`) and retry — this is what makes the worst case O(n).
+3. Otherwise fall back to the LC33 logic: find the sorted half and decide by target's range.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[2,5,6,0,0,1,2], target=0`
+- lo=0,hi=6,mid=3 → nums[3]=0 → return **True**.
+
+`nums=[1,0,1,1,1], target=0`
+- lo=0,hi=4,mid=2 → nums[lo]=nums[mid]=nums[hi]=1 → shrink: lo=1,hi=3.
+- lo=1,hi=3,mid=2 → nums[2]=1; left `[0..1]` sorted, 0∈[0,1) → hi=1 → nums[1]=0 → **True**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Search in Rotated Array step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+nums[lo]==nums[mid]==nums[hi] ──▶ ambiguous, shrink both ends (O(n) worst)
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
-    while lo < hi:
+def search(nums, target):
+    lo, hi = 0, len(nums) - 1
+    while lo <= hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
-        else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+        if nums[mid] == target:
+            return True
+        if nums[lo] == nums[mid] == nums[hi]:   # can't tell which half
+            lo += 1
+            hi -= 1
+        elif nums[lo] <= nums[mid]:             # left half sorted
+            if nums[lo] <= target < nums[mid]:
+                hi = mid - 1
+            else:
+                lo = mid + 1
+        else:                                   # right half sorted
+            if nums[mid] < target <= nums[hi]:
+                lo = mid + 1
+            else:
+                hi = mid - 1
+    return False
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n) average, **O(n)** worst case when duplicates force one-step shrinking; Space O(1).
 
 ## 11. Solved Example 3
 
 ### Problem — Find Min (LeetCode 153)
-A representative **Search in Rotated Array** problem. The signal: identify the sorted half each step to binary-search a rotated array.
+Return the minimum value in a rotated sorted array of **distinct** values, in O(log n).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (rotated, pivot, sorted rotated, binary search, find min).
-2. Reach for the Search in Rotated Array template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. The minimum is the pivot — the only element smaller than its predecessor. Compare `mid` to `hi` instead of a fixed target.
+2. If `nums[mid] > nums[hi]`, the pivot lies to the right → `lo = mid + 1`.
+3. Otherwise the min is at `mid` or to its left → `hi = mid`. Use half-open `lo < hi`; `nums[lo]` is the answer.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[4,5,6,7,0,1,2]`
+- lo=0,hi=6,mid=3 → nums[3]=7 > nums[6]=2 → lo=4.
+- lo=4,hi=6,mid=5 → nums[5]=1 < nums[6]=2 → hi=5.
+- lo=4,hi=5,mid=4 → nums[4]=0 < nums[5]=1 → hi=4.
+- lo==hi=4 → return nums[4] = **0**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Search in Rotated Array step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+nums[mid] > nums[hi] ──▶ min is right of mid : min at mid or left
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def findMin(nums):
+    lo, hi = 0, len(nums) - 1
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
+        if nums[mid] > nums[hi]:      # pivot to the right
             lo = mid + 1
-        else:
+        else:                         # min at mid or left
             hi = mid
-    return lo                     # first index with a[i] >= target
+    return nums[lo]
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n), Space O(1) — each step discards the half that cannot contain the pivot.
 
 
 ## 12. LeetCode Practice Set

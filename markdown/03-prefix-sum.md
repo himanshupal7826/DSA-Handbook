@@ -240,34 +240,35 @@ long long rangeSum(vector<long long>& pre, int l, int r) { return pre[r+1] - pre
 A representative **Prefix Sum** problem. The signal: precompute cumulative sums so any range query is o(1).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (prefix, cumulative, range sum, subarray sum, running total).
-2. Reach for the Prefix Sum template below and map the problem's entities onto it.
-3. Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
+1. Many `sumRange(l, r)` queries hit the same array, so precompute once.
+2. Build `pre` where `pre[i]` = sum of the first `i` elements (`pre[0]=0`).
+3. Any inclusive range sum is then `pre[r+1] - pre[l]` in O(1).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[-2,0,3,-5,2,-1]` → `pre=[0,-2,-2,1,-4,-2,-3]`
+- `sumRange(0,2)` = `pre[3]-pre[0]` = `1-0` = **1**
+- `sumRange(2,5)` = `pre[6]-pre[2]` = `-3-(-2)` = **-1**
 
 ### Visualization
 ```
-input  ──▶ [ apply Prefix Sum step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+pre: [0, -2, -2, 1, -4, -2, -3]
+sumRange(0,2) = pre[3]-pre[0] = 1
 ```
 
 ### Code
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
+class NumArray:
+    def __init__(self, nums):
+        self.pre = [0]*(len(nums)+1)
+        for i, v in enumerate(nums):
+            self.pre[i+1] = self.pre[i] + v
 
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+    def sumRange(self, left, right):    # inclusive [left, right]
+        return self.pre[right+1] - self.pre[left]
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass to build, O(1) per query.
+Time O(n) to build, O(1) per query. Space O(n).
 
 ## 10. Solved Example 2
 
@@ -275,34 +276,40 @@ Time O(n), Space O(n). One pass to build, O(1) per query.
 A representative **Prefix Sum** problem. The signal: precompute cumulative sums so any range query is o(1).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (prefix, cumulative, range sum, subarray sum, running total).
-2. Reach for the Prefix Sum template below and map the problem's entities onto it.
-3. Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
+1. A subarray sums to `k` iff `running - k` was a previous prefix sum.
+2. Track the running prefix sum and a map of `prefix → count of occurrences`.
+3. At each step add `count[running - k]` to the answer, then record `running`. Seed `count[0]=1` for subarrays starting at index 0.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[1,1,1], k=2`, count={0:1}
+- x=1: running=1, add count[-1]=0; count={0:1,1:1}
+- x=1: running=2, add count[0]=1 → total=1; count={0:1,1:1,2:1}
+- x=1: running=3, add count[1]=1 → total=2
+Answer: **2**
 
 ### Visualization
 ```
-input  ──▶ [ apply Prefix Sum step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+running - k in count?  yes -> that many subarrays end here
 ```
 
 ### Code
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
+from collections import defaultdict
 
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+def subarraySum(nums, k):
+    count = 0
+    running = 0
+    seen = defaultdict(int)
+    seen[0] = 1
+    for x in nums:
+        running += x
+        count += seen[running - k]
+        seen[running] += 1
+    return count
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass to build, O(1) per query.
+Time O(n), Space O(n). One pass with O(1) map lookups.
 
 ## 11. Solved Example 3
 
@@ -310,34 +317,36 @@ Time O(n), Space O(n). One pass to build, O(1) per query.
 A representative **Prefix Sum** problem. The signal: precompute cumulative sums so any range query is o(1).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (prefix, cumulative, range sum, subarray sum, running total).
-2. Reach for the Prefix Sum template below and map the problem's entities onto it.
-3. Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
+1. The pivot is where the left-side sum equals the right-side sum.
+2. With `total = sum(nums)`, the right side at index `i` is `total - left - nums[i]`.
+3. Sweep once keeping `left`; the first index where `left == total - left - nums[i]` is the pivot.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[1,7,3,6,5,6]`, total=28
+- i=0 left=0: right=28-0-1=27 ≠ 0
+- i=1 left=1: right=28-1-7=20 ≠ 1
+- i=2 left=8: right=28-8-3=17 ≠ 8
+- i=3 left=11: right=28-11-6=11 == 11 → pivot **3**
 
 ### Visualization
 ```
-input  ──▶ [ apply Prefix Sum step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+left=11 | nums[3]=6 | right = 28-11-6 = 11  ✓ balanced at index 3
 ```
 
 ### Code
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
-
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+def pivotIndex(nums):
+    total = sum(nums)
+    left = 0
+    for i, x in enumerate(nums):
+        if left == total - left - x:
+            return i
+        left += x
+    return -1
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass to build, O(1) per query.
+Time O(n), Space O(1). Two linear sweeps, no extra array.
 
 
 ## 12. LeetCode Practice Set

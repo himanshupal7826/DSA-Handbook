@@ -251,15 +251,17 @@ vector<vector<int>> merge(vector<vector<int>>& intervals) {
 ## 9. Solved Example 1
 
 ### Problem — Meeting Rooms (LeetCode 252)
-A representative **Meeting Rooms** problem. The signal: count maximum concurrent intervals to size resources (rooms/cores).
+Given meeting time intervals, decide whether a person can attend all of them (i.e., no two overlap).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (meeting rooms, min rooms, overlap count, heap, chronological).
-2. Reach for the Meeting Rooms template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. If any two meetings overlap, the person cannot attend all — so we only need to detect a single overlap.
+2. Sort by start time; then overlaps can only occur between adjacent meetings.
+3. Scan adjacent pairs: if the next meeting starts before the current one ends, return False.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[[0,30],[5,10],[15,20]]`. Sort by start → same order.
+- `[0,30]` then `[5,10]`: 5 < 30 → overlap → return False.
+- (If input were `[[7,10],[2,4]]`: sort → `[[2,4],[7,10]]`; 7 ≥ 4, no overlap → True.)
 
 ### Visualization
 ```
@@ -270,32 +272,33 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
+def canAttendMeetings(intervals):
     intervals.sort(key=lambda x: x[0])
-    res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
-        else:
-            res.append([s, e])
-    return res
+    for i in range(1, len(intervals)):
+        if intervals[i][0] < intervals[i - 1][1]:
+            return False
+    return True
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n log n), Space O(1). Sorting dominates; the adjacent scan is O(n).
 
 ## 10. Solved Example 2
 
 ### Problem — Meeting Rooms II (LeetCode 253)
-A representative **Meeting Rooms** problem. The signal: count maximum concurrent intervals to size resources (rooms/cores).
+Given meeting intervals, return the minimum number of rooms required to hold all meetings.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (meeting rooms, min rooms, overlap count, heap, chronological).
-2. Reach for the Meeting Rooms template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. The answer is the maximum number of meetings running at the same instant.
+2. Sort meetings by start; keep a min-heap of end times for rooms currently in use.
+3. For each meeting, if the earliest-ending room is free by its start, reuse it (pop); always push the new end. The heap size is the running room count.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[[0,30],[5,10],[15,20]]`, heap of ends.
+- `[0,30]`: heap `[30]` → 1 room.
+- `[5,10]`: 5 < 30, no free room → push → `[10,30]` → 2 rooms.
+- `[15,20]`: earliest end 10 ≤ 15, reuse → pop 10, push 20 → `[20,30]` → still 2.
+- Answer 2.
 
 ### Visualization
 ```
@@ -306,32 +309,39 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
+import heapq
+
+def minMeetingRooms(intervals):
+    if not intervals:
+        return 0
     intervals.sort(key=lambda x: x[0])
-    res = []
+    heap = []  # end times of rooms in use
     for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
+        if heap and heap[0] <= s:
+            heapq.heapreplace(heap, e)   # reuse freed room
         else:
-            res.append([s, e])
-    return res
+            heapq.heappush(heap, e)      # need a new room
+    return len(heap)
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n log n), Space O(n). Sort plus heap operations per meeting.
 
 ## 11. Solved Example 3
 
 ### Problem — Car Pooling (LeetCode 1094)
-A representative **Meeting Rooms** problem. The signal: count maximum concurrent intervals to size resources (rooms/cores).
+Given trips `[numPassengers, from, to]` and a car capacity, return whether all trips fit without ever exceeding capacity.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (meeting rooms, min rooms, overlap count, heap, chronological).
-2. Reach for the Meeting Rooms template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. This is a max-concurrent-load problem: passengers board at `from` and leave at `to`.
+2. Use a difference array over locations: `diff[from] += num`, `diff[to] -= num`.
+3. Sweep locations left to right accumulating the running load; if it ever exceeds capacity, return False.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`trips=[[2,1,5],[3,3,7]]`, `capacity=4`.
+- diff: +2 at 1, -2 at 5, +3 at 3, -3 at 7.
+- Sweep: at 1 → 2; at 3 → 5 > 4 → return False.
+- (Capacity 5 would give running max 5 ≤ 5 → True.)
 
 ### Visualization
 ```
@@ -342,19 +352,21 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
-        else:
-            res.append([s, e])
-    return res
+def carPooling(trips, capacity):
+    diff = [0] * 1001            # locations 0..1000
+    for num, start, end in trips:
+        diff[start] += num
+        diff[end] -= num
+    load = 0
+    for delta in diff:
+        load += delta
+        if load > capacity:
+            return False
+    return True
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n + R) where R is the location range; Space O(R) for the difference array.
 
 
 ## 12. LeetCode Practice Set

@@ -247,110 +247,139 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Koko Bananas (LeetCode 875)
-A representative **Binary Search on Answer** problem. The signal: binary search the answer value, using a feasibility check as the predicate.
+Koko eats bananas at speed `k` per hour, finishing one pile per hour (or less). Find the minimum integer `k` so she finishes all piles within `h` hours.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (binary search answer, minimize maximum, feasible, parametric, capacity).
-2. Reach for the Binary Search on Answer template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. The answer `k` is monotonic: if speed `k` works within `h` hours, any faster speed also works — so binary search `k`.
+2. Feasibility `feasible(k)` = total hours `sum(ceil(p/k))` is `<= h`. Search `k` in `[1, max(piles)]`.
+3. Find the smallest `k` for which `feasible(k)` is true using a lower-bound style search.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+piles=[3,6,7,11], h=8. Range [1,11], mid=6 → hours=1+1+2+2=6 ≤ 8 → feasible, go left (hi=6).
+mid=3 → hours=1+2+3+4=10 > 8 → infeasible, lo=4. mid=5 → 1+2+2+3=8 ≤ 8 → hi=5.
+mid=4 → 1+2+2+3=8 ≤ 8 → hi=4. lo=hi=4 → answer **4**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Binary Search on Answer step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+speed k ──▶ [ hours = Σ ceil(pile/k) ]
+predicate ──▶ feasible(k) = hours ≤ h  (monotonic in k)
+output ──▶ smallest k that stays within h hours
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+import math
+
+def minEatingSpeed(piles, h):
+    def feasible(k):
+        return sum(math.ceil(p / k) for p in piles) <= h
+
+    lo, hi = 1, max(piles)           # k must be at least 1
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        if feasible(mid):
+            hi = mid                 # mid works; try slower
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            lo = mid + 1             # too slow; speed up
+    return lo                        # smallest feasible speed
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(n log(max(piles))), Space O(1) — each of the log candidates costs an O(n) feasibility scan.
 
 ## 10. Solved Example 2
 
 ### Problem — Ship Within Days (LeetCode 1011)
-A representative **Binary Search on Answer** problem. The signal: binary search the answer value, using a feasibility check as the predicate.
+Packages with given `weights` must ship in order within `days`. A ship has a fixed daily capacity. Find the minimum capacity that ships everything within `days`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (binary search answer, minimize maximum, feasible, parametric, capacity).
-2. Reach for the Binary Search on Answer template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. Capacity is monotonic: a larger capacity needs the same or fewer days, so binary search the capacity.
+2. Lower bound is `max(weights)` (must fit the heaviest package); upper bound is `sum(weights)` (ship all in one day).
+3. `feasible(cap)` = greedily fill each day until the next package overflows `cap`, counting days; feasible if `days_needed <= days`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+weights=[1,2,3,4,5,6,7,8,9,10], days=5. Range [10,55], mid=32 → greedy days=2 ≤ 5 → hi=32.
+mid=21 → days=3 ≤ 5 → hi=21. mid=15 → days=5 ≤ 5 → hi=15. mid=12 → days=6 > 5 → lo=13.
+mid=14 → days=5 → hi=14. mid=13 → days=6 → lo=14. lo=hi=14 → answer **15**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Binary Search on Answer step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+capacity cap ──▶ [ greedily pack packages into days ]
+predicate ──▶ feasible(cap) = days_needed ≤ days  (monotonic in cap)
+output ──▶ smallest capacity shipping within days
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def shipWithinDays(weights, days):
+    def feasible(cap):
+        used, load = 1, 0
+        for w in weights:
+            if load + w > cap:       # start a new day
+                used += 1
+                load = 0
+            load += w
+        return used <= days
+
+    lo, hi = max(weights), sum(weights)
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        if feasible(mid):
+            hi = mid                 # capacity suffices; shrink it
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            lo = mid + 1             # too small; grow capacity
+    return lo                        # minimum feasible capacity
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(n log(sum(weights))), Space O(1) — a greedy O(n) day-count per binary-search step.
 
 ## 11. Solved Example 3
 
-### Problem — Split Array (LeetCode 410)
-A representative **Binary Search on Answer** problem. The signal: binary search the answer value, using a feasibility check as the predicate.
+### Problem — Split Array Largest Sum (LeetCode 410)
+Split `nums` into `k` non-empty contiguous subarrays so the largest subarray sum is minimized. Return that minimized largest sum.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (binary search answer, minimize maximum, feasible, parametric, capacity).
-2. Reach for the Binary Search on Answer template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. Binary search the answer `cap` = the allowed largest subarray sum. Fewer splits are needed as `cap` grows — monotonic.
+2. Search `cap` in `[max(nums), sum(nums)]`: it must fit the biggest element, and one part could hold everything.
+3. `feasible(cap)` = greedily extend a running sum, starting a new subarray whenever adding would exceed `cap`; feasible if the number of subarrays is `<= k`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums=[7,2,5,10,8], k=2. Range [10,32], mid=21 → greedy parts: [7,2,5]=14,[10,8]=18 → 2 ≤ 2 → hi=21.
+mid=15 → [7,2,5]=14,[10],[8] → 3 > 2 → lo=16. mid=18 → [7,2,5],[10,8] → 2 → hi=18.
+mid=17 → [7,2,5],[10],[8] → 3 → lo=18. lo=hi=18 → answer **18**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Binary Search on Answer step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+cap (largest allowed sum) ──▶ [ greedily cut subarrays ]
+predicate ──▶ feasible(cap) = pieces ≤ k  (monotonic in cap)
+output ──▶ smallest cap achievable with k pieces
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def splitArray(nums, k):
+    def feasible(cap):
+        pieces, cur = 1, 0
+        for x in nums:
+            if cur + x > cap:        # cut here; open a new subarray
+                pieces += 1
+                cur = 0
+            cur += x
+        return pieces <= k
+
+    lo, hi = max(nums), sum(nums)
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        if feasible(mid):
+            hi = mid                 # cap works; try a smaller max
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            lo = mid + 1             # needs too many pieces; raise cap
+    return lo                        # minimized largest subarray sum
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(n log(sum(nums))), Space O(1) — an O(n) greedy feasibility check per binary-search step.
 
 
 ## 12. LeetCode Practice Set

@@ -255,12 +255,15 @@ ListNode* reverseList(ListNode* head) {
 A representative **Reverse Linked List** problem. The signal: rewire next-pointers with prev/curr/next to reverse in o(n), o(1).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (reverse, linked list, pointers, prev curr next, iterative).
-2. Reach for the Reverse Linked List template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. Keep a `prev` pointer, starting at `None` — it will become the new head.
+2. Walk `curr` down the list; for each node save its `next`, then point the node back at `prev`.
+3. Slide `prev` and `curr` forward one step. When `curr` runs off the end, `prev` is the reversed head.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `1→2→3`, prev=None, curr=1.
+- node1: nxt=2, 1.next=None, prev=1, curr=2
+- node2: nxt=3, 2.next=1, prev=2, curr=3
+- node3: nxt=None, 3.next=2, prev=3, curr=None → return `3→2→1`
 
 ### Visualization
 ```
@@ -271,22 +274,19 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
+def reverseList(head):
     prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
+    curr = head
+    while curr:
+        nxt = curr.next      # save next
+        curr.next = prev     # reverse pointer
+        prev = curr          # advance prev
+        curr = nxt           # advance curr
     return prev
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(n), Space O(1). Single pass, in-place pointer rewiring.
 
 ## 10. Solved Example 2
 
@@ -294,12 +294,14 @@ Time O(n), Space O(1). In-place pointer manipulation, single traversal.
 A representative **Reverse Linked List** problem. The signal: rewire next-pointers with prev/curr/next to reverse in o(n), o(1).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (reverse, linked list, pointers, prev curr next, iterative).
-2. Reach for the Reverse Linked List template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. Use a dummy node so reversing that starts at the head has no special case; walk `prev` to the node just before position `left`.
+2. Repeatedly take the node after `curr` and splice it to the front of the sublist (head-insertion), `right - left` times.
+3. Everything outside `[left, right]` stays untouched; return `dummy.next`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `1→2→3→4→5`, left=2, right=4. prev=node1, curr=node2.
+- move 3 to front: `1→3→2→4→5`
+- move 4 to front: `1→4→3→2→5` → answer
 
 ### Visualization
 ```
@@ -310,22 +312,22 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+def reverseBetween(head, left, right):
+    dummy = ListNode(0, head)
+    prev = dummy
+    for _ in range(left - 1):          # node before the sublist
+        prev = prev.next
+    curr = prev.next
+    for _ in range(right - left):      # head-insert next node
+        nxt = curr.next
+        curr.next = nxt.next
+        nxt.next = prev.next
+        prev.next = nxt
+    return dummy.next
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(n), Space O(1). One pass to `left`, then constant work per swapped node.
 
 ## 11. Solved Example 3
 
@@ -333,12 +335,15 @@ Time O(n), Space O(1). In-place pointer manipulation, single traversal.
 A representative **Reverse Linked List** problem. The signal: rewire next-pointers with prev/curr/next to reverse in o(n), o(1).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (reverse, linked list, pointers, prev curr next, iterative).
-2. Reach for the Reverse Linked List template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. Find the middle with slow/fast pointers (fast moves two steps per slow step).
+2. Reverse the second half in place using the prev/curr/next template.
+3. Walk the first half and the reversed second half together; if any value differs it is not a palindrome.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `1→2→2→1`.
+- slow stops at the 3rd node (start of second half)
+- reverse second half → `1→2` (values 2,1 become 1,2)
+- compare front `1,2` with reversed `1,2` → all equal → True
 
 ### Visualization
 ```
@@ -349,22 +354,27 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+def isPalindrome(head):
+    slow = fast = head
+    while fast and fast.next:           # slow lands at 2nd-half start
+        slow = slow.next
+        fast = fast.next.next
+    prev = None                          # reverse second half
+    while slow:
+        nxt = slow.next
+        slow.next = prev
+        prev = slow
+        slow = nxt
+    left, right = head, prev             # compare halves
+    while right:
+        if left.val != right.val:
+            return False
+        left, right = left.next, right.next
+    return True
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(n), Space O(1). Find middle, reverse half, compare — all linear and in place.
 
 
 ## 12. LeetCode Practice Set

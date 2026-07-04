@@ -258,36 +258,52 @@ vector<vector<int>> subsets(vector<int>& nums) {
 A representative **Sudoku Solver** problem. The signal: fill cells with valid candidates, backtracking on dead ends.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sudoku, constraint propagation, backtracking, grid, try undo).
-2. Reach for the Sudoku Solver template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Scan the 9×9 grid for the next empty cell (`'.'`); if none remain the board is solved.
+2. Try digits `'1'`..`'9'`; a digit is valid only if it is absent from that row, column, and 3×3 box.
+3. Place a valid digit and recurse; if the recursion solves the rest, propagate `True`.
+4. Otherwise reset the cell to `'.'` and try the next digit; return `False` when no digit fits.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Solving from the first empty cell:
+- Cell (0,2) empty: try `'1'` — already in row → skip; `'4'` valid → place, recurse.
+- A deeper cell finds no valid digit → return `False`, undo `'4'`.
+- Backtrack to (0,2), try the next digit; keep going until every cell is consistent.
+- No empty cell remains → return `True`; the board is mutated in place to the solution.
 
 ### Visualization
 ```
-input  ──▶ [ apply Sudoku Solver step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+next empty cell → try 1..9 valid in row/col/box → recurse; first full grid returns True, undo on dead ends
 ```
 
 ### Code
 ```python
-def subsets(nums):
-    res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
-            path.pop()                          # un-choose
-    dfs(0)
-    return res
+def solveSudoku(board):
+    def valid(r, c, ch):
+        for i in range(9):
+            if board[r][i] == ch or board[i][c] == ch:
+                return False
+            if board[3 * (r // 3) + i // 3][3 * (c // 3) + i % 3] == ch:
+                return False
+        return True
+
+    def solve():
+        for r in range(9):
+            for c in range(9):
+                if board[r][c] == '.':
+                    for ch in "123456789":
+                        if valid(r, c, ch):
+                            board[r][c] = ch
+                            if solve():
+                                return True
+                            board[r][c] = '.'
+                    return False  # no digit works here → backtrack
+        return True  # no empty cell left → solved
+
+    solve()
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(9^(m)) worst case where m is the number of empty cells, Space O(m) for the recursion depth (board solved in place).
 
 ## 10. Solved Example 2
 
@@ -295,36 +311,49 @@ Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the 
 A representative **Sudoku Solver** problem. The signal: fill cells with valid candidates, backtracking on dead ends.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sudoku, constraint propagation, backtracking, grid, try undo).
-2. Reach for the Sudoku Solver template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Place exactly one queen per row, recursing from row 0 down to row n.
+2. Track occupied `cols`, `diag` (r − c), and `anti` (r + c) as sets so a conflict check is O(1).
+3. If a column is free on all three axes, place the queen, recurse to the next row, then undo before trying the next column.
+4. When `row == n`, build the `"...Q.."` board strings from the recorded queen columns and append.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+n = 4, place row by row:
+- row0 → col0; cols={0}, diag={0}, anti={0}.
+- row1 → col2 is the only safe column; recurse.
+- row2 → no safe column → backtrack up past row1 to row0.
+- row0=col1, row1=col3, row2=col0, row3=col2 succeeds → `.Q..`,`...Q`,`Q...`,`..Q.`; its mirror also solves → 2 boards.
 
 ### Visualization
 ```
-input  ──▶ [ apply Sudoku Solver step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+row-by-row placement, sets cols/diag(r-c)/anti(r+c) prune attacked columns before recursing
 ```
 
 ### Code
 ```python
-def subsets(nums):
-    res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
-            path.pop()                          # un-choose
-    dfs(0)
+def solveNQueens(n):
+    res, cols, diag, anti = [], set(), set(), set()
+    queens = []  # queens[r] = column of the queen in row r
+
+    def backtrack(row):
+        if row == n:
+            res.append(["".join("Q" if c == queens[r] else "."
+                                 for c in range(n)) for r in range(n)])
+            return
+        for col in range(n):
+            if col in cols or (row - col) in diag or (row + col) in anti:
+                continue
+            cols.add(col); diag.add(row - col); anti.add(row + col)
+            queens.append(col)
+            backtrack(row + 1)
+            queens.pop()
+            cols.remove(col); diag.remove(row - col); anti.remove(row + col)
+
+    backtrack(0)
     return res
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(n!) as columns/diagonals prune the branching, Space O(n) for the recursion depth and the three tracking sets.
 
 ## 11. Solved Example 3
 
@@ -332,36 +361,44 @@ Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the 
 A representative **Sudoku Solver** problem. The signal: fill cells with valid candidates, backtracking on dead ends.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sudoku, constraint propagation, backtracking, grid, try undo).
-2. Reach for the Sudoku Solver template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Try starting a DFS from every cell that matches `word[0]`.
+2. At index `k`, if the current cell equals `word[k]`, mark it visited (temporarily set to `'#'`).
+3. Recurse into the 4 neighbors for `word[k+1]`; success at any neighbor propagates `True`.
+4. Restore the cell after exploring, and return `True` immediately when `k` reaches `len(word)`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+board `[["A","B"],["C","D"]]`, word = `"ABD"`:
+- Start at (0,0)=`A` matches word[0]; mark `'#'`, look for `'B'`.
+- Right neighbor (0,1)=`B` matches word[1]; mark `'#'`, look for `'D'`.
+- Down neighbor (1,1)=`D` matches word[2]; next index == len(word) → return `True`.
+- Path A→B→D found → overall `True` (cells restored on the way out).
 
 ### Visualization
 ```
-input  ──▶ [ apply Sudoku Solver step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+DFS from each cell, char by char, mark visited '#' then restore; True when index == len(word)
 ```
 
 ### Code
 ```python
-def subsets(nums):
-    res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
-            path.pop()                          # un-choose
-    dfs(0)
-    return res
+def exist(board, word):
+    rows, cols = len(board), len(board[0])
+
+    def dfs(r, c, k):
+        if k == len(word):
+            return True
+        if r < 0 or r >= rows or c < 0 or c >= cols or board[r][c] != word[k]:
+            return False
+        board[r][c] = '#'                       # mark visited
+        found = (dfs(r + 1, c, k + 1) or dfs(r - 1, c, k + 1) or
+                 dfs(r, c + 1, k + 1) or dfs(r, c - 1, k + 1))
+        board[r][c] = word[k]                   # restore
+        return found
+
+    return any(dfs(r, c, 0) for r in range(rows) for c in range(cols))
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(m·n·4^L) where L is the word length, Space O(L) for the recursion depth (grid marked in place).
 
 
 ## 12. LeetCode Practice Set

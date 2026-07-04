@@ -244,15 +244,19 @@ vector<vector<int>> merge(vector<vector<int>>& intervals) {
 ## 9. Solved Example 1
 
 ### Problem — Non-overlapping (LeetCode 435)
-A representative **Interval Scheduling** problem. The signal: greedily pick earliest-finishing intervals to maximize non-overlap.
+Given a set of intervals, return the minimum number to remove so the rest are non-overlapping.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (interval scheduling, greedy, non-overlapping, earliest finish, activity).
-2. Reach for the Interval Scheduling template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. Maximizing the intervals we keep minimizes removals — the classic activity-selection greedy.
+2. Sort by end time; always keep the interval that finishes earliest so the most room remains.
+3. Walk left to right tracking the last kept end; if the next interval starts before it, that interval overlaps and must be removed (count++), otherwise adopt its end.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[[1,2],[2,3],[3,4],[1,3]]`. Sort by end → `[[1,2],[2,3],[1,3],[3,4]]`.
+- keep `[1,2]`, end=2.
+- `[2,3]`: 2 ≥ 2 keep, end=3.
+- `[1,3]`: 1 < 3 → overlap, remove (count=1).
+- `[3,4]`: 3 ≥ 3 keep, end=4. Answer 1.
 
 ### Visualization
 ```
@@ -263,32 +267,35 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
+def eraseOverlapIntervals(intervals):
+    intervals.sort(key=lambda x: x[1])   # earliest finish first
+    removed, end = 0, float('-inf')
     for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
+        if s >= end:
+            end = e          # keep this interval
         else:
-            res.append([s, e])
-    return res
+            removed += 1     # overlaps -> drop it
+    return removed
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n log n), Space O(1). Sort by end, then one greedy pass.
 
 ## 10. Solved Example 2
 
 ### Problem — Min Arrows (LeetCode 452)
-A representative **Interval Scheduling** problem. The signal: greedily pick earliest-finishing intervals to maximize non-overlap.
+Balloons span `[start, end]` on the x-axis; an arrow shot at x bursts every balloon whose span covers x. Return the minimum arrows to burst them all.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (interval scheduling, greedy, non-overlapping, earliest finish, activity).
-2. Reach for the Interval Scheduling template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. Overlapping balloons can share one arrow, so this is greedy interval grouping.
+2. Sort by end coordinate; shoot the first arrow at the earliest end — it hits every balloon overlapping that point.
+3. Skip all balloons already burst (those starting ≤ current arrow position); when one starts beyond it, a new arrow is needed at its end.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[[10,16],[2,8],[1,6],[7,12]]`. Sort by end → `[[1,6],[2,8],[7,12],[10,16]]`.
+- arrow at 6 (arrows=1); `[2,8]` start 2 ≤ 6 burst.
+- `[7,12]`: 7 > 6 → new arrow at 12 (arrows=2).
+- `[10,16]`: 10 ≤ 12 burst. Answer 2.
 
 ### Visualization
 ```
@@ -299,32 +306,36 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
-        else:
-            res.append([s, e])
-    return res
+def findMinArrowShots(points):
+    if not points:
+        return 0
+    points.sort(key=lambda x: x[1])   # earliest end first
+    arrows, arrow_x = 1, points[0][1]
+    for s, e in points[1:]:
+        if s > arrow_x:               # not covered -> new arrow
+            arrows += 1
+            arrow_x = e
+    return arrows
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n log n), Space O(1). Sort by end, then a single greedy pass.
 
 ## 11. Solved Example 3
 
 ### Problem — Max Chain (LeetCode 646)
-A representative **Interval Scheduling** problem. The signal: greedily pick earliest-finishing intervals to maximize non-overlap.
+Given pairs `[a, b]`, a chain links `[a,b] -> [c,d]` when `b < c`. Return the longest chain length.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (interval scheduling, greedy, non-overlapping, earliest finish, activity).
-2. Reach for the Interval Scheduling template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. This is activity selection: each pair is an interval and we want the most that fit end-to-start.
+2. Sort by the second element `b`; greedily extend the chain whenever the next pair's start exceeds the current chain tail.
+3. Track the tail (last chosen `b`); every pair with `a > tail` joins the chain and updates the tail.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[[1,2],[2,3],[3,4]]`. Sort by second → same.
+- take `[1,2]`, len=1, tail=2.
+- `[2,3]`: 2 > 2? no → skip.
+- `[3,4]`: 3 > 2 → take, len=2, tail=4. Answer 2.
 
 ### Visualization
 ```
@@ -335,19 +346,18 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
-        else:
-            res.append([s, e])
-    return res
+def findLongestChain(pairs):
+    pairs.sort(key=lambda x: x[1])   # earliest end first
+    length, tail = 0, float('-inf')
+    for a, b in pairs:
+        if a > tail:                 # can extend the chain
+            length += 1
+            tail = b
+    return length
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n log n), Space O(1). Sort by end, then one greedy pass.
 
 
 ## 12. LeetCode Practice Set

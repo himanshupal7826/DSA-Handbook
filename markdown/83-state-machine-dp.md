@@ -231,101 +231,123 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — Best Time Stock (LeetCode 121)
-A representative **State Machine DP** problem. The signal: model the problem as states + transitions; dp over the automaton.
+At most **one** transaction: buy once, sell once (later). Maximize profit; return 0 if no gain is possible.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (state machine, stock, transitions, dp, hold sell).
-2. Reach for the State Machine DP template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Two states per day: `cash` = max profit holding no stock, `hold` = max profit currently holding a share.
+2. Transitions: `cash = max(cash, hold + price)` (sell today); `hold = max(hold, -price)` (buy today — note `-price`, not `cash - price`, because only one buy is allowed).
+3. Start `cash = 0`, `hold = -inf`. Answer is `cash` after the last day.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+prices = [7,1,5,3,6,4]
+- day 7: hold=-7, cash=0
+- day 1: hold=max(-7,-1)=-1, cash=0
+- day 5: hold=-1, cash=max(0,-1+5)=4
+- day 6: hold=-1, cash=max(4,-1+6)=5
+- Answer = **5** (buy at 1, sell at 6).
 
 ### Visualization
 ```
-input  ──▶ [ apply State Machine DP step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+hold ──▶ [ best profit while owning a share, single buy ]
+cash ──▶ [ best profit after selling, read as the answer ]
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def maxProfit(prices):
+    cash, hold = 0, float('-inf')
+    for price in prices:
+        cash = max(cash, hold + price)   # sell today (or skip)
+        hold = max(hold, -price)         # buy today (only one buy allowed)
+    return cash
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n), Space O(1) — two scalar states swept once over the prices.
 
 ## 10. Solved Example 2
 
 ### Problem — Cooldown (LeetCode 309)
-A representative **State Machine DP** problem. The signal: model the problem as states + transitions; dp over the automaton.
+Unlimited transactions, but after selling you must **rest one day** before buying again. Maximize profit.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (state machine, stock, transitions, dp, hold sell).
-2. Reach for the State Machine DP template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Three states: `hold` = own a share, `sold` = just sold today (in cooldown), `rest` = idle and free to buy.
+2. Transitions each day: `hold = max(hold, rest - price)` (buy, only from rest); `sold = hold + price` (sell today); `rest = max(rest, prev_sold)` (stay idle or exit cooldown).
+3. Compute with the *previous* day's values, then update. Answer = `max(sold, rest)` at the end (never end holding).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+prices = [1,2,3,0,2]
+- start: hold=-inf, sold=0, rest=0
+- p=1: hold=-1, sold=-inf, rest=0
+- p=2: hold=-1, sold=1, rest=0
+- p=3: hold=-1, sold=2, rest=1
+- p=0: hold=1, sold=-1, rest=2
+- p=2: hold=1, sold=3, rest=2 → Answer = **3** (buy1/sell3, cooldown, buy0/sell2).
 
 ### Visualization
 ```
-input  ──▶ [ apply State Machine DP step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+rest ──▶ buy ──▶ hold ──▶ sell ──▶ sold ──▶ (cooldown) ──▶ rest
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def maxProfit(prices):
+    hold, sold, rest = float('-inf'), float('-inf'), 0
+    for price in prices:
+        prev_sold = sold
+        hold = max(hold, rest - price)   # buy only from rest
+        sold = hold + price              # sell today
+        rest = max(rest, prev_sold)      # exit cooldown into rest
+    return max(sold, rest)
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n), Space O(1) — three rolling scalar states.
 
 ## 11. Solved Example 3
 
 ### Problem — Stock IV (LeetCode 188)
-A representative **State Machine DP** problem. The signal: model the problem as states + transitions; dp over the automaton.
+At most **k** transactions. Maximize profit over the price series.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (state machine, stock, transitions, dp, hold sell).
-2. Reach for the State Machine DP template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. For each transaction slot `j` in 1..k keep two states: `buy[j]` = best profit after the j-th buy, `sell[j]` = best profit after the j-th sell.
+2. Per price: `buy[j] = max(buy[j], sell[j-1] - price)` (open j-th position from proceeds of j-1 sells); `sell[j] = max(sell[j], buy[j] + price)` (close it).
+3. If `k >= n//2`, transactions are effectively unlimited — sum every positive delta instead (avoids O(nk) blowup). Answer = `sell[k]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+k = 2, prices = [3,2,6,5,0,3]
+- init buy=[-inf,-inf], sell=[0,0]
+- p=3: buy1=-3
+- p=2: buy1=-2
+- p=6: sell1=4, buy2=max(-inf,4-6)=-2
+- p=5: sell1=4, sell2=max(0,-2+5)=3
+- p=0: buy1=max(-2,0)... buy2=max(-2,4-0)=4
+- p=3: sell2=max(3,4+3)=7 → Answer = **7** (buy2/sell6 + buy0/sell3).
 
 ### Visualization
 ```
-input  ──▶ [ apply State Machine DP step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+sell[j-1] ──▶ buy[j] ──▶ sell[j]   (k stacked buy/sell layers)
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def maxProfit(k, prices):
+    n = len(prices)
+    if not prices or k == 0:
+        return 0
+    if k >= n // 2:                       # unlimited transactions
+        return sum(max(0, prices[i] - prices[i-1]) for i in range(1, n))
+    buy = [float('-inf')] * (k + 1)
+    sell = [0] * (k + 1)
+    for price in prices:
+        for j in range(1, k + 1):
+            buy[j] = max(buy[j], sell[j-1] - price)
+            sell[j] = max(sell[j], buy[j] + price)
+    return sell[k]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n·k) (O(n) in the unlimited fast path), Space O(k).
 
 
 ## 12. LeetCode Practice Set

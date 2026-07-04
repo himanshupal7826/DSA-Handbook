@@ -255,39 +255,38 @@ int longestWindow(const string& s) {
 A representative **Longest Window** problem. The signal: maximize window length; shrink only when the window becomes invalid.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (longest, maximum window, at most k, substring, distinct).
-2. Reach for the Longest Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. Keep a variable window `[left, right]` that must contain no repeated character.
+2. Store the last-seen index of each character. When `s[right]` was seen inside the current window, jump `left` to one past its previous position.
+3. After every expansion the window is valid again, so record `right - left + 1` as a candidate answer.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `s = "abcabcbb"`:
+- r=0 'a' → window "a", best=1
+- r=1 'b' → "ab", best=2
+- r=2 'c' → "abc", best=3
+- r=3 'a' (last seen at 0, ≥ left) → left=1, window "bca", best=3
+- r=4 'b' (last seen 1, ≥ left) → left=2, window "cab", best still 3 → answer **3**
 
 ### Visualization
 ```
-input  ──▶ [ apply Longest Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+"abcabcbb": window "abc" is longest; repeat 'a' pushes left forward → best = 3
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
+def length_of_longest_substring(s):
+    last_seen = {}
     left = best = 0
     for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
+        if ch in last_seen and last_seen[ch] >= left:
+            left = last_seen[ch] + 1
+        last_seen[ch] = right
         best = max(best, right - left + 1)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n) — each index visited once; Space O(min(n, alphabet)) for the last-seen map.
 
 ## 10. Solved Example 2
 
@@ -295,39 +294,39 @@ Time O(n), Space O(k). Each index is added and removed at most once; k = window/
 A representative **Longest Window** problem. The signal: maximize window length; shrink only when the window becomes invalid.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (longest, maximum window, at most k, substring, distinct).
-2. Reach for the Longest Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. A window is valid if we can make every char equal by replacing at most `k` of them: `window_len - max_freq <= k`.
+2. Track counts of each letter in the window and the running `max_freq` (the most common letter's count).
+3. When the window becomes invalid, slide `left` forward by one (dropping one char) — never shrinking more than needed keeps it O(n). Record the best window length.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `s = "AABABBA", k = 1`:
+- Expand to "AABA" (r=3): counts A=3,B=1, max_freq=3, len=4, need 4-3=1 ≤ 1 → best=4
+- r=4 'B' → "AABAB" len=5, max_freq=3, need 5-3=2 > 1 → invalid, left++ → "ABAB"
+- Window stays length 4 thereafter → answer **4**
 
 ### Visualization
 ```
-input  ──▶ [ apply Longest Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+"AABABBA", k=1: best window length 4 ("AABA" → replace one B) → answer 4
 ```
 
 ### Code
 ```python
-def longest_window(s):
+def character_replacement(s, k):
     from collections import defaultdict
     count = defaultdict(int)
-    left = best = 0
+    left = best = max_freq = 0
     for right, ch in enumerate(s):
         count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
+        max_freq = max(max_freq, count[ch])
+        if (right - left + 1) - max_freq > k:   # too many to replace
             count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
             left += 1
         best = max(best, right - left + 1)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n) — single pass, `left` never moves backward; Space O(26) for the count map.
 
 ## 11. Solved Example 3
 
@@ -335,39 +334,37 @@ Time O(n), Space O(k). Each index is added and removed at most once; k = window/
 A representative **Longest Window** problem. The signal: maximize window length; shrink only when the window becomes invalid.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (longest, maximum window, at most k, substring, distinct).
-2. Reach for the Longest Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. We may flip up to `k` zeros to ones, so a window is valid while it holds at most `k` zeros.
+2. Expand `right` and count zeros inside the window; when the zero count exceeds `k`, advance `left`, decrementing the count as zeros leave.
+3. The longest window ever seen is the answer — the largest run of ones achievable with `k` flips.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `nums = [1,1,1,0,0,0,1,1,1,1,0], k = 2`:
+- Grow to index 5 → window [1,1,1,0,0,0] has 3 zeros > 2 → shrink left until 2 zeros
+- Best stretch is indices 5..10 `[0,1,1,1,1,0]` with 2 zeros flipped → length **6**
 
 ### Visualization
 ```
-input  ──▶ [ apply Longest Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[1,1,1,0,0,0,1,1,1,1,0], k=2: window "0,1,1,1,1,0" holds ≤2 zeros → answer 6
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
+def longest_ones(nums, k):
+    left = best = zeros = 0
+    for right, val in enumerate(nums):
+        if val == 0:
+            zeros += 1
+        while zeros > k:                 # too many zeros to flip
+            if nums[left] == 0:
+                zeros -= 1
             left += 1
         best = max(best, right - left + 1)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n) — each index enters and leaves the window once; Space O(1).
 
 
 ## 12. LeetCode Practice Set

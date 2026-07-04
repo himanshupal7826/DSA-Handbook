@@ -251,12 +251,18 @@ vector<int> nextGreater(vector<int>& nums) {
 A representative **Previous Greater Element** problem. The signal: stack scan to find each element's previous greater neighbor / span.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (previous greater, monotonic stack, to the left, span).
-2. Reach for the Previous Greater Element template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. The span for today's price is 1 + the number of consecutive earlier days whose price was less than or equal to today's — i.e. the distance back to the previous strictly greater price.
+2. Keep a monotonic decreasing stack of `(price, span)` pairs. When a new price arrives, pop every pair whose price is `<= price`, accumulating their spans into the current span.
+3. Push `(price, span)` for today; return that span. The popped days are now permanently subsumed, so each day is pushed and popped at most once.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Prices 100, 80, 60, 70, 60, 75, 85:
+- 100 → stack empty, span 1. push (100,1). stack=[(100,1)]
+- 80 → 100>80, span 1. push (80,1). stack=[(100,1),(80,1)]
+- 60 → 80>60, span 1. stack=[...,(80,1),(60,1)]
+- 70 → pop (60,1) span=1+1=2; 80>70 stop. push (70,2). stack=[(100,1),(80,1),(70,2)]
+- 75 → pop (70,2) span=1+2=3; 80>75 stop. push (75,3) → span 3
+- 85 → pop (75,3) span=1+3=4, pop (80,1) span=5; 100>85 stop → span 5
 
 ### Visualization
 ```
@@ -267,18 +273,20 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
-        stack.append(i)
-    return res
+class StockSpanner:
+    def __init__(self):
+        self.stack = []             # (price, span), prices strictly decreasing
+
+    def next(self, price: int) -> int:
+        span = 1
+        while self.stack and self.stack[-1][0] <= price:
+            span += self.stack.pop()[1]
+        self.stack.append((price, span))
+        return span
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time amortized O(1) per `next` call (O(n) total over n calls), Space O(n) for the stack.
 
 ## 10. Solved Example 2
 
@@ -286,12 +294,18 @@ Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved ind
 A representative **Previous Greater Element** problem. The signal: stack scan to find each element's previous greater neighbor / span.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (previous greater, monotonic stack, to the left, span).
-2. Reach for the Previous Greater Element template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. For each day we want how many days until a warmer temperature — that is the distance to the next strictly greater element on the right.
+2. Scan left to right keeping a stack of indices whose warmer day is still unknown, with temperatures in non-increasing order.
+3. When today is warmer than the temperature at the top index, pop it and record `today_index - popped_index` as its answer; repeat, then push today. Indices never resolved keep their default 0.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+temps = [73, 74, 75, 71, 69, 76]:
+- i0 73 → stack=[0]
+- i1 74>73 → pop 0, res[0]=1; push → stack=[1]
+- i2 75>74 → pop 1, res[1]=1; push → stack=[2]
+- i3 71 → stack=[2,3]
+- i4 69 → stack=[2,3,4]
+- i5 76 → pop 4 res[4]=1, pop 3 res[3]=2, pop 2 res[2]=3; push → res=[1,1,3,2,1,0]
 
 ### Visualization
 ```
@@ -302,18 +316,19 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
+def dailyTemperatures(temperatures):
+    res = [0] * len(temperatures)
+    stack = []                      # indices, temps non-increasing
+    for i, t in enumerate(temperatures):
+        while stack and temperatures[stack[-1]] < t:
+            j = stack.pop()
+            res[j] = i - j
         stack.append(i)
     return res
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(n), Space O(n). Each index is pushed and popped at most once; stack holds days awaiting a warmer temperature.
 
 ## 11. Solved Example 3
 
@@ -321,12 +336,18 @@ Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved ind
 A representative **Previous Greater Element** problem. The signal: stack scan to find each element's previous greater neighbor / span.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (previous greater, monotonic stack, to the left, span).
-2. Reach for the Previous Greater Element template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. Each bar is the shortest bar of some maximal rectangle; that rectangle extends left to the previous smaller bar and right to the next smaller bar.
+2. Keep an increasing stack of indices. When the current bar is shorter than the top, the top's rectangle ends here: pop it, its height is `heights[popped]`, and its width spans from the new top (previous smaller) up to the current index.
+3. Append a sentinel height 0 so every remaining bar is flushed and measured at the end.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+heights = [2, 1, 5, 6, 2, 3] (plus sentinel 0):
+- i0 h2 → stack=[0]
+- i1 h1<2 → pop 0: area 2*(1-(-1)-1)=2; stack=[1]
+- i2 h5,i3 h6 → stack=[1,2,3]
+- i4 h2<6 → pop 3: 6*(4-2-1)=6; pop 2: 5*(4-1-1)=10 (best); stack=[1,4]
+- i5 h3 → stack=[1,4,5]
+- sentinel 0 → pop 5:3*1=3, pop 4:2*(6-1-1)=8, pop 1:1*6=6 → max area = 10
 
 ### Visualization
 ```
@@ -337,18 +358,20 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
+def largestRectangleArea(heights):
+    stack = []                      # indices, heights strictly increasing
+    best = 0
+    for i, h in enumerate(heights + [0]):
+        while stack and heights[stack[-1]] >= h:
+            height = heights[stack.pop()]
+            left = stack[-1] if stack else -1
+            best = max(best, height * (i - left - 1))
         stack.append(i)
-    return res
+    return best
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(n), Space O(n). Each index is pushed and popped at most once; the stack holds bars whose right boundary is not yet known.
 
 
 ## 12. LeetCode Practice Set

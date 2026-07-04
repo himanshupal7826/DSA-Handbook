@@ -250,101 +250,128 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — Partition Equal (LeetCode 416)
-A representative **0/1 Knapsack** problem. The signal: take-or-skip dp over items and capacity; each item used once.
+Split the array into two equal-sum halves. Reduces to: can any subset reach `sum // 2`? That is a 0/1 subset-sum knapsack where each number is used at most once.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (knapsack, 01, dp, capacity, weight value, take skip).
-2. Reach for the 0/1 Knapsack template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. If the total sum is odd, no equal split exists — return False immediately.
+2. Set `target = sum // 2`; a boolean `dp[j]` means "sum `j` is reachable by some subset."
+3. For each number iterate `j` **downward** from `target` to `num`, so each number is counted once (0/1).
+4. The answer is `dp[target]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `nums = [1, 5, 11, 5]`, sum = 22, target = 11.
+- Start `dp[0]=True`, rest False.
+- After 1: reachable {0,1}.
+- After 5: {0,1,5,6}.
+- After 11: {0,1,5,6,11,12,16,17} → `dp[11]=True`.
+- Answer `True` (subsets {11} and {1,5,5} both sum to 11).
 
 ### Visualization
 ```
-input  ──▶ [ apply 0/1 Knapsack step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+target = 11 ──▶ [ flip dp[j] |= dp[j-num], j descending ]
+dp[11] becomes True once a subset hits 11  ──▶ answer = True
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def canPartition(nums):
+    total = sum(nums)
+    if total % 2:                       # odd total -> impossible
+        return False
+    target = total // 2
+    dp = [False] * (target + 1)
+    dp[0] = True                        # empty subset sums to 0
+    for num in nums:
+        for j in range(target, num - 1, -1):   # downward -> 0/1 (each num once)
+            dp[j] |= dp[j - num]
+    return dp[target]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n × target), Space O(target) — one rolling boolean row of size `sum/2 + 1`.
 
 ## 10. Solved Example 2
 
 ### Problem — Target Sum (LeetCode 494)
-A representative **0/1 Knapsack** problem. The signal: take-or-skip dp over items and capacity; each item used once.
+Assign `+` or `-` to each number to hit `target`. If `P` is the subset given `+`, then `P - (sum - P) = target`, so `P = (sum + target) / 2`. Count subsets summing to `P` — a 0/1 counting knapsack.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (knapsack, 01, dp, capacity, weight value, take skip).
-2. Reach for the 0/1 Knapsack template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Let `P = (sum + target) / 2`. If `sum + target` is odd or `abs(target) > sum`, no assignment works — return 0.
+2. `dp[j]` = number of subsets summing to `j`; seed `dp[0] = 1` (empty subset).
+3. For each number iterate `j` **downward** from `P` to `num`, adding `dp[j] += dp[j - num]` so each number is used once.
+4. The answer is `dp[P]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `nums = [1, 1, 1, 1, 1]`, target = 3, sum = 5, P = (5+3)/2 = 4.
+- `dp[0]=1`.
+- After each 1, counts of subsets by size accumulate (binomial).
+- After all five 1s, `dp[4] = C(5,4) = 5`.
+- Answer `5` (five ways to choose which four are `+`).
 
 ### Visualization
 ```
-input  ──▶ [ apply 0/1 Knapsack step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+P = 4 ──▶ [ dp[j] += dp[j-num], j descending -> subsets counted once ]
+dp[P] holds the number of + / - assignments  ──▶ answer = 5
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def findTargetSumWays(nums, target):
+    total = sum(nums)
+    if (total + target) % 2 or abs(target) > total:
+        return 0
+    P = (total + target) // 2
+    dp = [0] * (P + 1)
+    dp[0] = 1                           # one way to make sum 0: empty subset
+    for num in nums:
+        for j in range(P, num - 1, -1):        # downward -> each num once (0/1)
+            dp[j] += dp[j - num]
+    return dp[P]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n × P), Space O(P) where `P = (sum + target) / 2`.
 
 ## 11. Solved Example 3
 
 ### Problem — Last Stone II (LeetCode 1049)
-A representative **0/1 Knapsack** problem. The signal: take-or-skip dp over items and capacity; each item used once.
+Smashing stones splits them into two piles with signs `+`/`-`; the smallest leftover is `total - 2 * best`, where `best` is the largest subset sum not exceeding `total // 2`. Maximize a bounded subset sum — 0/1 knapsack.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (knapsack, 01, dp, capacity, weight value, take skip).
-2. Reach for the 0/1 Knapsack template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Let `total = sum(stones)` and `target = total // 2`; boolean `dp[j]` = "subset sum `j` reachable."
+2. For each stone iterate `j` **downward** from `target` to `stone`: `dp[j] |= dp[j - stone]` (each stone once).
+3. Take `best` = the largest `j ≤ target` with `dp[j]` True.
+4. The minimum remaining weight is `total - 2 * best`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `stones = [2, 7, 4, 1, 8, 1]`, total = 23, target = 11.
+- Seed `dp[0]=True`.
+- Reachable sums grow; 11 is reachable (2+8+1 = 11).
+- `best = 11`.
+- Answer `23 - 2*11 = 1`.
 
 ### Visualization
 ```
-input  ──▶ [ apply 0/1 Knapsack step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+target = 11 ──▶ [ dp[j] |= dp[j-stone], j descending ]
+best = max reachable j ≤ 11 = 11  ──▶ answer = 23 - 22 = 1
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def lastStoneWeightII(stones):
+    total = sum(stones)
+    target = total // 2
+    dp = [False] * (target + 1)
+    dp[0] = True
+    for stone in stones:
+        for j in range(target, stone - 1, -1):   # downward -> each stone once
+            dp[j] |= dp[j - stone]
+    best = max(j for j in range(target + 1) if dp[j])
+    return total - 2 * best
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n × target), Space O(target) with `target = sum/2`.
 
 
 ## 12. LeetCode Practice Set

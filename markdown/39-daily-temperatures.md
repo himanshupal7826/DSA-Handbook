@@ -257,12 +257,18 @@ vector<int> nextGreater(vector<int>& nums) {
 A representative **Daily Temperatures Pattern** problem. The signal: stack of unresolved indices to compute 'days until' answers.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (daily temperatures, wait days, next warmer, monotonic stack, distance).
-2. Reach for the Daily Temperatures Pattern template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. Keep a stack of indices whose warmer day is still unknown, kept with decreasing temperatures.
+2. For each new day `i`, while its temperature is warmer than the top's temperature, that top day just found its answer: `res[top] = i - top`; pop it.
+3. Push `i` as the newest unresolved day. Any index never popped keeps its default answer of 0.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[73,74,75,71,69,72,76,73]`:
+- i=0 T=73: stack empty → push. stack=[0]
+- i=1 T=74>73: pop 0, res[0]=1-0=1; push 1. stack=[1]
+- i=2 T=75>74: pop 1, res[1]=1; push 2. stack=[2]
+- i=3 T=71: push. stack=[2,3]; i=4 T=69: push. stack=[2,3,4]
+- i=5 T=72>69,71: pop 4 res[4]=1, pop 3 res[3]=2; push 5. stack=[2,5]
+- i=6 T=76 pops 5(res=1),2(res[2]=4); push 6. i=7 T=73 push. Final res=[1,1,4,2,1,1,0,0].
 
 ### Visualization
 ```
@@ -273,18 +279,19 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
+def dailyTemperatures(temperatures):
+    res = [0] * len(temperatures)
+    stack = []                      # indices, temperatures decreasing
+    for i, t in enumerate(temperatures):
+        while stack and temperatures[stack[-1]] < t:
+            j = stack.pop()
+            res[j] = i - j          # days waited until warmer
         stack.append(i)
     return res
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(n), Space O(n). Each index is pushed and popped at most once.
 
 ## 10. Solved Example 2
 
@@ -292,12 +299,17 @@ Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved ind
 A representative **Daily Temperatures Pattern** problem. The signal: stack of unresolved indices to compute 'days until' answers.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (daily temperatures, wait days, next warmer, monotonic stack, distance).
-2. Reach for the Daily Temperatures Pattern template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. Scan `nums2` once with a decreasing monotonic stack of values whose next greater is still unknown.
+2. When the current value beats the stack top, pop it and record `greater[top] = current` in a hash map.
+3. Then answer each query in `nums1` by a direct map lookup (default -1 for values with nothing greater to the right).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums2 = [1,3,4,2]`, `nums1 = [4,1,2]`:
+- v=1: stack=[1]
+- v=3>1: pop 1 → map[1]=3; stack=[3]
+- v=4>3: pop 3 → map[3]=4; stack=[4]
+- v=2: stack=[4,2]. Leftover 4,2 → no next greater.
+- map={1:3, 3:4}. Answer nums1: 4→-1, 1→3, 2→-1 ⇒ `[-1,3,-1]`.
 
 ### Visualization
 ```
@@ -308,18 +320,18 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
-        stack.append(i)
-    return res
+def nextGreaterElement(nums1, nums2):
+    greater = {}
+    stack = []                      # values, decreasing
+    for v in nums2:
+        while stack and stack[-1] < v:
+            greater[stack.pop()] = v
+        stack.append(v)
+    return [greater.get(x, -1) for x in nums1]
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(n + m), Space O(n) for the stack and map (n = len(nums2), m = len(nums1)).
 
 ## 11. Solved Example 3
 
@@ -327,12 +339,17 @@ Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved ind
 A representative **Daily Temperatures Pattern** problem. The signal: stack of unresolved indices to compute 'days until' answers.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (daily temperatures, wait days, next warmer, monotonic stack, distance).
-2. Reach for the Daily Temperatures Pattern template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. The span is the count of consecutive days back to (and including) today whose price ≤ today's price.
+2. Keep a stack of `(price, span)` pairs decreasing by price. On `next(price)`, start `span = 1`.
+3. While the top's price ≤ `price`, pop it and add its span into today's span (those days are subsumed), then push `(price, span)` and return it.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Calls with prices `[100, 80, 60, 70, 60, 75, 85]`:
+- 100 → span 1, stack=[(100,1)]
+- 80 → span 1, stack=[(100,1),(80,1)]
+- 60 → span 1, stack=[...,(60,1)]
+- 70 → pop (60,1) span=1+1=2; stack=[(100,1),(80,1),(70,2)]
+- 60 → span 1; then 75 → pop (60,1),(70,2) span=1+1+2=4; then 85 → pops (75,4),(80,1) span=1+4+1=6 ⇒ spans `[1,1,1,2,1,4,6]`.
 
 ### Visualization
 ```
@@ -343,18 +360,20 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
-        stack.append(i)
-    return res
+class StockSpanner:
+    def __init__(self):
+        self.stack = []             # (price, span), prices decreasing
+
+    def next(self, price):
+        span = 1
+        while self.stack and self.stack[-1][0] <= price:
+            span += self.stack.pop()[1]
+        self.stack.append((price, span))
+        return span
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(1) amortized per `next` call, Space O(n) for the stack.
 
 
 ## 12. LeetCode Practice Set

@@ -248,110 +248,122 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — First Bad Version (LeetCode 278)
-A representative **Monotonic Function Search** problem. The signal: binary search the boundary of a monotonic true/false predicate.
+Versions `1..n` are good then all bad. Given `isBadVersion(v)`, find the first bad one with the fewest API calls.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (monotonic, predicate, boolean search, first true, threshold).
-2. Reach for the Monotonic Function Search template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. The predicate `isBadVersion(v)` is monotonic: once true, it stays true — so the good/bad boundary is exactly a first-true search.
+2. Keep a closed interval `[lo, hi] = [1, n]` and always retain a candidate that could still be the first bad version.
+3. When `mid` is bad, the answer is `mid` or earlier (`hi = mid`); when good, it must be later (`lo = mid + 1`). Converge to the flip.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+n=5, versions 1,2,3,4,5 with 4,5 bad → answer 4.
+- lo=1, hi=5, mid=3 → isBad(3)=False → lo=4.
+- lo=4, hi=5, mid=4 → isBad(4)=True → hi=4.
+- lo==hi==4 → return 4. ✓
 
 ### Visualization
 ```
-input  ──▶ [ apply Monotonic Function Search step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+versions ──▶ 1  2  3 | 4  5      good...good | bad...bad
+predicate──▶ F  F  F | T  T      find the first T
+answer   ──▶ 4                   leftmost bad version
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def firstBadVersion(n):
+    lo, hi = 1, n                       # closed interval [lo, hi]
     while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        mid = lo + (hi - lo) // 2       # avoid overflow
+        if isBadVersion(mid):
+            hi = mid                    # mid may be the first bad one
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            lo = mid + 1                # first bad is strictly after mid
+    return lo                           # lo == hi == first bad version
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n) API calls, Space O(1).
 
 ## 10. Solved Example 2
 
-### Problem — Kth Missing (LeetCode 1539)
-A representative **Monotonic Function Search** problem. The signal: binary search the boundary of a monotonic true/false predicate.
+### Problem — Kth Missing Positive Number (LeetCode 1539)
+Given a strictly increasing array `arr`, return the `k`-th positive integer missing from it.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (monotonic, predicate, boolean search, first true, threshold).
-2. Reach for the Monotonic Function Search template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. At index `i`, the count of positives missing before `arr[i]` is `missing(i) = arr[i] - (i + 1)` — a non-decreasing (monotonic) function.
+2. Binary-search the first index where `missing(i) >= k`; that brackets where the k-th missing number lands.
+3. After the loop `lo` is that boundary, and the answer is simply `k + lo` (k positions past the `lo` present numbers to its left).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+arr=[2,3,4,7,11], k=5 → answer 9.
+- missing = [0,0,0,3,6]; want first missing(i) >= 5.
+- lo=0, hi=5, mid=2 → missing=0 < 5 → lo=3.
+- lo=3, hi=5, mid=4 → missing=6 >= 5 → hi=4.
+- lo=3, hi=4, mid=3 → missing=3 < 5 → lo=4 == hi. answer = k + lo = 5 + 4 = 9. ✓
 
 ### Visualization
 ```
-input  ──▶ [ apply Monotonic Function Search step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+arr      ──▶ 2  3  4  7  11
+missing  ──▶ 0  0  0  3   6      arr[i]-(i+1), monotonic
+k=5      ──▶ first index with missing >= k is lo=4
+answer   ──▶ k + lo = 9
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def findKthPositive(arr, k):
+    lo, hi = 0, len(arr)                # half-open [lo, hi]
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
+        if arr[mid] - (mid + 1) < k:    # fewer than k missing up to mid
             lo = mid + 1
         else:
             hi = mid
-    return lo                     # first index with a[i] >= target
+    return k + lo                       # k-th missing positive
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n), Space O(1).
 
 ## 11. Solved Example 3
 
-### Problem — Min Time Trips (LeetCode 2187)
-A representative **Monotonic Function Search** problem. The signal: binary search the boundary of a monotonic true/false predicate.
+### Problem — Minimum Time to Complete Trips (LeetCode 2187)
+Each bus `i` takes `time[i]` per trip. Find the minimum time `t` for the fleet to make `totalTrips` trips in total.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (monotonic, predicate, boolean search, first true, threshold).
-2. Reach for the Monotonic Function Search template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. In time `t`, bus `i` completes `t // time[i]` trips, so `feasible(t) = sum(t // x for x in time) >= totalTrips` is monotonic in `t`.
+2. Binary-search the answer over `t in [1, min(time) * totalTrips]` — the upper bound uses the fastest bus doing every trip alone.
+3. Shrink toward the smallest `t` for which `feasible(t)` is true (a first-true search on the answer space).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+time=[1,2,3], totalTrips=5 → answer 3.
+- lo=1, hi=5, mid=3 → 3//1+3//2+3//3 = 3+1+1 = 5 >= 5 → feasible → hi=3.
+- lo=1, hi=3, mid=2 → 2+1+0 = 3 < 5 → not feasible → lo=3.
+- lo==hi==3 → return 3. ✓
 
 ### Visualization
 ```
-input  ──▶ [ apply Monotonic Function Search step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+t        ──▶ 1  2  3  4  5      candidate answers
+feasible ──▶ F  F  T  T  T      sum(t//x) >= totalTrips, monotonic
+answer   ──▶ 3                  smallest feasible t
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def minimumTime(time, totalTrips):
+    lo, hi = 1, min(time) * totalTrips          # fastest bus alone bounds it
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        trips = sum(mid // x for x in time)
+        if trips >= totalTrips:
+            hi = mid                            # mid works, try smaller
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            lo = mid + 1                        # need more time
+    return lo                                   # min feasible time
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(n log(min(time)·totalTrips)), Space O(1).
 
 
 ## 12. LeetCode Practice Set

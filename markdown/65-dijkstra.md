@@ -253,119 +253,150 @@ vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
 ## 9. Solved Example 1
 
 ### Problem — Network Delay (LeetCode 743)
-A representative **Dijkstra** problem. The signal: greedy heap-based shortest paths for non-negative edge weights.
+Given directed travel times `times[i] = (u, v, w)`, a node count `n`, and a source `k`, return the time for a signal from `k` to reach every node, or `-1` if some node is unreachable.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (dijkstra, shortest path, weighted, heap, non-negative).
-2. Reach for the Dijkstra template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Build a weighted adjacency list; the signal reaches a node at its shortest-path distance from `k`.
+2. Run Dijkstra from `k`: pop the nearest unfinalized node from a min-heap and relax its outgoing edges.
+3. The answer is the maximum finalized distance (the last node to be reached); if fewer than `n` nodes were finalized, return `-1`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`times=[(2,1,1),(2,3,1),(3,4,1)]`, `n=4`, `k=2`.
+- Pop (0,2) → dist[2]=0, push (1,1),(1,3).
+- Pop (1,1) → dist[1]=1; pop (1,3) → dist[3]=1, push (2,4).
+- Pop (2,4) → dist[4]=2. All 4 reached → answer `max(0,1,1,2) = 2`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Dijkstra step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+heap pops nodes in nondecreasing distance ──▶ each finalized once
+answer = max over all finalized dist[node]
 ```
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+import heapq
+
+def networkDelayTime(times, n, k):
+    graph = {i: [] for i in range(1, n + 1)}
+    for u, v, w in times:
+        graph[u].append((v, w))
+    dist = {}
+    heap = [(0, k)]                       # (distance, node)
+    while heap:
+        d, node = heapq.heappop(heap)
+        if node in dist:                  # already finalized
+            continue
+        dist[node] = d
+        for nei, w in graph[node]:
+            if nei not in dist:
+                heapq.heappush(heap, (d + w, nei))
+    return max(dist.values()) if len(dist) == n else -1
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(E log V), Space O(V + E).
 
 ## 10. Solved Example 2
 
 ### Problem — Min Effort (LeetCode 1631)
-A representative **Dijkstra** problem. The signal: greedy heap-based shortest paths for non-negative edge weights.
+On a grid of `heights`, a path's effort is the maximum absolute height difference between consecutive cells. Return the minimum effort to walk from the top-left to the bottom-right cell.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (dijkstra, shortest path, weighted, heap, non-negative).
-2. Reach for the Dijkstra template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Treat each cell as a node; the "cost" of a path is the max edge weight (height jump) along it, not the sum.
+2. Run Dijkstra where a node's key is the smallest possible max-jump to reach it; relax neighbor with `max(current_effort, |Δheight|)`.
+3. Pop the bottom-right cell the moment it comes off the heap — that popped effort is the minimum.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`heights=[[1,2,2],[3,8,2],[5,3,5]]`.
+- Start (0,0) effort 0; push down |3-1|=2 and right |2-1|=1.
+- Pop (0,1) e=1 → push (0,2) e=max(1,0)=1, (1,1) e=6.
+- Follow low-effort rim 1→1→2→2→5 down the right/bottom; target (2,2) pops at e=2 → answer `2`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Dijkstra step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+effort[cell] = min over paths of ( max |Δheight| on path )
+relax: ne = max(effort[cur], |h[nbr]-h[cur]|)
 ```
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+import heapq
+
+def minimumEffortPath(heights):
+    rows, cols = len(heights), len(heights[0])
+    effort = [[float('inf')] * cols for _ in range(rows)]
+    effort[0][0] = 0
+    heap = [(0, 0, 0)]                    # (effort_so_far, r, c)
+    while heap:
+        e, r, c = heapq.heappop(heap)
+        if r == rows - 1 and c == cols - 1:
+            return e
+        if e > effort[r][c]:
+            continue
+        for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nr, nc = r + dr, c + dc
+            if 0 <= nr < rows and 0 <= nc < cols:
+                ne = max(e, abs(heights[nr][nc] - heights[r][c]))
+                if ne < effort[nr][nc]:
+                    effort[nr][nc] = ne
+                    heapq.heappush(heap, (ne, nr, nc))
+    return 0
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(R·C·log(R·C)), Space O(R·C).
 
 ## 11. Solved Example 3
 
 ### Problem — K Stops (LeetCode 787)
-A representative **Dijkstra** problem. The signal: greedy heap-based shortest paths for non-negative edge weights.
+Given `flights[i] = (u, v, price)`, find the cheapest price from `src` to `dst` using at most `k` stops (so at most `k + 1` edges), or `-1` if none.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (dijkstra, shortest path, weighted, heap, non-negative).
-2. Reach for the Dijkstra template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Extend the Dijkstra state to `(cost, node, stops_remaining)` so the stop budget rides along in the heap.
+2. Pop the cheapest state; if it is `dst`, return its cost — the heap guarantees it is the cheapest that respects the budget.
+3. Only expand a neighbor when `stops_remaining > 0` and the new cost improves the best seen for `(neighbor, stops_remaining - 1)`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`n=3`, `flights=[(0,1,100),(1,2,100),(0,2,500)]`, `src=0`, `dst=2`, `k=1`.
+- Start (0, 0, 2 edges). Push (100, 1, 1) and (500, 2, 1).
+- Pop (100,1,1) → push (200, 2, 0).
+- Pop (200,2,0) → node==dst → answer `200` (cheaper than the direct 500, within 1 stop).
 
 ### Visualization
 ```
-input  ──▶ [ apply Dijkstra step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+state = (cost, node, edges_left); heap ordered by cost
+first pop of dst within budget = cheapest valid price
 ```
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+import heapq
+
+def findCheapestPrice(n, flights, src, dst, k):
+    graph = {i: [] for i in range(n)}
+    for u, v, w in flights:
+        graph[u].append((v, w))
+    # (cost, node, edges_remaining); k stops == k+1 edges
+    heap = [(0, src, k + 1)]
+    best = {}                             # (node, edges_left) -> cheapest cost
+    while heap:
+        cost, node, edges = heapq.heappop(heap)
+        if node == dst:
+            return cost
+        if edges == 0:
+            continue
+        if best.get((node, edges), float('inf')) < cost:
+            continue
+        for nei, w in graph[node]:
+            nc = cost + w
+            if nc < best.get((nei, edges - 1), float('inf')):
+                best[(nei, edges - 1)] = nc
+                heapq.heappush(heap, (nc, nei, edges - 1))
+    return -1
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(E·K·log(E·K)), Space O(V·K).
 
 
 ## 12. LeetCode Practice Set

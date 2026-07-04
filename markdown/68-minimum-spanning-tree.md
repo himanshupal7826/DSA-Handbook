@@ -255,15 +255,18 @@ vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
 ## 9. Solved Example 1
 
 ### Problem — Connect Points (LeetCode 1584)
-A representative **Minimum Spanning Tree** problem. The signal: kruskal/prim connect all nodes at minimum total edge weight.
+Given `points` on a plane, connect all of them at minimum total cost where the cost between two points is their Manhattan distance. Return the minimum total cost.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (mst, kruskal, prim, spanning tree, minimum cost, union find).
-2. Reach for the Minimum Spanning Tree template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. The graph is complete: every pair of points is an edge weighted by Manhattan distance. Prim avoids materializing all O(n²) edges up front.
+2. Grow the tree from point 0, using a min-heap keyed by candidate edge cost `(dist, point)`.
+3. Pop the cheapest edge to an unvisited point, add its cost, mark it visited, and push distances to remaining points until all `n` are in the tree.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Points `[[0,0],[2,2],[3,10]]`.
+- Start heap `[(0,0)]`. Pop (0,0): visit 0, total 0, push (4,1),(13,2).
+- Pop (4,1): visit 1, total 4, push (9,2) (|2-3|+|2-10|=9).
+- Pop (9,2): visit 2, total 13. All visited → answer `13`.
 
 ### Visualization
 ```
@@ -274,35 +277,47 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+import heapq
+
+def minCostConnectPoints(points):
+    n = len(points)
+    visited = [False] * n
+    heap = [(0, 0)]                 # (edge cost, point index)
+    total, used = 0, 0
+    while heap and used < n:
+        cost, u = heapq.heappop(heap)
+        if visited[u]:
+            continue
+        visited[u] = True
+        total += cost
+        used += 1
+        ux, uy = points[u]
+        for v in range(n):
+            if not visited[v]:
+                d = abs(ux - points[v][0]) + abs(uy - points[v][1])
+                heapq.heappush(heap, (d, v))
+    return total
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(V² log V) via the heap over a dense graph, Space O(V²) worst-case heap entries.
 
 ## 10. Solved Example 2
 
 ### Problem — Connect Cities (LeetCode 1135)
-A representative **Minimum Spanning Tree** problem. The signal: kruskal/prim connect all nodes at minimum total edge weight.
+Given `n` cities (labelled `1..n`) and weighted `connections`, return the minimum cost to connect all cities, or `-1` if it is impossible.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (mst, kruskal, prim, spanning tree, minimum cost, union find).
-2. Reach for the Minimum Spanning Tree template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Sort connections by ascending weight — Kruskal always considers the cheapest remaining edge first.
+2. Use union-find: add an edge only if its endpoints are in different components (avoids cycles).
+3. Track how many edges were used; a spanning tree needs exactly `n-1`. Fewer means the graph is disconnected → return `-1`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`n=3`, connections `[[1,2,5],[1,3,6],[2,3,1]]`.
+- Sorted: `(2,3,1),(1,2,5),(1,3,6)`.
+- Take (2,3,1): union → total 1, used 1.
+- Take (1,2,5): 1 and 2 differ → union, total 6, used 2 = n-1. Stop.
+- (1,3,6) would form a cycle. Answer `6`.
 
 ### Visualization
 ```
@@ -313,35 +328,44 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+def minimumCost(n, connections):
+    parent = list(range(n + 1))     # cities are 1..n
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    connections.sort(key=lambda c: c[2])
+    total, used = 0, 0
+    for u, v, w in connections:
+        ru, rv = find(u), find(v)
+        if ru != rv:
+            parent[ru] = rv
+            total += w
+            used += 1
+    return total if used == n - 1 else -1
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(E log E) to sort, near-O(E α(V)) for the unions, Space O(V).
 
 ## 11. Solved Example 3
 
 ### Problem — Critical Edges (LeetCode 1489)
-A representative **Minimum Spanning Tree** problem. The signal: kruskal/prim connect all nodes at minimum total edge weight.
+Given a weighted undirected graph, classify each edge. A **critical** edge appears in every MST; a **pseudo-critical** edge appears in some but not all MSTs. Return `[critical, pseudo]` as lists of edge indices.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (mst, kruskal, prim, spanning tree, minimum cost, union find).
-2. Reach for the Minimum Spanning Tree template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Compute the baseline MST weight with standard Kruskal (sort edges, union-find).
+2. An edge is **critical** if forcing its removal makes the MST weight increase (or the graph disconnected → weight becomes infinite).
+3. Otherwise, an edge is **pseudo-critical** if forcing it into the tree first still yields the baseline weight.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Edges (index:weight) with baseline MST weight `W`.
+- Remove edge i, rebuild MST → weight `> W` ⇒ i is critical.
+- Else force edge i in, rebuild MST → weight `== W` ⇒ i is pseudo-critical.
+- Parallel equal-weight edges typically land as pseudo-critical (interchangeable).
 
 ### Visualization
 ```
@@ -352,22 +376,47 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+def findCriticalAndPseudoCriticalEdges(n, edges):
+    m = len(edges)
+    order = sorted(range(m), key=lambda i: edges[i][2])
+
+    def mst(skip=-1, force=-1):
+        parent = list(range(n))
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        weight, count = 0, 0
+        if force != -1:
+            u, v, w = edges[force]
+            parent[find(u)] = find(v)
+            weight, count = w, 1
+        for i in order:
+            if i == skip:
+                continue
+            u, v, w = edges[i]
+            ru, rv = find(u), find(v)
+            if ru != rv:
+                parent[ru] = rv
+                weight += w
+                count += 1
+        return weight if count == n - 1 else float('inf')
+
+    base = mst()
+    critical, pseudo = [], []
+    for i in range(m):
+        if mst(skip=i) > base:
+            critical.append(i)
+        elif mst(force=i) == base:
+            pseudo.append(i)
+    return [critical, pseudo]
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(E² α(V)) — an MST rebuild per edge, Space O(V + E).
 
 
 ## 12. LeetCode Practice Set

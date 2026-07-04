@@ -258,36 +258,49 @@ vector<vector<int>> subsets(vector<int>& nums) {
 A representative **N Queens** problem. The signal: place queens column by column, pruning conflicting diagonals/rows.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (n queens, backtracking, constraints, diagonal, prune).
-2. Reach for the N Queens template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Place exactly one queen per row, recursing from row 0 down to row n.
+2. Track occupied `cols`, `diag` (r − c), and `anti` (r + c) as sets so a conflict check is O(1).
+3. If a column is free on all three axes, place the queen (record its column), recurse to the next row, then undo before trying the next column.
+4. When `row == n`, every row holds a safe queen — turn the recorded columns into `"...Q.."` strings and append the board.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+n = 4, place row by row:
+- row0 → col0; cols={0}, diag={0}, anti={0}.
+- row1 → col2 is safe (col1 hits anti, others clash); recurse.
+- row2 → no safe column (all clash) → backtrack up to row1, then row0.
+- Eventually row0=col1, row1=col3, row2=col0, row3=col2 succeeds → board `.Q..`,`...Q`,`Q...`,`..Q.`; the mirror solution is also found → 2 boards.
 
 ### Visualization
 ```
-input  ──▶ [ apply N Queens step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+row-by-row placement, sets cols/diag(r-c)/anti(r+c) prune attacked columns before recursing
 ```
 
 ### Code
 ```python
-def subsets(nums):
-    res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
-            path.pop()                          # un-choose
-    dfs(0)
+def solveNQueens(n):
+    res, cols, diag, anti = [], set(), set(), set()
+    queens = []  # queens[r] = column of the queen in row r
+
+    def backtrack(row):
+        if row == n:
+            res.append(["".join("Q" if c == queens[r] else "."
+                                 for c in range(n)) for r in range(n)])
+            return
+        for col in range(n):
+            if col in cols or (row - col) in diag or (row + col) in anti:
+                continue
+            cols.add(col); diag.add(row - col); anti.add(row + col)
+            queens.append(col)
+            backtrack(row + 1)
+            queens.pop()
+            cols.remove(col); diag.remove(row - col); anti.remove(row + col)
+
+    backtrack(0)
     return res
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(n!) (branching shrinks as columns/diagonals fill), Space O(n) for the recursion depth and the three tracking sets.
 
 ## 10. Solved Example 2
 
@@ -295,36 +308,46 @@ Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the 
 A representative **N Queens** problem. The signal: place queens column by column, pruning conflicting diagonals/rows.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (n queens, backtracking, constraints, diagonal, prune).
-2. Reach for the N Queens template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Identical backtracking to LC51 — one queen per row, pruning with `cols`, `diag` (r − c), `anti` (r + c).
+2. We only need the number of solutions, so never build board strings.
+3. When `row == n`, a full valid placement was reached — increment a counter instead of appending a board.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+n = 4, count completions:
+- Explore row0=col0 branch → dead-ends (no full placement).
+- row0=col1 → row1=col3 → row2=col0 → row3=col2 completes → count = 1.
+- row0=col2 → the mirror completes → count = 2.
+- Remaining branches dead-end → return 2.
 
 ### Visualization
 ```
-input  ──▶ [ apply N Queens step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+same row-by-row pruning as LC51, but each complete placement just bumps an int counter
 ```
 
 ### Code
 ```python
-def subsets(nums):
-    res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
-            path.pop()                          # un-choose
-    dfs(0)
-    return res
+def totalNQueens(n):
+    cols, diag, anti = set(), set(), set()
+    count = 0
+
+    def backtrack(row):
+        nonlocal count
+        if row == n:
+            count += 1
+            return
+        for col in range(n):
+            if col in cols or (row - col) in diag or (row + col) in anti:
+                continue
+            cols.add(col); diag.add(row - col); anti.add(row + col)
+            backtrack(row + 1)
+            cols.remove(col); diag.remove(row - col); anti.remove(row + col)
+
+    backtrack(0)
+    return count
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(n!), Space O(n) for the recursion stack and the three conflict sets — no board storage needed.
 
 ## 11. Solved Example 3
 
@@ -332,36 +355,52 @@ Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the 
 A representative **N Queens** problem. The signal: place queens column by column, pruning conflicting diagonals/rows.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (n queens, backtracking, constraints, diagonal, prune).
-2. Reach for the N Queens template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Scan the 9×9 grid for the next empty cell (`'.'`); if none remain the board is solved.
+2. Try digits `'1'`..`'9'`; a digit is valid only if it is absent from that row, column, and 3×3 box.
+3. Place a valid digit and recurse; if the recursion solves the rest, propagate `True`.
+4. Otherwise reset the cell to `'.'` and try the next digit; return `False` when no digit fits.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Solving from the top-left empty cell:
+- First empty cell (0,2): try `'1'` — already in row → skip; `'4'` valid → place, recurse.
+- Deeper cell hits a contradiction (no digit fits) → return `False`, undo `'4'`.
+- Backtrack tries the next digit at (0,2); continue until every cell is filled consistently.
+- All cells filled → return `True`, board mutated in place to the unique solution.
 
 ### Visualization
 ```
-input  ──▶ [ apply N Queens step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+next empty cell → try 1..9 valid in row/col/box → recurse; first full grid returns True, undo on dead ends
 ```
 
 ### Code
 ```python
-def subsets(nums):
-    res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
-            path.pop()                          # un-choose
-    dfs(0)
-    return res
+def solveSudoku(board):
+    def valid(r, c, ch):
+        for i in range(9):
+            if board[r][i] == ch or board[i][c] == ch:
+                return False
+            if board[3 * (r // 3) + i // 3][3 * (c // 3) + i % 3] == ch:
+                return False
+        return True
+
+    def solve():
+        for r in range(9):
+            for c in range(9):
+                if board[r][c] == '.':
+                    for ch in "123456789":
+                        if valid(r, c, ch):
+                            board[r][c] = ch
+                            if solve():
+                                return True
+                            board[r][c] = '.'
+                    return False  # no digit works here → backtrack
+        return True  # no empty cell left → solved
+
+    solve()
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(9^(m)) worst case where m is the number of empty cells, Space O(m) for the recursion depth (board solved in place).
 
 
 ## 12. LeetCode Practice Set

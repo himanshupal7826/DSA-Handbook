@@ -229,34 +229,39 @@ long long rangeSum(vector<long long>& pre, int l, int r) { return pre[r+1] - pre
 A representative **Sorting Based Problems** problem. The signal: reorder data so structure (pairs, gaps, greedy choices) becomes obvious.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sort, order, comparator, custom sort, greedy sort).
-2. Reach for the Sorting Based Problems template below and map the problem's entities onto it.
-3. Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
+1. Sort intervals by start so overlapping ones become adjacent.
+2. Sweep once, keeping the last interval in the result.
+3. If the current start ≤ last end, extend the last end (`max`); otherwise append a new interval.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`[[1,3],[2,6],[8,10]]` → sorted same
+- push [1,3]
+- [2,6]: 2 ≤ 3 → merge → [1,6]
+- [8,10]: 8 > 6 → push [8,10]
+Result: `[[1,6],[8,10]]`
 
 ### Visualization
 ```
-input  ──▶ [ apply Sorting Based Problems step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+1--3
+   2------6     -> merged 1------6
+              8--10
 ```
 
 ### Code
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
-
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+def merge(intervals):
+    intervals.sort(key=lambda iv: iv[0])
+    merged = []
+    for start, end in intervals:
+        if merged and start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return merged
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass to build, O(1) per query.
+Time O(n log n) for the sort, Space O(n) for the output.
 
 ## 10. Solved Example 2
 
@@ -264,34 +269,42 @@ Time O(n), Space O(n). One pass to build, O(1) per query.
 A representative **Sorting Based Problems** problem. The signal: reorder data so structure (pairs, gaps, greedy choices) becomes obvious.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sort, order, comparator, custom sort, greedy sort).
-2. Reach for the Sorting Based Problems template below and map the problem's entities onto it.
-3. Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
+1. The task asks to sort in guaranteed O(n log n) — implement merge sort explicitly.
+2. Recursively split the array into halves until each has ≤ 1 element.
+3. Merge two sorted halves by repeatedly taking the smaller front element.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`[5,2,3,1]`
+- split → [5,2] and [3,1]
+- sort halves → [2,5] and [1,3]
+- merge: 1,2,3,5 → `[1,2,3,5]`
 
 ### Visualization
 ```
-input  ──▶ [ apply Sorting Based Problems step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[5,2,3,1] -> [5,2] [3,1] -> [2,5] [1,3] -> merge -> [1,2,3,5]
 ```
 
 ### Code
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
-
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+def sortArray(nums):
+    if len(nums) <= 1:
+        return nums
+    mid = len(nums) // 2
+    left = sortArray(nums[:mid])
+    right = sortArray(nums[mid:])
+    merged, i, j = [], 0, 0
+    while i < len(left) and j < len(right):
+        if left[i] <= right[j]:
+            merged.append(left[i]); i += 1
+        else:
+            merged.append(right[j]); j += 1
+    merged.extend(left[i:])
+    merged.extend(right[j:])
+    return merged
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass to build, O(1) per query.
+Time O(n log n) guaranteed, Space O(n) for merge buffers.
 
 ## 11. Solved Example 3
 
@@ -299,34 +312,39 @@ Time O(n), Space O(n). One pass to build, O(1) per query.
 A representative **Sorting Based Problems** problem. The signal: reorder data so structure (pairs, gaps, greedy choices) becomes obvious.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sort, order, comparator, custom sort, greedy sort).
-2. Reach for the Sorting Based Problems template below and map the problem's entities onto it.
-3. Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
+1. Only three values (0,1,2), so a full comparison sort is overkill — use the Dutch National Flag partition.
+2. Keep three pointers: `low` (next 0 slot), `mid` (scanner), `high` (next 2 slot).
+3. Swap 0s to the front, 2s to the back; 1s just advance `mid` — one in-place pass.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`[2,0,2,1,1,0]`  low=0 mid=0 high=5
+- nums[0]=2 → swap with high → [0,0,2,1,1,2], high=4
+- nums[0]=0 → swap with low → low=1, mid=1
+- ... continues → `[0,0,1,1,2,2]`
 
 ### Visualization
 ```
-input  ──▶ [ apply Sorting Based Problems step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[ 0s | 1s | mid scan | 2s ]
+ low        mid      high
 ```
 
 ### Code
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
-
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+def sortColors(nums):
+    low, mid, high = 0, 0, len(nums) - 1
+    while mid <= high:
+        if nums[mid] == 0:
+            nums[low], nums[mid] = nums[mid], nums[low]
+            low += 1; mid += 1
+        elif nums[mid] == 1:
+            mid += 1
+        else:                       # nums[mid] == 2
+            nums[mid], nums[high] = nums[high], nums[mid]
+            high -= 1
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass to build, O(1) per query.
+Time O(n) single pass, Space O(1) in-place.
 
 
 ## 12. LeetCode Practice Set

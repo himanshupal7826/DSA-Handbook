@@ -238,34 +238,38 @@ long long rangeSum(vector<long long>& pre, int l, int r) { return pre[r+1] - pre
 A representative **Difference Array** problem. The signal: apply many range updates in o(1) each, then reconstruct with one pass.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (difference, range update, increment range, imos, interval add).
-2. Reach for the Difference Array template below and map the problem's entities onto it.
-3. Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
+1. Each booking `[first, last, seats]` adds `seats` to a 1-indexed range — a classic range update.
+2. Use a diff array: `diff[first-1] += seats` and `diff[last] -= seats` (marks start and one-past-end).
+3. A running prefix sum over `diff` reconstructs the per-flight totals.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`bookings=[[1,2,10],[2,3,20]], n=3`
+- booking1: diff[0]+=10, diff[2]-=10
+- booking2: diff[1]+=20, diff[3]-=20 → diff=[10,20,-10,-20]
+- prefix: 10, 30, 20 → answer `[10,30,20]`
 
 ### Visualization
 ```
-input  ──▶ [ apply Difference Array step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+diff  = [ +10, +20, -10, -20 ]
+prefix= [  10,  30,  20 ]      ← seats per flight
 ```
 
 ### Code
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
-
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+def corpFlightBookings(bookings, n):
+    diff = [0]*(n+1)
+    for first, last, seats in bookings:
+        diff[first-1] += seats
+        diff[last]    -= seats
+    res, running = [], 0
+    for i in range(n):
+        running += diff[i]
+        res.append(running)
+    return res
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass to build, O(1) per query.
+Time O(n + m) for m bookings, Space O(n).
 
 ## 10. Solved Example 2
 
@@ -273,34 +277,38 @@ Time O(n), Space O(n). One pass to build, O(1) per query.
 A representative **Difference Array** problem. The signal: apply many range updates in o(1) each, then reconstruct with one pass.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (difference, range update, increment range, imos, interval add).
-2. Reach for the Difference Array template below and map the problem's entities onto it.
-3. Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
+1. Each update `[start, end, inc]` adds `inc` to the inclusive range `[start, end]`.
+2. Record only the boundaries in a diff array: `diff[start] += inc`, `diff[end+1] -= inc`.
+3. After all updates, a single prefix sum materializes the final array.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`length=5, updates=[[1,3,2],[2,4,3]]`
+- upd1: diff[1]+=2, diff[4]-=2
+- upd2: diff[2]+=3, diff[5]-=3 → diff=[0,2,3,0,-2,-3]
+- prefix: 0,2,5,5,3 → answer `[0,2,5,5,3]`
 
 ### Visualization
 ```
-input  ──▶ [ apply Difference Array step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+diff  = [0, +2, +3, 0, -2, (-3)]
+prefix= [0,  2,  5, 5,  3]
 ```
 
 ### Code
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
-
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+def getModifiedArray(length, updates):
+    diff = [0]*(length+1)
+    for start, end, inc in updates:
+        diff[start] += inc
+        diff[end+1] -= inc
+    res, running = [], 0
+    for i in range(length):
+        running += diff[i]
+        res.append(running)
+    return res
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass to build, O(1) per query.
+Time O(n + m) for m updates, Space O(n).
 
 ## 11. Solved Example 3
 
@@ -308,34 +316,39 @@ Time O(n), Space O(n). One pass to build, O(1) per query.
 A representative **Difference Array** problem. The signal: apply many range updates in o(1) each, then reconstruct with one pass.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (difference, range update, increment range, imos, interval add).
-2. Reach for the Difference Array template below and map the problem's entities onto it.
-3. Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
+1. Each trip `[num, start, end]` occupies `num` seats over the location range `[start, end)`.
+2. On a diff array indexed by location: `diff[start] += num`, `diff[end] -= num` (passengers leave at `end`).
+3. Sweep the running occupancy; if it ever exceeds `capacity`, return `False`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`trips=[[2,1,5],[3,3,7]], capacity=4`
+- trip1: diff[1]+=2, diff[5]-=2
+- trip2: diff[3]+=3, diff[7]-=3
+- running by location: loc1→2, loc3→5 > 4 → return **False**
 
 ### Visualization
 ```
-input  ──▶ [ apply Difference Array step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+loc:   1   2   3   4   5 ...
+occ:   2   2   5   5   3      5 > capacity(4) -> False
 ```
 
 ### Code
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
-
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+def carPooling(trips, capacity):
+    diff = [0]*1001                 # locations 0..1000
+    for num, start, end in trips:
+        diff[start] += num
+        diff[end]   -= num
+    running = 0
+    for d in diff:
+        running += d
+        if running > capacity:
+            return False
+    return True
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass to build, O(1) per query.
+Time O(n + maxLoc), Space O(maxLoc).
 
 
 ## 12. LeetCode Practice Set

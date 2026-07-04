@@ -235,101 +235,115 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — Unique Paths (LeetCode 62)
-A representative **DP on Grids** problem. The signal: 2d dp accumulating optimal paths/areas across a grid.
+Count the number of distinct paths a robot can take from the top-left to the bottom-right of an `m × n` grid, moving only right or down.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (grid dp, paths, min path sum, 2d dp, robot).
-2. Reach for the DP on Grids template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Let `dp[i][j]` = number of paths reaching cell `(i, j)`. A cell is entered either from above or from the left, so `dp[i][j] = dp[i-1][j] + dp[i][j-1]`.
+2. Base case: the first row and first column have exactly one path each (only rights, or only downs), so initialize them to 1.
+3. Roll the 2D table down to a single row: `row[j] += row[j-1]` sweeps left-to-right, reusing the previous row in place.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+For `m=3, n=3`, start with `row = [1, 1, 1]` (top row).
+- After row 2: `row[1]+=row[0]→2`, `row[2]+=row[1]→3` ⇒ `[1, 2, 3]`.
+- After row 3: `row[1]→1+2=3`, `row[2]→3+3=6` ⇒ `[1, 3, 6]`.
+- Answer = `row[-1] = 6` paths.
 
 ### Visualization
 ```
-input  ──▶ [ apply DP on Grids step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+input  ──▶ [ fill dp[i][j] = dp[i-1][j] + dp[i][j-1] ]
+state  ──▶ each cell = paths into it, built from top row/left column
+output ──▶ dp[m-1][n-1]
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def uniquePaths(m, n):
+    row = [1] * n                      # paths for the top row are all 1
+    for _ in range(1, m):
+        for j in range(1, n):
+            row[j] += row[j - 1]       # from above (row[j]) + from left (row[j-1])
+    return row[-1]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(m·n), Space O(n) using a single rolling row.
 
 ## 10. Solved Example 2
 
 ### Problem — Min Path Sum (LeetCode 64)
-A representative **DP on Grids** problem. The signal: 2d dp accumulating optimal paths/areas across a grid.
+Given an `m × n` grid of non-negative numbers, find a path from top-left to bottom-right, moving only right or down, that minimizes the sum of the numbers along the path.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (grid dp, paths, min path sum, 2d dp, robot).
-2. Reach for the DP on Grids template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Let `dp[i][j]` = minimum sum to reach cell `(i, j)`. You arrive from above or from the left, so `dp[i][j] = grid[i][j] + min(dp[i-1][j], dp[i][j-1])`.
+2. Seed the first row and first column as running prefix sums (only one way to reach them).
+3. Compress to a rolling row: `row[j] = grid[i][j] + min(row[j] (above), row[j-1] (left))`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+For `grid = [[1,3,1],[1,5,1],[4,2,1]]`, first row prefix ⇒ `row = [1, 4, 5]`.
+- Row 1: `row[0]=1+1=2`; `row[1]=5+min(4,2)=7`; `row[2]=1+min(5,7)=6` ⇒ `[2, 7, 6]`.
+- Row 2: `row[0]=2+4=6`; `row[1]=2+min(7,6)=8`; `row[2]=1+min(6,8)=7` ⇒ `[6, 8, 7]`.
+- Answer = `row[-1] = 7` (path 1→3→1→1→1).
 
 ### Visualization
 ```
-input  ──▶ [ apply DP on Grids step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+input  ──▶ [ dp[i][j] = grid[i][j] + min(top, left) ]
+state  ──▶ each cell = cheapest cost to reach it
+output ──▶ dp[m-1][n-1]
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def minPathSum(grid):
+    m, n = len(grid), len(grid[0])
+    row = [0] * n
+    row[0] = grid[0][0]
+    for j in range(1, n):              # first row: only move right
+        row[j] = row[j - 1] + grid[0][j]
+    for i in range(1, m):
+        row[0] += grid[i][0]           # first column: only move down
+        for j in range(1, n):
+            row[j] = grid[i][j] + min(row[j], row[j - 1])
+    return row[-1]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(m·n), Space O(n) using a single rolling row.
 
 ## 11. Solved Example 3
 
 ### Problem — Triangle (LeetCode 120)
-A representative **DP on Grids** problem. The signal: 2d dp accumulating optimal paths/areas across a grid.
+Given a triangle array, find the minimum path sum from top to bottom, where each step moves to an adjacent number on the row below (index `i` goes to `i` or `i+1`).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (grid dp, paths, min path sum, 2d dp, robot).
-2. Reach for the DP on Grids template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Work bottom-up: let `dp[j]` = min path sum from cell `j` of the current row down to the base. The last row's values are their own totals.
+2. For each higher row, `dp[j] = triangle[i][j] + min(dp[j], dp[j+1])`, since from `(i, j)` you may descend to `(i+1, j)` or `(i+1, j+1)`.
+3. After processing the top row, `dp[0]` holds the answer, and one 1D array suffices.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+For `triangle = [[2],[3,4],[6,5,7],[4,1,8,3]]`, start `dp = [4, 1, 8, 3]` (last row).
+- Row `[6,5,7]`: `dp=[6+min(4,1), 5+min(1,8), 7+min(8,3)] = [7, 6, 10]`.
+- Row `[3,4]`: `dp=[3+min(7,6), 4+min(6,10)] = [9, 10]`.
+- Row `[2]`: `dp=[2+min(9,10)] = [11]` ⇒ answer `11` (path 2→3→5→1).
 
 ### Visualization
 ```
-input  ──▶ [ apply DP on Grids step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+input  ──▶ [ bottom-up: dp[j] = tri[i][j] + min(dp[j], dp[j+1]) ]
+state  ──▶ dp shrinks by one each row toward the apex
+output ──▶ dp[0]
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def minimumTotal(triangle):
+    dp = triangle[-1][:]               # start from the bottom row
+    for i in range(len(triangle) - 2, -1, -1):
+        for j in range(len(triangle[i])):
+            dp[j] = triangle[i][j] + min(dp[j], dp[j + 1])
+    return dp[0]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n²) for a triangle of n rows, Space O(n) using one rolling array.
 
 
 ## 12. LeetCode Practice Set

@@ -235,101 +235,112 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — Coin Change (LeetCode 322)
-A representative **Coin Change** problem. The signal: min-coins / count-ways dp, a canonical unbounded-knapsack case.
+Given coins of distinct denominations and a target `amount`, return the **fewest coins** needed to make up that amount, or `-1` if it is impossible. Coins may be reused (unbounded).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (coin change, min coins, ways, dp, unbounded).
-2. Reach for the Coin Change template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Let `dp[a]` = minimum coins to make amount `a`. Base case `dp[0] = 0`; initialize all others to infinity (unreachable).
+2. For each amount `a` from 1 to `amount`, try every coin `c ≤ a`: taking coin `c` costs `dp[a - c] + 1`, so `dp[a] = min(dp[a], dp[a - c] + 1)`.
+3. The answer is `dp[amount]` if it stayed finite, else `-1`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+coins = [1, 2, 5], amount = 6.
+- dp[1]=1, dp[2]=min(dp[1]+1, dp[0]+1)=1, dp[3]=dp[2]+1=2, dp[4]=dp[2]+1=2.
+- dp[5]=min(dp[4]+1, dp[3]+1, dp[0]+1)=1 (one 5-coin).
+- dp[6]=min(dp[5]+1, dp[4]+1, dp[1]+1)=2 (5+1). Answer = **2**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Coin Change step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+amount ──▶ [ build dp[0..amount], min over each coin ]
+state  ──▶ dp[a] = fewest coins for a, filled bottom-up
+output ──▶ dp[amount], or -1 if still infinity
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def coinChange(coins, amount):
+    INF = float('inf')
+    dp = [0] + [INF] * amount          # dp[a] = fewest coins to make a
+    for a in range(1, amount + 1):
+        for c in coins:
+            if c <= a and dp[a - c] + 1 < dp[a]:
+                dp[a] = dp[a - c] + 1
+    return dp[amount] if dp[amount] != INF else -1
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(amount × len(coins)), Space O(amount).
 
 ## 10. Solved Example 2
 
 ### Problem — Coin Change II (LeetCode 518)
-A representative **Coin Change** problem. The signal: min-coins / count-ways dp, a canonical unbounded-knapsack case.
+Given coins of distinct denominations and a target `amount`, return the **number of combinations** that make up that amount. Order does not matter (2+1 and 1+2 count once); coins may be reused.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (coin change, min coins, ways, dp, unbounded).
-2. Reach for the Coin Change template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Let `dp[a]` = number of combinations making amount `a`, with `dp[0] = 1` (the empty combination).
+2. To avoid counting the same multiset in different orders, loop coins on the **outside** and amounts on the inside. Each coin is fully considered before moving on, so combinations stay order-independent.
+3. For each coin `c`, add `dp[a - c]` into `dp[a]` for `a` from `c` to `amount`. Return `dp[amount]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+coins = [1, 2, 5], amount = 5.
+- After coin 1: dp = [1,1,1,1,1,1] (all-ones combinations).
+- After coin 2: dp[2]+=dp[0]→2, dp[3]+=dp[1]→2, dp[4]+=dp[2]→3, dp[5]+=dp[3]→3.
+- After coin 5: dp[5]+=dp[0]→4. Answer = **4** ({1x5},{1,2,2},{1,1,1,2},{1x5 ones},{5}).
 
 ### Visualization
 ```
-input  ──▶ [ apply Coin Change step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+coins  ──▶ [ for each coin, sweep amounts upward ]
+state  ──▶ dp[a] = # combinations, coin-outer keeps order out
+output ──▶ dp[amount]
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def change(amount, coins):
+    dp = [1] + [0] * amount            # dp[a] = # combinations making a
+    for c in coins:                    # coin outer -> combinations, not permutations
+        for a in range(c, amount + 1):
+            dp[a] += dp[a - c]
+    return dp[amount]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(amount × len(coins)), Space O(amount).
 
 ## 11. Solved Example 3
 
 ### Problem — Comb Sum IV (LeetCode 377)
-A representative **Coin Change** problem. The signal: min-coins / count-ways dp, a canonical unbounded-knapsack case.
+Given an array of distinct positive integers `nums` and a `target`, return the **number of ordered permutations** (sequences) that sum to `target`. Here order matters: (1,2) and (2,1) are counted separately; numbers may be reused.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (coin change, min coins, ways, dp, unbounded).
-2. Reach for the Coin Change template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Let `dp[t]` = number of ordered sequences summing to `t`, with `dp[0] = 1` (the empty sequence).
+2. Because order matters, loop the **target on the outside** and the numbers on the inside — this lets any number be the last element of a sequence, counting each ordering.
+3. For each `t` from 1 to `target`, add `dp[t - n]` for every `n ≤ t`. Return `dp[target]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums = [1, 2, 3], target = 4.
+- dp[0]=1, dp[1]=dp[0]=1, dp[2]=dp[1]+dp[0]=2, dp[3]=dp[2]+dp[1]+dp[0]=4.
+- dp[4]=dp[3]+dp[2]+dp[1]=4+2+1=7. Answer = **7** ordered sequences summing to 4.
 
 ### Visualization
 ```
-input  ──▶ [ apply Coin Change step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+target ──▶ [ for each t, sum dp[t-n] over all n ]
+state  ──▶ dp[t] = # ordered sequences, target-outer counts order
+output ──▶ dp[target]
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def combinationSum4(nums, target):
+    dp = [1] + [0] * target            # dp[t] = # ordered sequences summing to t
+    for t in range(1, target + 1):     # target outer -> permutations, order counts
+        for n in nums:
+            if n <= t:
+                dp[t] += dp[t - n]
+    return dp[target]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(target × len(nums)), Space O(target).
 
 
 ## 12. LeetCode Practice Set

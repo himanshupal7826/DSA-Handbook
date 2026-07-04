@@ -237,110 +237,148 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Find Peak (LeetCode 162)
-A representative **Peak Element** problem. The signal: follow the ascending slope with binary search to a peak.
+Given `nums` where no two adjacent elements are equal, return the index of **any** peak (`nums[i] > both neighbors`), treating `nums[-1] = nums[n] = -inf`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (peak, local maximum, bitonic, slope, binary search).
-2. Reach for the Peak Element template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. A peak must exist because the virtual `-inf` boundaries make the array "rise into" the range from both ends.
+2. Compare `nums[mid]` with `nums[mid+1]`: if `nums[mid] < nums[mid+1]` we are on an ascending slope, so a peak lies to the right — set `lo = mid + 1`.
+3. Otherwise `mid` could be the peak, so keep the left half including `mid` (`hi = mid`). Converge until `lo == hi`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [1,2,3,1]`, lo=0, hi=3.
+- mid=1: `nums[1]=2 < nums[2]=3` → ascend right, lo=2.
+- mid=2: `nums[2]=3 > nums[3]=1` → hi=2.
+- lo==hi==2 → return 2 (value 3 is a peak). ✓
 
 ### Visualization
 ```
-input  ──▶ [ apply Peak Element step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+compare nums[mid] vs nums[mid+1]  ──▶ climb toward the higher neighbor
+ascending slope  ──▶ peak is to the right (lo = mid + 1)
+descending/level ──▶ peak is here or left (hi = mid)
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def findPeakElement(nums):
+    lo, hi = 0, len(nums) - 1
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        if nums[mid] < nums[mid + 1]:
+            lo = mid + 1          # climb toward the higher neighbor
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            hi = mid              # peak is at mid or to its left
+    return lo                     # lo == hi points at a peak
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n), Space O(1). Halves the range each step by following the ascending slope.
 
 ## 10. Solved Example 2
 
 ### Problem — Peak Mountain (LeetCode 852)
-A representative **Peak Element** problem. The signal: follow the ascending slope with binary search to a peak.
+`arr` is a mountain array (strictly increasing then strictly decreasing). Return the index of the single peak.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (peak, local maximum, bitonic, slope, binary search).
-2. Reach for the Peak Element template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. The array is bitonic, so there is exactly one peak where the slope flips from up to down.
+2. Compare `arr[mid]` with `arr[mid+1]`: while ascending (`arr[mid] < arr[mid+1]`), the peak is strictly to the right — set `lo = mid + 1`.
+3. Once `arr[mid] > arr[mid+1]` we are on the descending side, so the peak is at `mid` or left (`hi = mid`). Guaranteed convergence to the unique peak.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`arr = [0,2,5,3,1]`, lo=0, hi=4.
+- mid=2: `arr[2]=5 > arr[3]=3` → descending, hi=2.
+- mid=1: `arr[1]=2 < arr[2]=5` → ascending, lo=2.
+- lo==hi==2 → return 2 (peak value 5). ✓
 
 ### Visualization
 ```
-input  ──▶ [ apply Peak Element step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+mountain: /\   compare arr[mid] vs arr[mid+1]
+ascending (arr[mid] < arr[mid+1]) ──▶ lo = mid + 1
+descending (arr[mid] > arr[mid+1]) ──▶ hi = mid
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def peakIndexInMountainArray(arr):
+    lo, hi = 0, len(arr) - 1
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        if arr[mid] < arr[mid + 1]:
+            lo = mid + 1          # still climbing the mountain
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            hi = mid              # past the summit, go left
+    return lo                     # lo == hi is the peak index
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n), Space O(1). One binary search over the bitonic slope.
 
 ## 11. Solved Example 3
 
 ### Problem — Mountain Array (LeetCode 1095)
-A representative **Peak Element** problem. The signal: follow the ascending slope with binary search to a peak.
+Find the **smallest** index whose value equals `target` in a hidden mountain array, using only `mountain_arr.get(i)` and `mountain_arr.length()`. Return -1 if absent.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (peak, local maximum, bitonic, slope, binary search).
-2. Reach for the Peak Element template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. First find the peak with the ascending-slope binary search (compare `get(mid)` to `get(mid+1)`).
+2. The left half `[0, peak]` is strictly increasing — run a standard ascending binary search there; a hit is the smallest index, so return it immediately.
+3. Otherwise search the right half `[peak+1, n-1]`, which is strictly decreasing, with the comparison flipped. Minimize calls to `get` by caching where cheap.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`arr = [1,5,2]`, target=2, length=3.
+- Find peak: mid=1, `get(1)=5 > get(2)=2` → hi=1; mid=0, `get(0)=1 < get(1)=5` → lo=1. peak=1.
+- Ascending search [0,1] for 2: values 1,5 → miss.
+- Descending search [2,2]: `get(2)=2` == target → return 2. ✓
 
 ### Visualization
 ```
-input  ──▶ [ apply Peak Element step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+step 1 ──▶ find peak (ascending-slope binary search)
+step 2 ──▶ binary search ascending left half  [0 .. peak]
+step 3 ──▶ binary search descending right half [peak+1 .. n-1]
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def findInMountainArray(target, mountain_arr):
+    n = mountain_arr.length()
+
+    # 1) locate the peak
+    lo, hi = 0, n - 1
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
+        if mountain_arr.get(mid) < mountain_arr.get(mid + 1):
             lo = mid + 1
         else:
             hi = mid
-    return lo                     # first index with a[i] >= target
+    peak = lo
+
+    # 2) ascending search in the left half (smallest index first)
+    lo, hi = 0, peak
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        val = mountain_arr.get(mid)
+        if val == target:
+            return mid
+        elif val < target:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+
+    # 3) descending search in the right half
+    lo, hi = peak + 1, n - 1
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        val = mountain_arr.get(mid)
+        if val == target:
+            return mid
+        elif val > target:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+
+    return -1
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n), Space O(1). Three logarithmic passes: find peak, then each monotonic half.
 
 
 ## 12. LeetCode Practice Set

@@ -246,15 +246,19 @@ pair<int,int> twoSumSorted(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Remove Duplicates (LeetCode 26)
-A representative **Same Direction Two Pointers** problem. The signal: a reader and writer pointer compact/filter an array in place in o(n).
+The array is sorted; remove duplicates in place so each element appears once and return the new length.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (two pointer, slow fast, read write, in place, remove, partition).
-2. Reach for the Same Direction Two Pointers template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. A writer index `w` marks the end of the deduped prefix; a reader `r` scans the rest.
+2. Because the array is sorted, a value is new exactly when it differs from `nums[w-1]`.
+3. On a new value, write it at `w` and advance `w`; return `w` as the length.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums = [1,1,2,3,3].
+- w=1, r=1 (1)==nums[0] → skip.
+- r=2 (2)!=nums[0](1) → nums[1]=2, w=2.
+- r=3 (3)!=nums[1](2) → nums[2]=3, w=3.
+- r=4 (3)==nums[2](3) → skip. Return 3, prefix [1,2,3].
 
 ### Visualization
 ```
@@ -265,34 +269,36 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+def removeDuplicates(nums):
+    if not nums:
+        return 0
+    w = 1
+    for r in range(1, len(nums)):
+        if nums[r] != nums[w - 1]:
+            nums[w] = nums[r]
+            w += 1
+    return w
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time O(n), Space O(1) — one reader pass, in-place writer.
 
 ## 10. Solved Example 2
 
 ### Problem — Remove Element (LeetCode 27)
-A representative **Same Direction Two Pointers** problem. The signal: a reader and writer pointer compact/filter an array in place in o(n).
+Remove every occurrence of `val` from the array in place and return the count of remaining elements.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (two pointer, slow fast, read write, in place, remove, partition).
-2. Reach for the Same Direction Two Pointers template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. A writer index `w` collects the elements we keep; a reader `r` scans all positions.
+2. Whenever `nums[r] != val`, copy it to `nums[w]` and advance `w`.
+3. Order need not be preserved among kept elements; `w` is the final length.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums = [3,2,2,3], val = 3.
+- r=0 (3)==val → skip, w=0.
+- r=1 (2)!=val → nums[0]=2, w=1.
+- r=2 (2)!=val → nums[1]=2, w=2.
+- r=3 (3)==val → skip. Return 2, prefix [2,2].
 
 ### Visualization
 ```
@@ -303,34 +309,34 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+def removeElement(nums, val):
+    w = 0
+    for r in range(len(nums)):
+        if nums[r] != val:
+            nums[w] = nums[r]
+            w += 1
+    return w
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time O(n), Space O(1) — single pass with an in-place writer.
 
 ## 11. Solved Example 3
 
 ### Problem — Move Zeroes (LeetCode 283)
-A representative **Same Direction Two Pointers** problem. The signal: a reader and writer pointer compact/filter an array in place in o(n).
+Move all zeroes to the end in place while keeping the relative order of the non-zero elements.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (two pointer, slow fast, read write, in place, remove, partition).
-2. Reach for the Same Direction Two Pointers template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. A writer index `w` points to where the next non-zero element belongs.
+2. For each reader position with a non-zero value, swap it into `nums[w]` and advance `w`.
+3. Swapping (rather than overwriting) drags the zeroes toward the tail automatically.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums = [0,1,0,3,12].
+- r=0 (0) → skip, w=0.
+- r=1 (1) → swap nums[0],nums[1] → [1,0,0,3,12], w=1.
+- r=3 (3) → swap nums[1],nums[3] → [1,3,0,0,12], w=2.
+- r=4 (12) → swap nums[2],nums[4] → [1,3,12,0,0].
 
 ### Visualization
 ```
@@ -341,21 +347,17 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+def moveZeroes(nums):
+    w = 0
+    for r in range(len(nums)):
+        if nums[r] != 0:
+            nums[w], nums[r] = nums[r], nums[w]
+            w += 1
+    return nums
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time O(n), Space O(1) — a single in-place pass, order preserved.
 
 
 ## 12. LeetCode Practice Set

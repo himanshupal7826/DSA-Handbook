@@ -252,119 +252,130 @@ vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
 ## 9. Solved Example 1
 
 ### Problem — K Stops (LeetCode 787)
-A representative **Bellman Ford** problem. The signal: relax all edges v-1 times; handles negative weights & detects cycles.
+Given `flights[i] = (u, v, price)`, find the cheapest price from `src` to `dst` using at most `k` stops (`k + 1` edges), or `-1`. This is Bellman-Ford capped at `k + 1` relaxation rounds.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (bellman ford, negative edges, shortest path, relax, negative cycle).
-2. Reach for the Bellman Ford template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. `dist[node]` = cheapest cost to reach `node` using at most the rounds run so far. Initialize `dist[src] = 0`.
+2. Run exactly `k + 1` relaxation rounds — one round adds at most one more edge to every path.
+3. Relax from a frozen snapshot (`tmp = dist[:]`) each round so a path cannot gain two edges within a single round.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`n=3`, `flights=[(0,1,100),(1,2,100),(0,2,500)]`, `src=0`, `dst=2`, `k=1` → 2 rounds.
+- Round 1 (from dist[0]=0): tmp[1]=100, tmp[2]=500. dist=[0,100,500].
+- Round 2 (from dist): tmp[2]=min(500, 100+100)=200. dist=[0,100,200].
+- `dist[2] = 200` → answer `200`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Bellman Ford step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+round r  ──▶ every path may grow by exactly one edge
+snapshot ──▶ tmp = dist[:] prevents 2 edges in one round
 ```
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
+def findCheapestPrice(n, flights, src, dst, k):
+    dist = [float('inf')] * n
     dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+    for _ in range(k + 1):                # at most k stops = k+1 edges
+        tmp = dist[:]                     # freeze this round's source values
+        for u, v, w in flights:
+            if dist[u] + w < tmp[v]:
+                tmp[v] = dist[u] + w
+        dist = tmp
+    return dist[dst] if dist[dst] != float('inf') else -1
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(K·E), Space O(V).
 
 ## 10. Solved Example 2
 
 ### Problem — Network Delay (LeetCode 743)
-A representative **Bellman Ford** problem. The signal: relax all edges v-1 times; handles negative weights & detects cycles.
+Given directed travel times `times[i] = (u, v, w)`, `n` nodes, and source `k`, return the time for a signal to reach all nodes, or `-1` if some node is unreachable — solved with plain Bellman-Ford.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (bellman ford, negative edges, shortest path, relax, negative cycle).
-2. Reach for the Bellman Ford template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Initialize `dist[k] = 0`, all others `inf`; nodes are labeled `1..n`.
+2. Relax every edge `n - 1` times — after that pass all shortest paths (at most `n - 1` edges) are settled.
+3. The answer is the largest finalized distance; if any node is still `inf`, return `-1`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`times=[(2,1,1),(2,3,1),(3,4,1)]`, `n=4`, `k=2`.
+- Init dist=[_,∞,0,∞,∞] (indices 1..4).
+- Pass 1 relaxes (2,1):dist[1]=1, (2,3):dist[3]=1, (3,4):dist[4]=2.
+- Later passes change nothing → `max(1,0,1,2) = 2`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Bellman Ford step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+relax all edges (n-1) passes ──▶ dist[] converges
+answer = max(dist[1..n]); ∞ anywhere ──▶ -1
 ```
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+def networkDelayTime(times, n, k):
+    dist = [float('inf')] * (n + 1)       # nodes are 1-indexed
+    dist[k] = 0
+    for _ in range(n - 1):
+        for u, v, w in times:
+            if dist[u] + w < dist[v]:
+                dist[v] = dist[u] + w
+    ans = max(dist[1:])
+    return ans if ans != float('inf') else -1
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(V·E), Space O(V).
 
 ## 11. Solved Example 3
 
 ### Problem — City Threshold (LeetCode 1334)
-A representative **Bellman Ford** problem. The signal: relax all edges v-1 times; handles negative weights & detects cycles.
+Given `n` cities and undirected weighted `edges`, find the city that can reach the fewest other cities within `distanceThreshold`; on a tie return the city with the greatest index.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (bellman ford, negative edges, shortest path, relax, negative cycle).
-2. Reach for the Bellman Ford template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. For each source city, run Bellman-Ford over the undirected edges (relax both `u→v` and `v→u`) to get shortest distances to all others.
+2. Count how many cities are within `distanceThreshold` from that source.
+3. Track the city with the fewest reachable neighbors, breaking ties toward the larger index by using `<=` while scanning `0..n-1`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`n=4`, `edges=[(0,1,3),(1,2,1),(1,3,4),(2,3,1)]`, `threshold=4`.
+- City 0: dist=[0,3,4,5] → within 4: {1,2} = 2.
+- City 3: dist=[5,4,1,0] → within 4: {1,2} = 2.
+- Cities 1 and 2 each reach 3 others; min count 2 tie between 0 and 3 → pick larger index `3`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Bellman Ford step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+for each source: Bellman-Ford ──▶ shortest dist to all cities
+answer = city with fewest neighbors ≤ threshold, ties → larger index
 ```
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+def findTheCity(n, edges, distanceThreshold):
+    def bellman_ford(src):
+        dist = [float('inf')] * n
+        dist[src] = 0
+        for _ in range(n - 1):
+            changed = False
+            for u, v, w in edges:         # undirected: relax both ways
+                if dist[u] + w < dist[v]:
+                    dist[v] = dist[u] + w; changed = True
+                if dist[v] + w < dist[u]:
+                    dist[u] = dist[v] + w; changed = True
+            if not changed:
+                break
+        return dist
+
+    best_city, fewest = 0, n + 1
+    for city in range(n):
+        d = bellman_ford(city)
+        reach = sum(1 for j in range(n) if j != city and d[j] <= distanceThreshold)
+        if reach <= fewest:               # <= keeps the larger index on ties
+            fewest, best_city = reach, city
+    return best_city
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(V²·E), Space O(V).
 
 
 ## 12. LeetCode Practice Set

@@ -263,12 +263,15 @@ ListNode* reverseList(ListNode* head) {
 A representative **K Group Reversal** problem. The signal: reverse the list in fixed-size k blocks, stitching segments together.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (reverse k group, linked list, in place, segment reverse).
-2. Reach for the K Group Reversal template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. First check that k nodes actually remain; if fewer, leave the tail as-is (the problem forbids reversing a partial group).
+2. Reverse exactly k nodes with the prev/curr/next template.
+3. Recurse on the rest and link the old group head to whatever the recursion returns.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `1→2→3→4→5`, k=2.
+- k nodes exist: reverse first 2 → `2→1`, curr at 3
+- recurse on `3→4→5`: reverse → `4→3`, then `5` alone stays → `4→3→5`
+- link 1→(4) → `2→1→4→3→5`
 
 ### Visualization
 ```
@@ -279,22 +282,24 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
+def reverseKGroup(head, k):
+    node = head                       # verify k nodes remain
+    for _ in range(k):
+        if not node:
+            return head
+        node = node.next
+    prev, curr = None, head           # reverse first k
+    for _ in range(k):
+        nxt = curr.next
+        curr.next = prev
+        prev = curr
+        curr = nxt
+    head.next = reverseKGroup(curr, k)  # recurse on the rest
     return prev
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(n), Space O(n/k) for the recursion depth (O(1) if done iteratively).
 
 ## 10. Solved Example 2
 
@@ -302,12 +307,14 @@ Time O(n), Space O(1). In-place pointer manipulation, single traversal.
 A representative **K Group Reversal** problem. The signal: reverse the list in fixed-size k blocks, stitching segments together.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (reverse k group, linked list, in place, segment reverse).
-2. Reach for the K Group Reversal template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. This is k-group reversal with k=2 — reverse every adjacent pair.
+2. A dummy node lets `prev` sit before each pair so relinking is uniform even for the first pair.
+3. For each pair `(first, second)`, point `first` past `second`, put `second` before `first`, then advance `prev` to `first`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `1→2→3→4`.
+- pair (1,2): 1.next=3, 2.next=1, prev→2 → `2→1→3→4`, prev at 1
+- pair (3,4): 3.next=None, 4.next=3, 1.next=4 → `2→1→4→3`
 
 ### Visualization
 ```
@@ -318,22 +325,20 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+def swapPairs(head):
+    dummy = prev = ListNode(0, head)
+    while prev.next and prev.next.next:
+        first = prev.next
+        second = first.next
+        first.next = second.next     # first jumps past second
+        second.next = first          # second leads the pair
+        prev.next = second           # stitch to preceding node
+        prev = first                 # advance to next pair
+    return dummy.next
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(n), Space O(1). One pass swapping adjacent nodes in place.
 
 ## 11. Solved Example 3
 

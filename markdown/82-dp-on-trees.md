@@ -231,101 +231,139 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — House Robber III (LeetCode 337)
-A representative **DP on Trees** problem. The signal: states computed bottom-up per subtree; reroot for all-roots answers.
+Rob a binary tree of houses for maximum money, but you cannot rob two directly-connected (parent–child) nodes.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (tree dp, rerooting, subtree dp, postorder, states).
-2. Reach for the DP on Trees template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. For each node, the choice depends on whether we rob it. Return **two** values per subtree: `rob` (max money if we DO rob this node) and `notRob` (max if we don't).
+2. If we rob a node: add `node.val` plus each child's `notRob` (children must be skipped).
+3. If we don't rob it: each child contributes `max(childRob, childNotRob)` — free to pick the better option.
+4. Post-order DFS bubbles these pairs up; the answer is `max(rob, notRob)` at the root.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Tree: root=3, left=2 (leaf), right=3 (leaf).
+- Leaf 2 → (rob=2, notRob=0); leaf 3 → (rob=3, notRob=0).
+- Root: rob = 3 + 0 + 0 = 3; notRob = max(2,0) + max(3,0) = 5.
+- Answer = max(3, 5) = **5** (rob the two children, skip root).
 
 ### Visualization
 ```
-input  ──▶ [ apply DP on Trees step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+each node ──▶ returns (rob, notRob)
+rob     = node.val + left.notRob + right.notRob
+notRob  = max(left) + max(right)
+answer  = max(rob, notRob) at root
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def rob(self, root):
+    def dfs(node):
+        if not node:
+            return (0, 0)                       # (rob, notRob)
+        l_rob, l_not = dfs(node.left)
+        r_rob, r_not = dfs(node.right)
+        rob_here = node.val + l_not + r_not     # rob node -> skip children
+        skip_here = max(l_rob, l_not) + max(r_rob, r_not)
+        return (rob_here, skip_here)
+    return max(dfs(root))
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n) — each node visited once; Space O(h) recursion stack (h = tree height).
 
 ## 10. Solved Example 2
 
-### Problem — Cameras (LeetCode 968)
-A representative **DP on Trees** problem. The signal: states computed bottom-up per subtree; reroot for all-roots answers.
+### Problem — Binary Tree Cameras (LeetCode 968)
+Place the minimum number of cameras on tree nodes so every node is monitored; a camera covers its parent, itself, and its direct children.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (tree dp, rerooting, subtree dp, postorder, states).
-2. Reach for the DP on Trees template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Greedy post-order DFS with three states per node: `0` = not covered, `1` = covered (no camera), `2` = has a camera.
+2. Push cameras as high as possible: only place one when a child is uncovered — leaves should never hold cameras.
+3. If any child returns `0` (uncovered), this node MUST hold a camera → return `2` and increment count.
+4. Else if any child has a camera (`2`), this node is covered → return `1`; otherwise it is uncovered → return `0`. A `null` node returns `1` (covered) so leaves report uncovered.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Tree: root=0, root.left=0, root.left.left=0 (a left-leaning chain of 3).
+- Deepest leaf → children are null (`1`,`1`) → node is uncovered → returns `0`.
+- Its parent sees a child `0` → places camera, count=1, returns `2`.
+- Root sees child `2` → covered → returns `1`. Root itself covered by that camera.
+- Answer = **1** camera.
 
 ### Visualization
 ```
-input  ──▶ [ apply DP on Trees step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+null      ──▶ 1 (treated as covered)
+child==0  ──▶ place camera here, return 2  (count++)
+child==2  ──▶ covered by child, return 1
+else      ──▶ uncovered, return 0 (parent must cover)
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def minCameraCover(self, root):
+    self.count = 0
+    NOT_COVERED, COVERED, CAMERA = 0, 1, 2
+
+    def dfs(node):
+        if not node:
+            return COVERED                       # null is fine, needs no camera
+        l = dfs(node.left)
+        r = dfs(node.right)
+        if l == NOT_COVERED or r == NOT_COVERED:
+            self.count += 1
+            return CAMERA
+        if l == CAMERA or r == CAMERA:
+            return COVERED
+        return NOT_COVERED
+
+    return self.count + (1 if dfs(root) == NOT_COVERED else 0)
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n) — one post-order pass; Space O(h) recursion stack (h = tree height).
 
 ## 11. Solved Example 3
 
-### Problem — Max Path (LeetCode 124)
-A representative **DP on Trees** problem. The signal: states computed bottom-up per subtree; reroot for all-roots answers.
+### Problem — Binary Tree Maximum Path Sum (LeetCode 124)
+Find the maximum sum of any path in a binary tree, where a path is any node sequence connected by edges (need not pass through the root).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (tree dp, rerooting, subtree dp, postorder, states).
-2. Reach for the DP on Trees template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Each node's DFS returns the best **downward gain**: `node.val + max(0, leftGain, rightGain)` — a straight path extending into at most one child.
+2. Clamp negative child gains to `0`, since a path can always drop a harmful branch.
+3. The best path *through* a node bends: `node.val + leftGain + rightGain` (uses both children). Update a global `max` with this at every node.
+4. Return the one-sided gain upward so the parent can extend a valid single path.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Tree: root=-10, left=9, right=20 (20.left=15, 20.right=7).
+- Leaves 9,15,7 → gains 9,15,7.
+- Node 20: through = 20+15+7 = 42 → update global; returns 20+15 = 35.
+- Root -10: through = -10+9+35 = 34; global stays **42**.
+- Answer = **42** (path 15→20→7).
 
 ### Visualization
 ```
-input  ──▶ [ apply DP on Trees step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+gain(node)  = node.val + max(0, gain(left), gain(right))   # extend upward
+through     = node.val + max(0,gain(left)) + max(0,gain(right))  # bend here
+best        = max over all nodes of `through`
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def maxPathSum(self, root):
+    self.best = float('-inf')
+
+    def gain(node):
+        if not node:
+            return 0
+        l = max(gain(node.left), 0)     # drop negative branches
+        r = max(gain(node.right), 0)
+        self.best = max(self.best, node.val + l + r)   # path bending at node
+        return node.val + max(l, r)     # extend one side upward
+
+    gain(root)
+    return self.best
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n) — each node visited once; Space O(h) recursion stack (h = tree height).
 
 
 ## 12. LeetCode Practice Set

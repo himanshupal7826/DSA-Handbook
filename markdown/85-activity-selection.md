@@ -236,15 +236,17 @@ int maxNonOverlap(vector<vector<int>>& intervals) {
 ## 9. Solved Example 1
 
 ### Problem — Non-overlapping (LeetCode 435)
-A representative **Activity Selection** problem. The signal: pick earliest-finishing compatible activities to maximize count.
+Given intervals, return the minimum number to remove so the rest are non-overlapping.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (activity selection, greedy, earliest finish, intervals, scheduling).
-2. Reach for the Activity Selection template below and map the problem's entities onto it.
-3. When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
+1. Keeping the most intervals is equivalent to removing the fewest — classic activity selection.
+2. Sort by end time and greedily keep an interval whenever its start is at or after the last kept end.
+3. The answer is the total minus the number kept, since every un-kept interval must be erased.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+intervals = [[1,2],[2,3],[3,4],[1,3]] → sort by end: [1,2],[2,3],[1,3],[3,4]
+keep [1,2] end=2; [2,3] start 2>=2 keep end=3; [1,3] start 1<3 drop; [3,4] start 3>=3 keep.
+kept=3, removed = 4 - 3 = 1.
 
 ### Visualization
 ```
@@ -255,14 +257,14 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
+def eraseOverlapIntervals(intervals):
+    intervals.sort(key=lambda x: x[1])       # earliest finish first
+    kept, end = 0, float('-inf')
     for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
+        if s >= end:                          # compatible, keep it
+            kept += 1
             end = e
-    return count
+    return len(intervals) - kept
 ```
 
 ### Complexity
@@ -271,15 +273,17 @@ Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
 ## 10. Solved Example 2
 
 ### Problem — Min Arrows (LeetCode 452)
-A representative **Activity Selection** problem. The signal: pick earliest-finishing compatible activities to maximize count.
+Given balloons as [start,end] intervals, find the minimum arrows needed to burst them all.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (activity selection, greedy, earliest finish, intervals, scheduling).
-2. Reach for the Activity Selection template below and map the problem's entities onto it.
-3. When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
+1. An arrow at position x bursts every balloon covering x — picking piercing points is the dual of activity selection.
+2. Sort by end and shoot an arrow at the first balloon's end, bursting all balloons that overlap it.
+3. Only when a later balloon starts after the current arrow do we need a fresh arrow.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+points = [[10,16],[2,8],[1,6],[7,12]] → sort by end: [1,6],[2,8],[7,12],[10,16]
+arrow at 6 bursts [1,6],[2,8]; [7,12] start 7>6 → new arrow at 12 bursts [7,12],[10,16].
+arrows = 2.
 
 ### Visualization
 ```
@@ -290,14 +294,14 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
-            end = e
-    return count
+def findMinArrowShots(points):
+    points.sort(key=lambda x: x[1])          # earliest end first
+    arrows, arrow = 0, float('-inf')
+    for s, e in points:
+        if s > arrow:                         # current arrow misses it
+            arrows += 1
+            arrow = e                         # shoot at this balloon's end
+    return arrows
 ```
 
 ### Complexity
@@ -306,15 +310,17 @@ Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
 ## 11. Solved Example 3
 
 ### Problem — Max Chain (LeetCode 646)
-A representative **Activity Selection** problem. The signal: pick earliest-finishing compatible activities to maximize count.
+Given pairs [a,b], pair (c,d) can follow (a,b) when b < c. Find the longest chain length.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (activity selection, greedy, earliest finish, intervals, scheduling).
-2. Reach for the Activity Selection template below and map the problem's entities onto it.
-3. When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
+1. Building the longest chain mirrors selecting the most non-overlapping activities.
+2. Sort by the second element; greedily extend the chain when the next pair's first exceeds the last chosen second.
+3. The earliest-finishing pair leaves the most room, so the greedy choice is optimal.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+pairs = [[1,2],[2,3],[3,4]] → sort by second: [1,2],[2,3],[3,4]
+take [1,2] cur=2; [2,3] first 2 not >2 skip; [3,4] first 3>2 take cur=4.
+chain length = 2.
 
 ### Visualization
 ```
@@ -325,14 +331,14 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
-            end = e
-    return count
+def findLongestChain(pairs):
+    pairs.sort(key=lambda x: x[1])           # earliest end first
+    length, cur = 0, float('-inf')
+    for a, b in pairs:
+        if a > cur:                           # can follow the last link
+            length += 1
+            cur = b
+    return length
 ```
 
 ### Complexity

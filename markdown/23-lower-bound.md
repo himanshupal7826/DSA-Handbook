@@ -238,110 +238,121 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Search Insert (LeetCode 35)
-A representative **Lower Bound** problem. The signal: first index with value ≥ target — the bisect_left primitive.
+Given a sorted array and a target, return the index where target is found, or the leftmost index where it should be inserted to keep the array sorted.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (lower bound, first >=, bisect left, insert position).
-2. Reach for the Lower Bound template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. The insert position is exactly the first index `i` with `nums[i] >= target` — a textbook lower bound.
+2. Run a half-open binary search on `[0, n)`: when `nums[mid] < target` the answer lies strictly right, else `mid` is still a candidate.
+3. When the loop collapses, `lo` is the leftmost qualifying index (or `n` if target exceeds every element).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[1,3,5,6]`, `target=4`.
+- `lo=0,hi=4 → mid=2, nums[2]=5 >= 4 → hi=2`
+- `lo=0,hi=2 → mid=1, nums[1]=3 < 4 → lo=2`
+- `lo=2,hi=2` stop → return `2` (insert between 3 and 5). Correct.
 
 ### Visualization
 ```
-input  ──▶ [ apply Lower Bound step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[1, 3, 5, 6]  target 4
+       ^ first index with value >= 4  ──▶ insert at 2
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def searchInsert(nums, target):
+    lo, hi = 0, len(nums)            # half-open [lo, hi)
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
+        if nums[mid] < target:
             lo = mid + 1
         else:
             hi = mid
-    return lo                     # first index with a[i] >= target
+    return lo                        # leftmost index with nums[i] >= target
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n), Space O(1) — a single binary search over the array.
 
 ## 10. Solved Example 2
 
 ### Problem — LIS (LeetCode 300)
-A representative **Lower Bound** problem. The signal: first index with value ≥ target — the bisect_left primitive.
+Return the length of the longest strictly increasing subsequence of `nums`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (lower bound, first >=, bisect left, insert position).
-2. Reach for the Lower Bound template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. Maintain a `tails` array where `tails[k]` is the smallest possible tail of any increasing subsequence of length `k+1` (patience sorting).
+2. For each value `x`, use `bisect_left` (a lower bound) to find the first tail `>= x`; that is the pile `x` belongs on.
+3. If the position is past the end, `x` extends the longest run (append); otherwise it replaces that tail, keeping piles as small as possible. The answer is `len(tails)`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[10,9,2,5,3,7]`.
+- 10 → tails=[10]; 9 replaces → [9]; 2 replaces → [2]
+- 5 appends → [2,5]; 3 replaces the 5 → [2,3]; 7 appends → [2,3,7]
+- `len(tails)=3` (e.g. 2,3,7). Correct.
 
 ### Visualization
 ```
-input  ──▶ [ apply Lower Bound step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+value ──▶ bisect_left(tails, value)  (first tail >= value)
+tails ──▶ [2, 3, 7]   length = LIS length
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+from bisect import bisect_left
+
+def lengthOfLIS(nums):
+    tails = []                       # tails[k] = smallest tail of an LIS of length k+1
+    for x in nums:
+        i = bisect_left(tails, x)    # lower bound: first tail >= x
+        if i == len(tails):
+            tails.append(x)          # x extends the longest run
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            tails[i] = x             # keep piles minimal
+    return len(tails)
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(n log n) — one lower-bound search per element; Space O(n) for `tails`.
 
 ## 11. Solved Example 3
 
 ### Problem — Russian Dolls (LeetCode 354)
-A representative **Lower Bound** problem. The signal: first index with value ≥ target — the bisect_left primitive.
+Each envelope has a width and height; one fits inside another only if both dimensions are strictly larger. Return the maximum number of envelopes you can nest.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (lower bound, first >=, bisect left, insert position).
-2. Reach for the Lower Bound template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. Sort by width ascending, and on equal widths by height **descending** — the descending tie-break stops two same-width envelopes from ever counting as an increasing pair.
+2. With widths handled by the sort, the answer reduces to the strictly increasing LIS on the heights sequence.
+3. Compute that LIS in O(n log n) with `bisect_left` (lower bound) on a `tails` array, exactly as in problem 300.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`[[5,4],[6,4],[6,7],[2,3]]` → sort → `[[2,3],[5,4],[6,7],[6,4]]`.
+- heights = `[3, 4, 7, 4]`
+- LIS via bisect_left: 3→[3]; 4→[3,4]; 7→[3,4,7]; 4 replaces 7→[3,4,4]
+- `len(tails)=3` → answer `3`. Correct.
 
 ### Visualization
 ```
-input  ──▶ [ apply Lower Bound step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+sort (w asc, h desc on ties) ──▶ heights [3, 4, 7, 4]
+LIS on heights via bisect_left ──▶ length 3
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+from bisect import bisect_left
+
+def maxEnvelopes(envelopes):
+    envelopes.sort(key=lambda e: (e[0], -e[1]))   # width asc, height desc on ties
+    tails = []                                    # LIS on heights
+    for _, h in envelopes:
+        i = bisect_left(tails, h)                 # lower bound: first tail >= h
+        if i == len(tails):
+            tails.append(h)
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            tails[i] = h
+    return len(tails)
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(n log n) — sort plus one lower-bound search per envelope; Space O(n) for `tails`.
 
 
 ## 12. LeetCode Practice Set

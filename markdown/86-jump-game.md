@@ -237,15 +237,17 @@ int maxNonOverlap(vector<vector<int>>& intervals) {
 ## 9. Solved Example 1
 
 ### Problem — Jump Game (LeetCode 55)
-A representative **Jump Game** problem. The signal: track farthest reach greedily to decide reachability / min jumps.
+Each nums[i] is a maximum jump length; return whether you can reach the last index.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (jump game, greedy, reachable, farthest, min jumps).
-2. Reach for the Jump Game template below and map the problem's entities onto it.
-3. When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
+1. Scan left to right, tracking the farthest index reachable so far.
+2. If the current index sits beyond that farthest reach, there's an unbridgeable gap — return False.
+3. Otherwise extend the reach with i + nums[i]; if it ever covers the last index, return True.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums = [2,3,1,1,4]
+i=0 reach=2; i=1 reach=max(2,4)=4 which already covers last index 4 → True.
+Contrast [3,2,1,0,4]: reach caps at 3, then i=4>3 is unreachable → False.
 
 ### Visualization
 ```
@@ -256,31 +258,33 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
-            end = e
-    return count
+def canJump(nums):
+    reach = 0
+    for i, step in enumerate(nums):
+        if i > reach:                         # gap we cannot cross
+            return False
+        reach = max(reach, i + step)          # farthest so far
+    return True
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
+Time O(n), Space O(1). A single greedy pass over the array.
 
 ## 10. Solved Example 2
 
 ### Problem — Jump Game II (LeetCode 45)
-A representative **Jump Game** problem. The signal: track farthest reach greedily to decide reachability / min jumps.
+Every position is reachable; return the minimum number of jumps to reach the last index.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (jump game, greedy, reachable, farthest, min jumps).
-2. Reach for the Jump Game template below and map the problem's entities onto it.
-3. When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
+1. Think in levels: from the current jump's range, find the farthest index the next jump can reach.
+2. When the scan reaches the current range's end, spend one jump and push the boundary to that farthest.
+3. This BFS-style greedy uses the fewest jumps.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums = [2,3,1,1,4]
+i=0 farthest=2, i==cur_end(0) → jumps=1 cur_end=2
+i=1 farthest=max(2,4)=4; i=2==cur_end(2) → jumps=2 cur_end=4 covers last.
+answer = 2.
 
 ### Visualization
 ```
@@ -291,31 +295,32 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
-            end = e
-    return count
+def jump(nums):
+    jumps = cur_end = farthest = 0
+    for i in range(len(nums) - 1):
+        farthest = max(farthest, i + nums[i])
+        if i == cur_end:                      # must jump now
+            jumps += 1
+            cur_end = farthest
+    return jumps
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
+Time O(n), Space O(1). One pass tracking level boundaries.
 
 ## 11. Solved Example 3
 
 ### Problem — Jump III (LeetCode 1306)
-A representative **Jump Game** problem. The signal: track farthest reach greedily to decide reachability / min jumps.
+From index start you may jump to i±arr[i]; return whether any index holding value 0 is reachable.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (jump game, greedy, reachable, farthest, min jumps).
-2. Reach for the Jump Game template below and map the problem's entities onto it.
-3. When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
+1. From a position you branch to i+arr[i] and i-arr[i]; explore all reachable indices with BFS.
+2. Mark indices visited to avoid revisiting and looping forever.
+3. Success the moment you land on an index whose value is 0.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+arr = [4,2,3,0,3,1,2], start=5
+5 → 4,6; 4 → 1 (7 out of range); 6 → 8 out (4 seen); 1 → 3 (-1 out); arr[3]==0 → True.
 
 ### Visualization
 ```
@@ -326,18 +331,25 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
-            end = e
-    return count
+from collections import deque
+
+def canReach(arr, start):
+    n = len(arr)
+    seen = {start}
+    queue = deque([start])
+    while queue:
+        i = queue.popleft()
+        if arr[i] == 0:
+            return True
+        for j in (i + arr[i], i - arr[i]):    # branch both directions
+            if 0 <= j < n and j not in seen:
+                seen.add(j)
+                queue.append(j)
+    return False
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
+Time O(n), Space O(n). Each index is enqueued at most once.
 
 
 ## 12. LeetCode Practice Set

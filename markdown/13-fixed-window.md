@@ -252,122 +252,125 @@ int longestWindow(const string& s) {
 ## 9. Solved Example 1
 
 ### Problem — Max Average (LeetCode 643)
-A representative **Fixed Size Window** problem. The signal: slide a window of constant width k, adding the new and dropping the old element.
+Given `nums` and an integer `k`, find the contiguous subarray of length exactly `k` with the largest average, and return that maximum average.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sliding window, fixed size, k elements, subarray of size k, average).
-2. Reach for the Fixed Size Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. The subarray length is fixed at `k`, so maximizing the average is the same as maximizing the window sum — divide by `k` at the end.
+2. Seed the sum of the first `k` elements as the initial `window_sum` and best.
+3. Slide one step at a time: add `nums[right]`, subtract `nums[right - k]`, and track the max sum in O(1) per step.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [1, 12, -5, -6, 50, 3], k = 4`
+- Seed sum of first 4 = `1+12-5-6 = 2` → best = 2
+- Slide to index 4: `2 + 50 - 1 = 51` → best = 51
+- Slide to index 5: `51 + 3 - 12 = 42` → best stays 51
+- Answer = `51 / 4 = 12.75`
 
 ### Visualization
 ```
-input  ──▶ [ apply Fixed Size Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+window sum slides by +nums[right] -nums[right-k]; answer = best_sum / k
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
-        best = max(best, right - left + 1)
-    return best
+def findMaxAverage(nums, k):
+    window_sum = sum(nums[:k])
+    best = window_sum
+    for right in range(k, len(nums)):
+        window_sum += nums[right] - nums[right - k]
+        best = max(best, window_sum)
+    return best / k
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n), Space O(1). One pass with a rolling sum; no extra storage beyond scalars.
 
 ## 10. Solved Example 2
 
 ### Problem — Sliding Window Max (LeetCode 239)
-A representative **Fixed Size Window** problem. The signal: slide a window of constant width k, adding the new and dropping the old element.
+Given `nums` and window size `k`, return a list containing the maximum of each contiguous window of size `k` as it slides left to right.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sliding window, fixed size, k elements, subarray of size k, average).
-2. Reach for the Fixed Size Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. Keep a deque of *indices* whose values are in decreasing order — the front always holds the index of the current window's maximum.
+2. Before pushing `i`, pop from the back every index whose value is `<= nums[i]`; those can never be the max again.
+3. Pop the front when it falls outside the window (`front <= i - k`); once `i >= k-1`, record `nums[deque[0]]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [1, 3, -1, -3, 5], k = 3`
+- i=0 push0 dq=[0]; i=1 3>1 pop0 push1 dq=[1]; i=2 dq=[1,2] → max nums[1]=3
+- i=3 dq=[1,2,3] front 1<=3-3=0? no → max nums[1]=3
+- i=4 5 pops all, dq=[4] → max 5 → result `[3, 3, 5]`
 
 ### Visualization
 ```
-input  ──▶ [ apply Fixed Size Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+deque holds indices with decreasing values; front = window max
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
-        best = max(best, right - left + 1)
-    return best
+from collections import deque
+
+def maxSlidingWindow(nums, k):
+    dq = deque()          # indices, values decreasing
+    result = []
+    for i, x in enumerate(nums):
+        while dq and nums[dq[-1]] <= x:
+            dq.pop()
+        dq.append(i)
+        if dq[0] <= i - k:      # front slid out of window
+            dq.popleft()
+        if i >= k - 1:
+            result.append(nums[dq[0]])
+    return result
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n), Space O(k). Each index is pushed and popped at most once; deque holds at most k indices.
 
 ## 11. Solved Example 3
 
 ### Problem — Permutation in String (LeetCode 567)
-A representative **Fixed Size Window** problem. The signal: slide a window of constant width k, adding the new and dropping the old element.
+Return `True` if `s2` contains any permutation of `s1` as a contiguous substring — i.e. some window of length `len(s1)` in `s2` has the exact same character counts as `s1`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sliding window, fixed size, k elements, subarray of size k, average).
-2. Reach for the Fixed Size Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. A permutation match means equal character frequencies, so use a fixed window of width `len(s1)` over `s2`.
+2. Build the target count for `s1` and a rolling count for the current window; compare them.
+3. Slide the window one char at a time: add the incoming char, drop the outgoing char, and return `True` the moment the counts match.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`s1 = "ab", s2 = "eidbaooo"` → need = {a:1, b:1}, window size 2
+- "ei" {e,i} ≠ need; "id" ≠; "db" ≠; "ba" {b:1,a:1} == need → return True
 
 ### Visualization
 ```
-input  ──▶ [ apply Fixed Size Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+fixed window len(s1) over s2; compare rolling counts to target counts
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
-        best = max(best, right - left + 1)
-    return best
+from collections import Counter
+
+def checkInclusion(s1, s2):
+    k = len(s1)
+    if k > len(s2):
+        return False
+    need = Counter(s1)
+    window = Counter(s2[:k])
+    if window == need:
+        return True
+    for i in range(k, len(s2)):
+        window[s2[i]] += 1
+        left = s2[i - k]
+        window[left] -= 1
+        if window[left] == 0:
+            del window[left]
+        if window == need:
+            return True
+    return False
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n), Space O(1). One pass over `s2`; the counts hold at most 26 distinct letters.
 
 
 ## 12. LeetCode Practice Set

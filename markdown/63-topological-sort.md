@@ -257,15 +257,20 @@ vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
 ## 9. Solved Example 1
 
 ### Problem — Course Schedule (LeetCode 207)
-A representative **Topological Sort** problem. The signal: order a dag so every edge points forward (kahn / dfs finish times).
+Given `numCourses` and `prerequisites[i] = [a, b]` meaning "take b before a", return `True` if you can finish all courses (i.e. the prerequisite graph is a DAG with no cycle).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (topological sort, kahn, dag, ordering, prerequisites, indegree).
-2. Reach for the Topological Sort template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Build a directed graph `b → a` and count each course's indegree.
+2. Kahn's BFS: push every indegree-0 course into a queue and pop them one at a time.
+3. Each time you pop a course, decrement its neighbors' indegrees; any that hit 0 join the queue.
+4. If the number of courses popped equals `numCourses`, there was no cycle → return `True`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input: `numCourses=2`, `prerequisites=[[1,0]]` (need 0 before 1).
+- indegree = [0, 1]; queue starts with course 0.
+- Pop 0 → decrement indegree[1] to 0 → push 1. taken=1.
+- Pop 1. taken=2.
+- taken (2) == numCourses (2) → return `True`.
 
 ### Visualization
 ```
@@ -277,34 +282,46 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
+
+def canFinish(numCourses, prerequisites):
+    adj = [[] for _ in range(numCourses)]
+    indeg = [0] * numCourses
+    for a, b in prerequisites:      # must take b before a: edge b -> a
+        adj[b].append(a)
+        indeg[a] += 1
+
+    q = deque(c for c in range(numCourses) if indeg[c] == 0)
+    taken = 0
     while q:
         u = q.popleft()
+        taken += 1
         for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
+            indeg[v] -= 1
+            if indeg[v] == 0:
                 q.append(v)
-    return dist
+    return taken == numCourses
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(V + E), Space O(V + E) for the adjacency list and queue.
 
 ## 10. Solved Example 2
 
 ### Problem — Course Schedule II (LeetCode 210)
-A representative **Topological Sort** problem. The signal: order a dag so every edge points forward (kahn / dfs finish times).
+Same prerequisite graph as 207, but return a valid ordering of all courses. If it is impossible (a cycle exists), return an empty list.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (topological sort, kahn, dag, ordering, prerequisites, indegree).
-2. Reach for the Topological Sort template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Build the graph `b → a` and indegree array exactly as in Course Schedule.
+2. Run Kahn's BFS, but this time append each popped course to an `order` list.
+3. The order in which indegree-0 courses are removed is a valid topological order.
+4. If `order` contains every course, return it; otherwise a cycle blocked some courses → return `[]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input: `numCourses=4`, `prerequisites=[[1,0],[2,0],[3,1],[3,2]]`.
+- indegree = [0,1,1,2]; queue = [0].
+- Pop 0 → order=[0]; indeg[1]=0, indeg[2]=0 → queue=[1,2].
+- Pop 1 → order=[0,1]; indeg[3]=1. Pop 2 → order=[0,1,2]; indeg[3]=0 → queue=[3].
+- Pop 3 → order=[0,1,2,3]. len==4 → return `[0,1,2,3]`.
 
 ### Visualization
 ```
@@ -316,34 +333,46 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
+
+def findOrder(numCourses, prerequisites):
+    adj = [[] for _ in range(numCourses)]
+    indeg = [0] * numCourses
+    for a, b in prerequisites:      # edge b -> a
+        adj[b].append(a)
+        indeg[a] += 1
+
+    q = deque(c for c in range(numCourses) if indeg[c] == 0)
+    order = []
     while q:
         u = q.popleft()
+        order.append(u)
         for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
+            indeg[v] -= 1
+            if indeg[v] == 0:
                 q.append(v)
-    return dist
+    return order if len(order) == numCourses else []
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(V + E), Space O(V + E) for the adjacency list, indegrees, and output.
 
 ## 11. Solved Example 3
 
 ### Problem — Alien Dict (LeetCode 269)
-A representative **Topological Sort** problem. The signal: order a dag so every edge points forward (kahn / dfs finish times).
+Given a list of `words` sorted lexicographically by an unknown alien alphabet, derive a valid ordering of its letters. Return `""` if the ordering is invalid.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (topological sort, kahn, dag, ordering, prerequisites, indegree).
-2. Reach for the Topological Sort template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Every letter that appears is a node; seed indegree 0 for each.
+2. Compare each adjacent word pair; the first differing character gives an edge `c1 → c2`.
+3. Guard the prefix case: if the longer word comes before its own prefix (e.g. "abc" before "ab"), the input is invalid → return `""`.
+4. Kahn's topological sort over the letter graph; if the result uses every letter, join it, else a cycle exists → return `""`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input: `words=["wrt","wrf","er","ett","rftt"]`.
+- Pairs give edges: t→f, w→e, r→t, e→r. Letters = {w,r,t,f,e}.
+- indegree: w0, e1, r1, t1, f1; queue starts with w.
+- Pop w→e(0); pop e→r(0); pop r→t(0); pop t→f(0); pop f.
+- order = "wertf", uses all 5 letters → return `"wertf"`.
 
 ### Visualization
 ```
@@ -354,22 +383,37 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
+from collections import deque, defaultdict
+
+def alienOrder(words):
+    adj = defaultdict(set)
+    indeg = {c: 0 for w in words for c in w}
+
+    for first, second in zip(words, words[1:]):
+        for a, b in zip(first, second):
+            if a != b:
+                if b not in adj[a]:
+                    adj[a].add(b)
+                    indeg[b] += 1
+                break
+        else:                       # no differing char in the overlap
+            if len(first) > len(second):
+                return ""           # prefix appears after longer word
+
+    q = deque(c for c in indeg if indeg[c] == 0)
+    order = []
     while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+        c = q.popleft()
+        order.append(c)
+        for nxt in adj[c]:
+            indeg[nxt] -= 1
+            if indeg[nxt] == 0:
+                q.append(nxt)
+    return "".join(order) if len(order) == len(indeg) else ""
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(C) where C is the total number of characters across all words; Space O(1) (bounded by the 26-letter alphabet).
 
 
 ## 12. LeetCode Practice Set

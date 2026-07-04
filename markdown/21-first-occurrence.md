@@ -239,110 +239,126 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — First Last Position (LeetCode 34)
-A representative **First Occurrence** problem. The signal: bias binary search left to find the first matching index.
+Given a sorted array `nums`, return the starting and ending index of a given `target`, or `[-1, -1]` if it is absent.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (first, leftmost, binary search, duplicates, boundary).
-2. Reach for the First Occurrence template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. The first index is `lower_bound(target)` — the leftmost `i` with `nums[i] >= target`.
+2. The last index is `lower_bound(target + 1) - 1` — one before the leftmost element strictly greater than `target`.
+3. If the lower bound is out of range or doesn't equal `target`, the value is missing, so return `[-1, -1]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [5,7,7,8,8,10], target = 8`
+- `lower_bound(8)` → first index with value ≥ 8 → index 3.
+- `lower_bound(9)` → first index with value ≥ 9 → index 5, minus 1 → index 4.
+- `nums[3] == 8`, so answer is `[3, 4]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply First Occurrence step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[5, 7, 7, 8, 8, 10]   target = 8
+          ^  ^
+        first last  ──▶ [3, 4]
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
-        else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+def searchRange(nums, target):
+    def lower_bound(t):
+        lo, hi = 0, len(nums)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if nums[mid] < t:
+                lo = mid + 1
+            else:
+                hi = mid
+        return lo
+
+    first = lower_bound(target)
+    if first == len(nums) or nums[first] != target:
+        return [-1, -1]
+    last = lower_bound(target + 1) - 1
+    return [first, last]
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n) — two binary searches; Space O(1).
 
 ## 10. Solved Example 2
 
 ### Problem — First Bad Version (LeetCode 278)
-A representative **First Occurrence** problem. The signal: bias binary search left to find the first matching index.
+Versions `1..n` are good then bad. Using the API `isBadVersion(v)`, find the first bad version with the fewest calls.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (first, leftmost, binary search, duplicates, boundary).
-2. Reach for the First Occurrence template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. The predicate `isBadVersion(v)` is monotonic: once true it stays true, so we can binary search the boundary.
+2. Keep a closed range `[lo, hi] = [1, n]`; on a bad mid, the answer is at `mid` or left (`hi = mid`), otherwise it's strictly right (`lo = mid + 1`).
+3. When `lo == hi` the range collapses onto the first bad version.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`n = 5`, first bad = 4
+- `lo=1, hi=5, mid=3` → good → `lo=4`.
+- `lo=4, hi=5, mid=4` → bad → `hi=4`.
+- `lo == hi == 4` → return 4.
 
 ### Visualization
 ```
-input  ──▶ [ apply First Occurrence step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+versions:  1  2  3  4  5
+good ------------|
+bad             4  5   ──▶ first bad = 4
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def firstBadVersion(n):
+    lo, hi = 1, n
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
-        else:
+        if isBadVersion(mid):
             hi = mid
-    return lo                     # first index with a[i] >= target
+        else:
+            lo = mid + 1
+    return lo
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n) API calls; Space O(1).
 
 ## 11. Solved Example 3
 
 ### Problem — Search Insert (LeetCode 35)
-A representative **First Occurrence** problem. The signal: bias binary search left to find the first matching index.
+Given a sorted array of distinct integers and a `target`, return the index if found, otherwise the index where it would be inserted in order.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (first, leftmost, binary search, duplicates, boundary).
-2. Reach for the First Occurrence template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. The insert position is exactly the leftmost index `i` with `nums[i] >= target` — a lower bound.
+2. Search the half-open range `[0, len(nums))`; when `nums[mid] < target` move `lo` right, otherwise pull `hi` in to `mid`.
+3. `lo` ends on the first element ≥ target, or on `len(nums)` if target exceeds every element — both are the correct insert index.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [1,3,5,6], target = 4`
+- `lo=0, hi=4, mid=2` → `nums[2]=5 >= 4` → `hi=2`.
+- `lo=0, hi=2, mid=1` → `nums[1]=3 < 4` → `lo=2`.
+- `lo == hi == 2` → insert at index 2.
 
 ### Visualization
 ```
-input  ──▶ [ apply First Occurrence step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[1, 3, 5, 6]   target = 4
+      ^
+   insert here  ──▶ 2
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def searchInsert(nums, target):
+    lo, hi = 0, len(nums)
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
+        if nums[mid] < target:
             lo = mid + 1
         else:
             hi = mid
-    return lo                     # first index with a[i] >= target
+    return lo
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n); Space O(1).
 
 
 ## 12. LeetCode Practice Set

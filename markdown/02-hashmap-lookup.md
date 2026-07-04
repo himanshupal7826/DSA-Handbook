@@ -231,34 +231,33 @@ long long rangeSum(vector<long long>& pre, int l, int r) { return pre[r+1] - pre
 A representative **Hash Map Lookup** problem. The signal: trade space for time: store seen values for o(1) existence/complement checks.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (hashmap, lookup, complement, seen, cache, O(1), dictionary).
-2. Reach for the Hash Map Lookup template below and map the problem's entities onto it.
-3. Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
+1. For each `x`, the partner we need is its complement `target - x`.
+2. Keep a map of `value → index` for everything seen so far.
+3. Before storing `x`, check if its complement is already in the map — if so, we found the pair in a single pass.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[2,7,11,15], target=9`
+- x=2: need 7, not seen → store {2:0}
+- x=7: need 2, seen at index 0 → return `[0, 1]`
 
 ### Visualization
 ```
-input  ──▶ [ apply Hash Map Lookup step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+seen={2:0}   x=7  need 9-7=2  ── found at 0 ─▶ answer [0,1]
 ```
 
 ### Code
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
-
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+def twoSum(nums, target):
+    seen = {}                       # value -> index
+    for i, x in enumerate(nums):
+        if target - x in seen:
+            return [seen[target - x], i]
+        seen[x] = i
+    return []
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass to build, O(1) per query.
+Time O(n), Space O(n). Single pass with O(1) complement lookups.
 
 ## 10. Solved Example 2
 
@@ -266,34 +265,35 @@ Time O(n), Space O(n). One pass to build, O(1) per query.
 A representative **Hash Map Lookup** problem. The signal: trade space for time: store seen values for o(1) existence/complement checks.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (hashmap, lookup, complement, seen, cache, O(1), dictionary).
-2. Reach for the Hash Map Lookup template below and map the problem's entities onto it.
-3. Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
+1. A duplicate exists iff some value appears a second time as we scan.
+2. Maintain a `set` of values already seen.
+3. On each element, if it is already in the set return `True`; otherwise add it.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[1,2,3,1]`
+- 1 → not seen, add {1}
+- 2 → add {1,2}
+- 3 → add {1,2,3}
+- 1 → already in set → return `True`
 
 ### Visualization
 ```
-input  ──▶ [ apply Hash Map Lookup step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+seen={1,2,3}   x=1  ── already present ─▶ True
 ```
 
 ### Code
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
-
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+def containsDuplicate(nums):
+    seen = set()
+    for x in nums:
+        if x in seen:
+            return True
+        seen.add(x)
+    return False
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass to build, O(1) per query.
+Time O(n), Space O(n). Each element checked/inserted in O(1).
 
 ## 11. Solved Example 3
 
@@ -301,34 +301,37 @@ Time O(n), Space O(n). One pass to build, O(1) per query.
 A representative **Hash Map Lookup** problem. The signal: trade space for time: store seen values for o(1) existence/complement checks.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (hashmap, lookup, complement, seen, cache, O(1), dictionary).
-2. Reach for the Hash Map Lookup template below and map the problem's entities onto it.
-3. Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
+1. Two words are anagrams iff their sorted letters are identical.
+2. Use that sorted string as a hash-map key that groups all its anagrams.
+3. Bucket each word under its key; the map's values are the answer groups.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`["eat","tea","tan"]`
+- "eat" → key "aet" → {aet:[eat]}
+- "tea" → key "aet" → {aet:[eat,tea]}
+- "tan" → key "ant" → {aet:[eat,tea], ant:[tan]}
+Result: `[["eat","tea"],["tan"]]`
 
 ### Visualization
 ```
-input  ──▶ [ apply Hash Map Lookup step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+key "aet" -> [eat, tea]
+key "ant" -> [tan]
 ```
 
 ### Code
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
+from collections import defaultdict
 
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+def groupAnagrams(strs):
+    groups = defaultdict(list)
+    for s in strs:
+        key = "".join(sorted(s))    # anagrams share the sorted key
+        groups[key].append(s)
+    return list(groups.values())
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass to build, O(1) per query.
+Time O(N·L log L), Space O(N·L) for N words of max length L.
 
 
 ## 12. LeetCode Practice Set

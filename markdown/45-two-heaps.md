@@ -256,12 +256,14 @@ vector<int> topK(vector<int>& nums, int k) {
 A representative **Two Heaps** problem. The signal: a max-heap + min-heap split keeps the median at the heaps' tops.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (two heaps, median, max heap, min heap, balance).
-2. Reach for the Two Heaps template below and map the problem's entities onto it.
-3. A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
+1. Keep a max-heap `small` for the lower half and a min-heap `large` for the upper half.
+2. On each insert, push to `small`, move its max into `large`, then rebalance so `small` never gets smaller than `large`.
+3. The median is `small`'s top when sizes differ, else the average of both tops.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+add 1 → small=[1]. add 2 → small=[1], large=[2], median=(1+2)/2=1.5.
+add 3 → push→balance → small=[2,1], large=[3], median=small top = 2.
+Stream so far → medians 1, 1.5, 2.
 
 ### Visualization
 ```
@@ -273,17 +275,25 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+class MedianFinder:
+    def __init__(self):
+        self.small = []   # max-heap (values negated)
+        self.large = []   # min-heap
+
+    def addNum(self, num):
+        heapq.heappush(self.small, -num)
+        heapq.heappush(self.large, -heapq.heappop(self.small))
+        if len(self.large) > len(self.small):
+            heapq.heappush(self.small, -heapq.heappop(self.large))
+
+    def findMedian(self):
+        if len(self.small) > len(self.large):
+            return float(-self.small[0])
+        return (-self.small[0] + self.large[0]) / 2
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
+Time O(log n) per insert, O(1) per query. Space O(n) across the two heaps.
 
 ## 10. Solved Example 2
 
@@ -291,12 +301,14 @@ Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
 A representative **Two Heaps** problem. The signal: a max-heap + min-heap split keeps the median at the heaps' tops.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (two heaps, median, max heap, min heap, balance).
-2. Reach for the Two Heaps template below and map the problem's entities onto it.
-3. A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
+1. A window's median needs order statistics under both insert and delete — a balanced multiset does both in O(log k).
+2. Use a `SortedList`: slide by adding the incoming element and removing the outgoing one.
+3. Read the median directly by index: middle element for odd k, average of the two middles for even k.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums=[1,3,-1,-3,5,3,6,7], k=3. Window [1,3,-1]→sorted[-1,1,3], median 1.
+Slide → [3,-1,-3]→[-3,-1,3], median -1. Slide → [-1,-3,5]→[-3,-1,5], median -1.
+Medians so far → 1, -1, -1, ...
 
 ### Visualization
 ```
@@ -307,18 +319,23 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+from sortedcontainers import SortedList
+def medianSlidingWindow(nums, k):
+    window = SortedList(nums[:k])
+    res = []
+    for i in range(k, len(nums) + 1):
+        if k % 2:
+            res.append(float(window[k // 2]))
+        else:
+            res.append((window[k // 2 - 1] + window[k // 2]) / 2)
+        if i < len(nums):
+            window.add(nums[i])
+            window.remove(nums[i - k])
+    return res
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
+Time O(n log k), Space O(k). Each add/remove on the size-k ordered structure is O(log k).
 
 ## 11. Solved Example 3
 
@@ -326,12 +343,14 @@ Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
 A representative **Two Heaps** problem. The signal: a max-heap + min-heap split keeps the median at the heaps' tops.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (two heaps, median, max heap, min heap, balance).
-2. Reach for the Two Heaps template below and map the problem's entities onto it.
-3. A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
+1. Sort projects by capital so cheaper-to-start ones unlock first (min-heap-by-capital behaviour).
+2. As capital `w` grows, push every affordable project's profit into a max-heap.
+3. Each of the k rounds greedily takes the highest available profit from the max-heap.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+k=2, w=0, profits=[1,2,3], capital=[0,1,1]. Sorted: (0,1),(1,2),(1,3).
+Round1: affordable {1} → take 1 → w=1. Round2: affordable {2,3} → take 3 → w=4.
+Answer → `4`.
 
 ### Visualization
 ```
@@ -343,17 +362,22 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+def findMaximizedCapital(k, w, profits, capital):
+    projects = sorted(zip(capital, profits))     # ascending by capital
+    available = []                               # max-heap of profits (negated)
+    i = 0
+    for _ in range(k):
+        while i < len(projects) and projects[i][0] <= w:
+            heapq.heappush(available, -projects[i][1])
+            i += 1
+        if not available:
+            break
+        w -= heapq.heappop(available)            # add best affordable profit
+    return w
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
+Time O(n log n), Space O(n). Sorting dominates; each project is pushed/popped at most once.
 
 
 ## 12. LeetCode Practice Set

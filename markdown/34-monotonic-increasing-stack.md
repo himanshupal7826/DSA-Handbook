@@ -247,12 +247,23 @@ vector<int> nextGreater(vector<int>& nums) {
 A representative **Monotonic Increasing Stack** problem. The signal: maintain an increasing stack to find nearest smaller elements.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (monotonic stack, increasing, previous smaller, next smaller).
-2. Reach for the Monotonic Increasing Stack template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. We want, for each day, how many days until a warmer temperature — i.e. the distance to the next greater element.
+2. Keep a stack of indices whose warmer day hasn't been found yet, with temperatures kept monotonically decreasing (top is the coldest pending day).
+3. For each new day, pop every pending index whose temperature is strictly less than today's; today is their answer, so record `i - popped_index`.
+4. Push the current index. Any indices left on the stack at the end keep their default answer of 0.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[73, 74, 75, 71, 69, 72]`:
+```
+i=0 t=73  stack=[]        -> push 0            stack=[0]
+i=1 t=74  74>73 pop 0 ans[0]=1-0=1             stack=[1]
+i=2 t=75  75>74 pop 1 ans[1]=2-1=1             stack=[2]
+i=3 t=71  71<75 push 3                         stack=[2,3]
+i=4 t=69  69<71 push 4                         stack=[2,3,4]
+i=5 t=72  pop 4 ans[4]=1, pop 3 ans[3]=2       stack=[2,5]
+end -> index 2 & 5 unresolved, ans stays 0
+```
+Result `[1, 1, 4, 2, 1, 0]`.
 
 ### Visualization
 ```
@@ -263,18 +274,19 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
+def dailyTemperatures(temperatures):
+    res = [0] * len(temperatures)
+    stack = []                          # indices, temps decreasing
+    for i, t in enumerate(temperatures):
+        while stack and temperatures[stack[-1]] < t:
+            j = stack.pop()
+            res[j] = i - j
         stack.append(i)
     return res
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(n), Space O(n). Each index is pushed and popped at most once.
 
 ## 10. Solved Example 2
 
@@ -282,12 +294,22 @@ Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved ind
 A representative **Monotonic Increasing Stack** problem. The signal: maintain an increasing stack to find nearest smaller elements.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (monotonic stack, increasing, previous smaller, next smaller).
-2. Reach for the Monotonic Increasing Stack template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. `nums1` is a subset of `nums2`; for each value we need its next greater element to the right within `nums2`.
+2. Sweep `nums2` once with a decreasing stack of values whose next-greater is still unknown.
+3. When the current value exceeds the stack top, it is that top's next greater — pop and record it in a hash map `value -> next greater`.
+4. Finally map each element of `nums1` through the dictionary, defaulting to -1.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums2 = [1, 3, 4, 2]`, `nums1 = [4, 1, 2]`:
+```
+v=1  stack=[]        push 1        stack=[1]
+v=3  3>1 pop1 nge[1]=3, push3      stack=[3]
+v=4  4>3 pop3 nge[3]=4, push4      stack=[4]
+v=2  2<4 push2                     stack=[4,2]
+end -> nge={1:3, 3:4}
+map nums1: 4->-1, 1->3, 2->-1
+```
+Result `[-1, 3, -1]`.
 
 ### Visualization
 ```
@@ -298,18 +320,18 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
-        stack.append(i)
-    return res
+def nextGreaterElement(nums1, nums2):
+    nge = {}
+    stack = []                          # values, decreasing
+    for v in nums2:
+        while stack and stack[-1] < v:
+            nge[stack.pop()] = v
+        stack.append(v)
+    return [nge.get(v, -1) for v in nums1]
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(n + m), Space O(n) for the stack and map (n = len(nums2), m = len(nums1)).
 
 ## 11. Solved Example 3
 
@@ -317,12 +339,23 @@ Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved ind
 A representative **Monotonic Increasing Stack** problem. The signal: maintain an increasing stack to find nearest smaller elements.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (monotonic stack, increasing, previous smaller, next smaller).
-2. Reach for the Monotonic Increasing Stack template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. Each bar defines a maximal rectangle whose height is that bar; its width spans until a strictly shorter bar on each side.
+2. Keep a stack of indices with heights in increasing order. When a bar shorter than the stack top arrives, the top's rectangle can be closed.
+3. On popping index `top`, its height is `heights[top]` and its width is bounded left by the new stack top and right by the current index `i`, giving width `i - stack[-1] - 1` (or `i` if the stack is empty).
+4. Append a sentinel height 0 at the end to flush all remaining bars.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[2, 1, 5, 6, 2]` (append sentinel 0):
+```
+i=0 h=2  push0                       stack=[0]
+i=1 h=1  1<2 pop0 area=2*1=2          stack=[1]  push1
+i=2 h=5  push2                        stack=[1,2]
+i=3 h=6  push3                        stack=[1,2,3]
+i=4 h=2  2<6 pop3 area=6*(4-2-1)=6
+         2<5 pop2 area=5*(4-1-1)=10   best=10  push4
+i=5 h=0  pop4 area=2*(5-1-1)=6, pop1 area=1*5=5
+```
+Best area `10`.
 
 ### Visualization
 ```
@@ -333,18 +366,20 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
+def largestRectangleArea(heights):
+    stack = []                          # indices, heights increasing
+    best = 0
+    for i, h in enumerate(heights + [0]):
+        while stack and heights[stack[-1]] >= h:
+            height = heights[stack.pop()]
+            width = i - stack[-1] - 1 if stack else i
+            best = max(best, height * width)
         stack.append(i)
-    return res
+    return best
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(n), Space O(n). Each bar is pushed and popped exactly once.
 
 
 ## 12. LeetCode Practice Set

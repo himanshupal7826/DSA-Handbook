@@ -241,15 +241,18 @@ int height(TreeNode* node) {
 ## 9. Solved Example 1
 
 ### Problem — Max Depth (LeetCode 104)
-A representative **Tree DFS** problem. The signal: recursive/stack traversal visiting a subtree fully before siblings.
+Find the length of the longest root-to-leaf path — the canonical post-order Tree DFS combine.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (dfs, tree, preorder, inorder, postorder, recursion).
-2. Reach for the Tree DFS template below and map the problem's entities onto it.
-3. Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
+1. The depth of an empty subtree is 0 — that is the recursion's base case.
+2. A node's depth is 1 plus the deeper of its two subtree depths (combine after recursing).
+3. DFS dives to the leaves, then folds the child depths back up to the root.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Tree `[3,9,20,null,null,15,7]`:
+- leaves 9, 15, 7 each return depth 1
+- node 20 = 1 + max(1,1) = 2
+- root 3 = 1 + max(1,2) = 3 → answer 3
 
 ### Visualization
 ```
@@ -264,33 +267,30 @@ class TreeNode:
     def __init__(self, val=0, left=None, right=None):
         self.val, self.left, self.right = val, left, right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+def maxDepth(root):
+    if not root:
+        return 0
+    return 1 + max(maxDepth(root.left), maxDepth(root.right))
 ```
 
 ### Complexity
-Time O(n), Space O(h). Visit each node once; recursion stack is O(height).
+Time O(n), Space O(h) for the recursion stack.
 
 ## 10. Solved Example 2
 
 ### Problem — Preorder (LeetCode 144)
-A representative **Tree DFS** problem. The signal: recursive/stack traversal visiting a subtree fully before siblings.
+Return the values in preorder (node, then left, then right) using DFS.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (dfs, tree, preorder, inorder, postorder, recursion).
-2. Reach for the Tree DFS template below and map the problem's entities onto it.
-3. Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
+1. Preorder means: record the current node's value first, before its children.
+2. Then recurse into the left subtree fully, then the right subtree.
+3. DFS visits each subtree completely before moving on to the sibling.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Tree `[1,null,2,3]` (1's right child is 2, whose left child is 3):
+- visit 1 → out=[1]; left of 1 is None
+- recurse right to 2 → out=[1,2]; left of 2 is 3 → out=[1,2,3]
+- answer [1,2,3]
 
 ### Visualization
 ```
@@ -305,33 +305,36 @@ class TreeNode:
     def __init__(self, val=0, left=None, right=None):
         self.val, self.left, self.right = val, left, right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+def preorderTraversal(root):
+    out = []
+    def dfs(node):
+        if not node:
+            return
+        out.append(node.val)   # visit node before its children
+        dfs(node.left)
+        dfs(node.right)
+    dfs(root)
+    return out
 ```
 
 ### Complexity
-Time O(n), Space O(h). Visit each node once; recursion stack is O(height).
+Time O(n), Space O(h) for the recursion stack.
 
 ## 11. Solved Example 3
 
 ### Problem — Inorder (LeetCode 94)
-A representative **Tree DFS** problem. The signal: recursive/stack traversal visiting a subtree fully before siblings.
+Return the values in inorder (left, then node, then right) using DFS.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (dfs, tree, preorder, inorder, postorder, recursion).
-2. Reach for the Tree DFS template below and map the problem's entities onto it.
-3. Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
+1. Inorder means: fully traverse the left subtree before recording the node.
+2. Record the node's value between the left and right recursions.
+3. On a BST this emits the values in sorted order.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Tree `[1,null,2,3]`:
+- dfs(1): left is None → record 1 → out=[1]
+- recurse right to 2: its left is 3 → record 3 → out=[1,3]; then record 2 → out=[1,3,2]
+- answer [1,3,2]
 
 ### Visualization
 ```
@@ -346,20 +349,20 @@ class TreeNode:
     def __init__(self, val=0, left=None, right=None):
         self.val, self.left, self.right = val, left, right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+def inorderTraversal(root):
+    out = []
+    def dfs(node):
+        if not node:
+            return
+        dfs(node.left)
+        out.append(node.val)   # visit node between the two subtrees
+        dfs(node.right)
+    dfs(root)
+    return out
 ```
 
 ### Complexity
-Time O(n), Space O(h). Visit each node once; recursion stack is O(height).
+Time O(n), Space O(h) for the recursion stack.
 
 
 ## 12. LeetCode Practice Set

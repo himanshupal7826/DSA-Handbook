@@ -255,122 +255,128 @@ int longestWindow(const string& s) {
 ## 9. Solved Example 1
 
 ### Problem — Longest Substring (LeetCode 3)
-A representative **Variable Size Window** problem. The signal: grow the window to include, shrink to restore validity under a constraint.
+Given a string `s`, find the length of the longest substring without repeating characters.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sliding window, variable, expand shrink, constraint, at most).
-2. Reach for the Variable Size Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. Keep a window `[left, right]` and a map from each character to its most recent index.
+2. Expand `right` one char at a time. If the current char was seen inside the window, jump `left` to just past its previous position so the window stays duplicate-free.
+3. After placing each char, update the answer with `right - left + 1`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`s = "abcabcbb"`:
+- r=0..2 "abc": no repeats, window grows, best = 3.
+- r=3 'a': last seen at 0, so left = 1; window "bca", best stays 3.
+- r=4 'b': last seen at 1, left = 2; window "cab", best 3.
+- Continues at length 3; answer = **3**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Variable Size Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+a b c a b c b b   ─▶ on repeat 'a', left jumps past its old index
+    [c a b]        ─▶ longest duplicate-free window has length 3
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
+def lengthOfLongestSubstring(s):
+    last_seen = {}
     left = best = 0
     for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
+        if ch in last_seen and last_seen[ch] >= left:
+            left = last_seen[ch] + 1
+        last_seen[ch] = right
         best = max(best, right - left + 1)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n) — each index visited once; Space O(min(n, alphabet)) for the last-seen map.
 
 ## 10. Solved Example 2
 
 ### Problem — Min Window (LeetCode 76)
-A representative **Variable Size Window** problem. The signal: grow the window to include, shrink to restore validity under a constraint.
+Given strings `s` and `t`, return the smallest substring of `s` that contains every character of `t` including multiplicity, or `""` if none exists.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sliding window, variable, expand shrink, constraint, at most).
-2. Reach for the Variable Size Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. Count how many of each char `t` needs; track `missing` = total chars still required.
+2. Expand `right`; whenever the added char is still needed (its window count hasn't overshot `t`'s need), decrement `missing`.
+3. When `missing == 0` the window is valid — contract `left` while it stays valid, recording the shortest span each time.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`s = "ADOBECODEBANC"`, `t = "ABC"`:
+- Expand until "ADOBEC" — all of A,B,C present, missing = 0. Length 6.
+- Shrink left past "A"; keep expanding to find "CODEBA"... eventually "BANC" (start index 9) is valid, length 4.
+- Best = **"BANC"**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Variable Size Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+A D O B E C O D E B A N C
+                  [B A N C]  ─▶ shortest window covering A,B,C
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
+def minWindow(s, t):
+    from collections import Counter
+    need = Counter(t)
+    missing = len(t)
+    left = start = 0
+    end = float('inf')
     for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
+        if need[ch] > 0:
+            missing -= 1
+        need[ch] -= 1
+        while missing == 0:              # window valid: try to shrink
+            if right - left < end - start:
+                start, end = left, right
+            need[s[left]] += 1
+            if need[s[left]] > 0:
+                missing += 1
             left += 1
-        best = max(best, right - left + 1)
-    return best
+    return "" if end == float('inf') else s[start:end + 1]
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(|s| + |t|) — each pointer advances once; Space O(|t|) for the need counter.
 
 ## 11. Solved Example 3
 
 ### Problem — Min Size Subarray (LeetCode 209)
-A representative **Variable Size Window** problem. The signal: grow the window to include, shrink to restore validity under a constraint.
+Given a positive-integer array `nums` and a `target`, return the minimal length of a contiguous subarray whose sum is `>= target`, or `0` if none exists.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sliding window, variable, expand shrink, constraint, at most).
-2. Reach for the Variable Size Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. Because all numbers are positive, growing the window only increases the sum and shrinking only decreases it — a clean shrink-while-valid window works.
+2. Add each `nums[right]` to a running `total`.
+3. While `total >= target`, record `right - left + 1` and shrink from the left, subtracting `nums[left]` — this finds the shortest valid window ending at each `right`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`target = 7`, `nums = [2,3,1,2,4,3]`:
+- Grow to [2,3,1,2] total 8 >= 7 → best 4; shrink drops 2 → total 6.
+- Add 4 → [3,1,2,4] total 10 → best 4; shrink to [1,2,4]=7 best 3, [2,4]=6 stop.
+- Add 3 → [2,4,3]=9 best 3; shrink to [4,3]=7 best 2. Answer = **2**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Variable Size Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+2 3 1 2 4 3   target = 7
+        [4 3]  ─▶ shortest subarray with sum >= 7 has length 2
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
+def minSubArrayLen(target, nums):
+    left = 0
+    total = 0
+    best = float('inf')
+    for right, x in enumerate(nums):
+        total += x
+        while total >= target:           # shrink while still valid
+            best = min(best, right - left + 1)
+            total -= nums[left]
             left += 1
-        best = max(best, right - left + 1)
-    return best
+    return 0 if best == float('inf') else best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n) — left and right each advance at most n times; Space O(1).
 
 
 ## 12. LeetCode Practice Set

@@ -253,12 +253,17 @@ vector<int> maxSlidingWindow(vector<int>& nums, int k) {
 A representative **Sliding Window Maximum** problem. The signal: deque of candidate indices gives window maxima in o(n).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sliding window maximum, deque, monotonic, window, max).
-2. Reach for the Sliding Window Maximum template below and map the problem's entities onto it.
-3. A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier.
+1. Keep a deque of indices whose values are in strictly decreasing order — the front is always the max of the current window.
+2. Before pushing index `i`, pop indices from the back whose value is `<= nums[i]`; they can never be the max while `i` is in the window.
+3. Pop the front when it falls out of the window (`dq[0] <= i - k`), and once `i >= k-1` record `nums[dq[0]]` as that window's maximum.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[1,3,-1,-3,5], k=3`
+- i=0 v=1 → dq=[0]
+- i=1 v=3 pops 0 → dq=[1]
+- i=2 v=-1 → dq=[1,2]; window full → max=nums[1]=3
+- i=3 v=-3 → dq=[1,2,3]; front 1 <= 3-3=0? no → max=nums[1]=3
+- i=4 v=5 pops 3,2,1 → dq=[4]; max=nums[4]=5 → result `[3,3,5]`.
 
 ### Visualization
 ```
@@ -270,21 +275,22 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def max_sliding_window(nums, k):
+
+def maxSlidingWindow(nums, k):
     dq, res = deque(), []          # dq holds indices, values decreasing
     for i, v in enumerate(nums):
-        while dq and nums[dq[-1]] < v:
+        while dq and nums[dq[-1]] <= v:
             dq.pop()
         dq.append(i)
-        if dq[0] <= i - k:
+        if dq[0] <= i - k:         # front slid out of the window
             dq.popleft()
-        if i >= k - 1:
+        if i >= k - 1:             # window fully formed
             res.append(nums[dq[0]])
     return res
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits each node/edge once.
+Time O(n), Space O(k). Each index is pushed and popped from the deque at most once.
 
 ## 10. Solved Example 2
 
@@ -292,12 +298,18 @@ Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits eac
 A representative **Sliding Window Maximum** problem. The signal: deque of candidate indices gives window maxima in o(n).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sliding window maximum, deque, monotonic, window, max).
-2. Reach for the Sliding Window Maximum template below and map the problem's entities onto it.
-3. A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier.
+1. Let `dp[i]` be the max score to reach index `i`; then `dp[i] = nums[i] + max(dp[i-k .. i-1])`, since you can jump here from up to `k` steps back.
+2. The `max(dp[i-k .. i-1])` is a sliding-window maximum over the `dp` array — maintain a deque of indices with decreasing `dp` values.
+3. For each `i`, drop front indices older than `i-k`, read `dp[dq[0]]` as the best predecessor, compute `dp[i]`, then push `i` after popping smaller `dp` from the back. Answer is `dp[n-1]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[1,-1,-2,4,-7,3], k=2`
+- dp[0]=1, dq=[0]
+- i=1: best=dp[0]=1 → dp[1]=1+(-1)=0; dq=[0,1]
+- i=2: front 0 in window; best=dp[0]=1 → dp[2]=1+(-2)=-1; dq=[0,1,2]
+- i=3: drop front 0 (0 < 3-2=1) → dq=[1,2]; best=dp[1]=0 → dp[3]=4; pops 2,1 → dq=[3]
+- i=4: best=dp[3]=4 → dp[4]=-7+4=-3; dq=[3,4]
+- i=5: best=dp[3]=4 → dp[5]=3+4=7 → answer **7**.
 
 ### Visualization
 ```
@@ -309,21 +321,24 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def max_sliding_window(nums, k):
-    dq, res = deque(), []          # dq holds indices, values decreasing
-    for i, v in enumerate(nums):
-        while dq and nums[dq[-1]] < v:
+
+def maxResult(nums, k):
+    n = len(nums)
+    dp = [0] * n
+    dp[0] = nums[0]
+    dq = deque([0])                    # indices with decreasing dp values
+    for i in range(1, n):
+        while dq[0] < i - k:           # front outside [i-k, i-1]
+            dq.popleft()
+        dp[i] = nums[i] + dp[dq[0]]    # best reachable predecessor
+        while dq and dp[dq[-1]] <= dp[i]:
             dq.pop()
         dq.append(i)
-        if dq[0] <= i - k:
-            dq.popleft()
-        if i >= k - 1:
-            res.append(nums[dq[0]])
-    return res
+    return dp[-1]
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits each node/edge once.
+Time O(n), Space O(n) for the dp array (deque holds at most k+1 indices).
 
 ## 11. Solved Example 3
 
@@ -331,12 +346,17 @@ Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits eac
 A representative **Sliding Window Maximum** problem. The signal: deque of candidate indices gives window maxima in o(n).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sliding window maximum, deque, monotonic, window, max).
-2. Reach for the Sliding Window Maximum template below and map the problem's entities onto it.
-3. A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier.
+1. Let `dp[i]` be the best subsequence sum ending at `i`; then `dp[i] = nums[i] + max(0, max(dp[i-k .. i-1]))` — extend the best window predecessor, or start fresh if it is negative.
+2. Maintain a deque of indices with decreasing `dp` values to read `max(dp[i-k .. i-1])` in O(1), evicting the front once it leaves the window.
+3. Unlike Jump VI, the subsequence can end anywhere, so track a running answer as the maximum `dp[i]` over all `i`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[10,2,-10,5,20], k=2`
+- i=0: best=0 → dp[0]=10, ans=10, dq=[0]
+- i=1: max(0,dp[0])=10 → dp[1]=12; pop 0 (10<=12) → dq=[1]; ans=12
+- i=2: front 1 in window, max(0,dp[1])=12 → dp[2]=2; dq=[1,2]; ans=12
+- i=3: front 1 stays (1 < 3-2=1 is false); max(0,dp[1])=12 → dp[3]=17; pops 2,1 → dq=[3]; ans=17
+- i=4: max(0,dp[3])=17 → dp[4]=37; ans=**37**.
 
 ### Visualization
 ```
@@ -348,21 +368,26 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def max_sliding_window(nums, k):
-    dq, res = deque(), []          # dq holds indices, values decreasing
-    for i, v in enumerate(nums):
-        while dq and nums[dq[-1]] < v:
+
+def constrainedSubsetSum(nums, k):
+    n = len(nums)
+    dp = [0] * n
+    dq = deque()                       # indices with decreasing dp values
+    ans = float('-inf')
+    for i in range(n):
+        while dq and dq[0] < i - k:    # front outside window [i-k, i-1]
+            dq.popleft()
+        best = dp[dq[0]] if dq else 0
+        dp[i] = nums[i] + max(0, best)
+        ans = max(ans, dp[i])
+        while dq and dp[dq[-1]] <= dp[i]:
             dq.pop()
         dq.append(i)
-        if dq[0] <= i - k:
-            dq.popleft()
-        if i >= k - 1:
-            res.append(nums[dq[0]])
-    return res
+    return ans
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits each node/edge once.
+Time O(n), Space O(n) for the dp array (deque holds at most k+1 indices).
 
 
 ## 12. LeetCode Practice Set

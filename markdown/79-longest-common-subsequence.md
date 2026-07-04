@@ -245,101 +245,134 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — LCS (LeetCode 1143)
-A representative **Longest Common Subsequence** problem. The signal: 2d grid dp aligning two sequences character by character.
+Given two strings `text1` and `text2`, return the length of their **longest common subsequence** (characters in the same relative order, not necessarily contiguous).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (lcs, common subsequence, dp, grid, edit distance).
-2. Reach for the Longest Common Subsequence template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Let `dp[i][j]` = LCS length of the first `i` chars of `text1` and first `j` chars of `text2`.
+2. If `text1[i-1] == text2[j-1]`, the pair extends the LCS: `dp[i][j] = dp[i-1][j-1] + 1`.
+3. Otherwise skip one character from either string: `dp[i][j] = max(dp[i-1][j], dp[i][j-1])`.
+4. Answer is `dp[m][n]`; row 0 and column 0 are 0 (empty string matches nothing).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`text1 = "abcde"`, `text2 = "ace"`.
+- `a`==`a` → dp lifts to 1 along that diagonal.
+- `c`==`c` builds on the `a` match → 2.
+- `e`==`e` builds on the `ac` match → 3.
+- Non-matching cells inherit the best neighbor; final `dp[5][3] = 3` ("ace").
 
 ### Visualization
 ```
-input  ──▶ [ apply Longest Common Subsequence step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+input  ──▶ [ fill dp grid comparing text1[i] vs text2[j] ]
+state  ──▶ match: diagonal+1, else max(up, left)
+output ──▶ dp[m][n]
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def longestCommonSubsequence(text1, text2):
+    m, n = len(text1), len(text2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if text1[i - 1] == text2[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+    return dp[m][n]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(m × n), Space O(m × n) (reducible to O(n) with a rolling row).
 
 ## 10. Solved Example 2
 
 ### Problem — Edit Distance (LeetCode 72)
-A representative **Longest Common Subsequence** problem. The signal: 2d grid dp aligning two sequences character by character.
+Given `word1` and `word2`, return the minimum number of insert, delete, or replace operations to convert `word1` into `word2`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (lcs, common subsequence, dp, grid, edit distance).
-2. Reach for the Longest Common Subsequence template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Let `dp[i][j]` = min operations to turn the first `i` chars of `word1` into the first `j` chars of `word2`.
+2. Base cases: `dp[i][0] = i` (delete all), `dp[0][j] = j` (insert all).
+3. If the last chars match, no cost: `dp[i][j] = dp[i-1][j-1]`.
+4. Else take 1 + min of replace `dp[i-1][j-1]`, delete `dp[i-1][j]`, insert `dp[i][j-1]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`word1 = "horse"`, `word2 = "ros"`.
+- Base row/col seed the deletes/inserts (`dp[i][0]=i`, `dp[0][j]=j`).
+- `h`≠`r` → replace path; mismatches take `1+min(neighbors)`.
+- `o`==`o` and `s`==`s` copy the diagonal, keeping cost flat.
+- Final `dp[5][3] = 3` (replace h→r, delete r, delete e).
 
 ### Visualization
 ```
-input  ──▶ [ apply Longest Common Subsequence step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+input  ──▶ [ fill dp grid over word1[i] vs word2[j] ]
+state  ──▶ match: diagonal, else 1 + min(replace, delete, insert)
+output ──▶ dp[m][n]
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def minDistance(word1, word2):
+    m, n = len(word1), len(word2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(m + 1):
+        dp[i][0] = i
+    for j in range(n + 1):
+        dp[0][j] = j
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if word1[i - 1] == word2[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1]
+            else:
+                dp[i][j] = 1 + min(dp[i - 1][j - 1],  # replace
+                                   dp[i - 1][j],       # delete
+                                   dp[i][j - 1])       # insert
+    return dp[m][n]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(m × n), Space O(m × n) (reducible to O(n) with a rolling row).
 
 ## 11. Solved Example 3
 
 ### Problem — Delete Ops (LeetCode 583)
-A representative **Longest Common Subsequence** problem. The signal: 2d grid dp aligning two sequences character by character.
+Given `word1` and `word2`, return the minimum number of character deletions (from either string) needed to make the two strings equal.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (lcs, common subsequence, dp, grid, edit distance).
-2. Reach for the Longest Common Subsequence template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Whatever survives the deletions must be a common subsequence, so the largest string we can keep is the LCS.
+2. Compute `L = LCS(word1, word2)` with the standard 2D DP.
+3. Delete every non-LCS character from each: `m - L` from `word1`, `n - L` from `word2`.
+4. Answer = `m + n - 2*L`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`word1 = "sea"`, `word2 = "eat"`.
+- LCS DP finds "ea" → `L = 2`.
+- `m = 3`, `n = 3`.
+- Answer = `3 + 3 - 2*2 = 2` (delete `s` from "sea", `t` from "eat").
 
 ### Visualization
 ```
-input  ──▶ [ apply Longest Common Subsequence step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+input  ──▶ [ fill LCS grid over word1 vs word2 ]
+state  ──▶ match: diagonal+1, else max(up, left)
+output ──▶ m + n - 2*dp[m][n]
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def minDistance(word1, word2):
+    m, n = len(word1), len(word2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if word1[i - 1] == word2[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+    lcs = dp[m][n]
+    return m + n - 2 * lcs
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(m × n), Space O(m × n) (reducible to O(n) with a rolling row).
 
 
 ## 12. LeetCode Practice Set

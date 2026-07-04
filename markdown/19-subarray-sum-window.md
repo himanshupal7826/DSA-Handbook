@@ -254,122 +254,133 @@ int longestWindow(const string& s) {
 ## 9. Solved Example 1
 
 ### Problem — Min Size Subarray (LeetCode 209)
-A representative **Subarray Sum Window** problem. The signal: window/prefix sums to count or bound subarrays by their sum.
+Given positive `nums` and a `target`, return the minimal length of a contiguous subarray whose sum is `>= target`, or `0` if none exists.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (subarray sum, window sum, positive, prefix, count subarrays).
-2. Reach for the Subarray Sum Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. All numbers are positive, so growing the window only increases the sum and shrinking only decreases it — a sliding window works.
+2. Expand `right`, adding `nums[right]` to a running `total`.
+3. While `total >= target`, record the window length and shrink from `left` (subtracting `nums[left]`) to search for a shorter valid window.
+4. Track the minimum length seen; return `0` if it was never updated.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [2,3,1,2,4,3]`, `target = 7`.
+- Expand to `[2,3,1,2]` → total 8 ≥ 7, len 4; shrink `[3,1,2]` = 6 < 7.
+- Add 4 → `[3,1,2,4]` = 10 ≥ 7, len 4; shrink `[1,2,4]` = 7 ≥ 7, len 3; shrink `[2,4]` = 6 < 7.
+- Add 3 → `[2,4,3]` = 9 ≥ 7, len 3; shrink `[4,3]` = 7 ≥ 7, len 2; shrink `[3]` = 3 < 7.
+- Minimum length = **2**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Subarray Sum Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[2,3,1,2,4,3], target=7  ──▶ grow right; while total>=target shrink left, record len
+best window ──▶ [4,3] of length 2
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
+def min_sub_array_len(target, nums):
+    left = 0
+    total = 0
+    best = float('inf')
+    for right, val in enumerate(nums):
+        total += val
+        while total >= target:
+            best = min(best, right - left + 1)
+            total -= nums[left]
             left += 1
-        best = max(best, right - left + 1)
-    return best
+    return 0 if best == float('inf') else best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n), Space O(1). Each index enters and leaves the window at most once.
 
 ## 10. Solved Example 2
 
 ### Problem — Subarray Sum K (LeetCode 560)
-A representative **Subarray Sum Window** problem. The signal: window/prefix sums to count or bound subarrays by their sum.
+Given `nums` (values may be **negative**) and an integer `k`, count the number of contiguous subarrays that sum to exactly `k`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (subarray sum, window sum, positive, prefix, count subarrays).
-2. Reach for the Subarray Sum Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. Because values can be negative, growing/shrinking a window is no longer monotonic — a plain sliding window fails, so use the prefix-sum variant of this chapter.
+2. A subarray `(i, j]` sums to `k` exactly when `prefix[j] - prefix[i] == k`, i.e. `prefix[i] == prefix[j] - k`.
+3. Sweep left to right keeping a hashmap of how many times each prefix sum has occurred; for each new prefix, add the count of `prefix - k` seen so far.
+4. Seed the map with `{0: 1}` so subarrays starting at index 0 are counted.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [1,-1,1,1,1]`, `k = 2`.
+- Start `seen = {0:1}`, `prefix = 0`, `count = 0`.
+- +1 → prefix 1, need −1: none; seen `{0:1,1:1}`.
+- −1 → prefix 0, need −2: none; count adds seen[0]? need `0-2=-2` → 0; seen `{0:2,1:1}`.
+- +1 → prefix 1, need −1: 0; seen[1]→2.
+- +1 → prefix 2, need 0: seen[0]=2 → count 2; seen `{...,2:1}`.
+- +1 → prefix 3, need 1: seen[1]=2 → count **4**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Subarray Sum Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[1,-1,1,1,1], k=2  ──▶ prefix sums with hashmap of counts (negatives break windows)
+answer ──▶ matches where prefix-k was seen before = 4
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
-        best = max(best, right - left + 1)
-    return best
+from collections import defaultdict
+
+def subarray_sum(nums, k):
+    seen = defaultdict(int)
+    seen[0] = 1
+    prefix = 0
+    count = 0
+    for val in nums:
+        prefix += val
+        count += seen[prefix - k]
+        seen[prefix] += 1
+    return count
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n), Space O(n) for the prefix-sum hashmap.
 
 ## 11. Solved Example 3
 
 ### Problem — Subarray Product (LeetCode 713)
-A representative **Subarray Sum Window** problem. The signal: window/prefix sums to count or bound subarrays by their sum.
+Given positive `nums` and integer `k`, count the contiguous subarrays whose product is strictly less than `k`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (subarray sum, window sum, positive, prefix, count subarrays).
-2. Reach for the Subarray Sum Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. All numbers are positive, so extending the window multiplies the product up and shrinking divides it down — a sliding window applies.
+2. Expand `right`, multiplying `prod` by `nums[right]`.
+3. While `prod >= k` (and `left <= right`), divide out `nums[left]` and advance `left` to restore `prod < k`.
+4. Every subarray ending at `right` and starting anywhere in `[left, right]` is valid, so add `right - left + 1` to the count.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [10,5,2,6]`, `k = 100`.
+- right=0: prod 10 < 100 → +1 (`[10]`), count 1.
+- right=1: prod 50 < 100 → +2 (`[5],[10,5]`), count 3.
+- right=2: prod 100 ≥ 100 → shrink out 10 → prod 10; window `[5,2]`, +2, count 5.
+- right=3: prod 60 < 100 → +3 (`[6],[2,6],[5,2,6]`), count **8**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Subarray Sum Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[10,5,2,6], k=100  ──▶ grow right; while prod>=k divide out left; add (right-left+1)
+answer ──▶ 8 subarrays with product < 100
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
+def num_subarray_product_less_than_k(nums, k):
+    if k <= 1:
+        return 0
+    left = 0
+    prod = 1
+    count = 0
+    for right, val in enumerate(nums):
+        prod *= val
+        while prod >= k:
+            prod //= nums[left]
             left += 1
-        best = max(best, right - left + 1)
-    return best
+        count += right - left + 1
+    return count
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n), Space O(1). Each index enters and leaves the window at most once.
 
 
 ## 12. LeetCode Practice Set

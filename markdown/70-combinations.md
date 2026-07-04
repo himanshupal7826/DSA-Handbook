@@ -258,113 +258,135 @@ vector<vector<int>> subsets(vector<int>& nums) {
 ## 9. Solved Example 1
 
 ### Problem — Combinations (LeetCode 77)
-A representative **Combinations** problem. The signal: choose elements with a moving start index to avoid duplicates.
+Return all combinations of `k` numbers chosen from the range `1..n`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (combinations, choose k, backtracking, start index, combination sum).
-2. Reach for the Combinations template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Numbers are picked in increasing order, so carry a `start` index and only ever look forward — this kills duplicate combinations.
+2. When `len(path) == k`, we have a full combination; snapshot it and return.
+3. At each level loop `i` from `start` to `n`, choose `i`, recurse with `i + 1`, then un-choose.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `n = 4, k = 2`:
+- pick 1 → pick 2 → `[1,2]` ✓; back up, pick 3 → `[1,3]` ✓; pick 4 → `[1,4]` ✓.
+- pick 2 → pick 3 → `[2,3]` ✓; pick 4 → `[2,4]` ✓.
+- pick 3 → pick 4 → `[3,4]` ✓.
+- Result: `[[1,2],[1,3],[1,4],[2,3],[2,4],[3,4]]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Combinations step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+n=4,k=2 ──▶ start index moves right so combos never repeat
+record when len(path) == k ──▶ [1,2] [1,3] [1,4] [2,3] [2,4] [3,4]
 ```
 
 ### Code
 ```python
-def subsets(nums):
+def combine(n, k):
     res, path = [], []
     def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
+        if len(path) == k:
+            res.append(path[:])
+            return
+        for i in range(start, n + 1):
+            path.append(i)                      # choose
+            dfs(i + 1)                          # explore forward only
             path.pop()                          # un-choose
-    dfs(0)
+    dfs(1)
     return res
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(k · C(n, k)) to build every combination, Space O(k) recursion depth.
 
 ## 10. Solved Example 2
 
 ### Problem — Combination Sum (LeetCode 39)
-A representative **Combinations** problem. The signal: choose elements with a moving start index to avoid duplicates.
+Return all combinations of `candidates` (distinct, each reusable unlimited times) that sum to `target`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (combinations, choose k, backtracking, start index, combination sum).
-2. Reach for the Combinations template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Track `remaining = target - (sum of path)`; record the path when `remaining == 0`, and abandon the branch when `remaining < 0`.
+2. Because a number can be reused, recurse with the **same** index `i` (not `i + 1`) so the current candidate stays available.
+3. Still pass a `start` index so we never revisit earlier candidates — that keeps each combination sorted and unique.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `candidates = [2,3,6,7], target = 7`:
+- take 2 → remaining 5 → take 2 → remaining 3 → take 3 → remaining 0 → `[2,2,3]` ✓.
+- back up, from 2 try 6/7 → overshoot.
+- take 7 → remaining 0 → `[7]` ✓.
+- Result: `[[2,2,3],[7]]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Combinations step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+target=7 ──▶ subtract chosen candidate, reuse index i for repeats
+remaining==0 record ──▶ [2,2,3] [7]   (remaining<0 prunes branch)
 ```
 
 ### Code
 ```python
-def subsets(nums):
+def combinationSum(candidates, target):
     res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
+    def dfs(start, remaining):
+        if remaining == 0:
+            res.append(path[:])
+            return
+        if remaining < 0:
+            return
+        for i in range(start, len(candidates)):
+            path.append(candidates[i])          # choose
+            dfs(i, remaining - candidates[i])   # reuse i → unlimited use
             path.pop()                          # un-choose
-    dfs(0)
+    dfs(0, target)
     return res
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(N^(target/min)) in the worst case, Space O(target/min) recursion depth.
 
 ## 11. Solved Example 3
 
 ### Problem — Combination Sum II (LeetCode 40)
-A representative **Combinations** problem. The signal: choose elements with a moving start index to avoid duplicates.
+Return all combinations of `candidates` (may contain duplicates, each used at most once) that sum to `target`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (combinations, choose k, backtracking, start index, combination sum).
-2. Reach for the Combinations template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Sort `candidates` so equal values sit next to each other, which lets us both prune and skip duplicates cleanly.
+2. Each number is used once, so recurse with `i + 1`; record the path when `remaining == 0`.
+3. Skip a duplicate sibling with `if i > start and candidates[i] == candidates[i-1]: continue`, and break early once `candidates[i] > remaining`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `candidates = [10,1,2,7,6,1,5], target = 8` → sorted `[1,1,2,5,6,7,10]`:
+- 1 → 1 → 6 → `[1,1,6]` ✓; back up, 1 → 2 → 5 → `[1,2,5]` ✓; 1 → 7 → `[1,7]` ✓.
+- second leading 1 is skipped (duplicate sibling).
+- 2 → 6 → `[2,6]` ✓.
+- Result: `[[1,1,6],[1,2,5],[1,7],[2,6]]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Combinations step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+sorted [1,1,2,5,6,7,10] ──▶ recurse i+1 (use once), skip equal siblings
+remaining==0 record ──▶ [1,1,6] [1,2,5] [1,7] [2,6]
 ```
 
 ### Code
 ```python
-def subsets(nums):
+def combinationSum2(candidates, target):
+    candidates.sort()
     res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
+    def dfs(start, remaining):
+        if remaining == 0:
+            res.append(path[:])
+            return
+        for i in range(start, len(candidates)):
+            if i > start and candidates[i] == candidates[i - 1]:
+                continue                        # skip duplicate sibling
+            if candidates[i] > remaining:
+                break                           # sorted → rest overshoot too
+            path.append(candidates[i])          # choose
+            dfs(i + 1, remaining - candidates[i])  # each used once
             path.pop()                          # un-choose
-    dfs(0)
+    dfs(0, target)
     return res
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(2^N) worst case over the sorted candidates, Space O(N) recursion depth.
 
 
 ## 12. LeetCode Practice Set

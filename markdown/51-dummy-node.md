@@ -251,12 +251,15 @@ ListNode* reverseList(ListNode* head) {
 A representative **Dummy Node Pattern** problem. The signal: a sentinel head node erases head-edge special cases.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (dummy node, sentinel, head, remove, edge case).
-2. Reach for the Dummy Node Pattern template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. Put a dummy before the head so removing the real head is not a special case.
+2. Advance a `fast` pointer n steps ahead, then move `fast` and `slow` together until `fast` reaches the last node.
+3. `slow` now sits just before the target; splice it out with `slow.next = slow.next.next`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `1→2→3→4→5`, n=2.
+- fast advances 2 → at node 2; slow at dummy
+- move together until fast at node 5 → slow at node 3
+- slow.next = node5 → result `1→2→3→5`
 
 ### Visualization
 ```
@@ -267,22 +270,20 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+def removeNthFromEnd(head, n):
+    dummy = ListNode(0, head)
+    fast = slow = dummy
+    for _ in range(n):            # gap of n between fast and slow
+        fast = fast.next
+    while fast.next:              # move both to the end
+        fast = fast.next
+        slow = slow.next
+    slow.next = slow.next.next    # unlink nth-from-end
+    return dummy.next
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(n), Space O(1). Single pass with two pointers, dummy removes the head case.
 
 ## 10. Solved Example 2
 
@@ -290,12 +291,15 @@ Time O(n), Space O(1). In-place pointer manipulation, single traversal.
 A representative **Dummy Node Pattern** problem. The signal: a sentinel head node erases head-edge special cases.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (dummy node, sentinel, head, remove, edge case).
-2. Reach for the Dummy Node Pattern template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. A dummy before the head lets us delete matching head nodes with the same code as any other node.
+2. Walk a `curr` pointer; whenever `curr.next` holds the target value, unlink it by skipping over it.
+3. Only advance `curr` when it does not delete, so consecutive matches are all removed.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `1→2→6→3→6`, val=6.
+- curr=dummy: next=1 keep → curr=1
+- 1.next=2 keep → curr=2; 2.next=6 delete → 2→3
+- curr=2: next=3 keep → curr=3; 3.next=6 delete → 3→None → `1→2→3`
 
 ### Visualization
 ```
@@ -306,22 +310,19 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+def removeElements(head, val):
+    dummy = ListNode(0, head)
+    curr = dummy
+    while curr.next:
+        if curr.next.val == val:
+            curr.next = curr.next.next   # skip the match
+        else:
+            curr = curr.next             # advance only when kept
+    return dummy.next
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(n), Space O(1). One pass, dummy removes the leading-match edge case.
 
 ## 11. Solved Example 3
 
@@ -329,12 +330,15 @@ Time O(n), Space O(1). In-place pointer manipulation, single traversal.
 A representative **Dummy Node Pattern** problem. The signal: a sentinel head node erases head-edge special cases.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (dummy node, sentinel, head, remove, edge case).
-2. Reach for the Dummy Node Pattern template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. Digits are stored least-significant first, so add position by position while carrying like grade-school addition.
+2. A dummy head lets us append result digits uniformly without a special first-node case.
+3. Keep looping while either list has digits or a carry remains; use `divmod` to split sum into carry and digit.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `2→4→3` (342) and `5→6→4` (465).
+- 2+5=7 → digit 7, carry 0
+- 4+6=10 → digit 0, carry 1
+- 3+4+1=8 → digit 8 → result `7→0→8` (807)
 
 ### Visualization
 ```
@@ -345,22 +349,21 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+def addTwoNumbers(l1, l2):
+    dummy = tail = ListNode()
+    carry = 0
+    while l1 or l2 or carry:
+        total = carry
+        if l1: total, l1 = total + l1.val, l1.next
+        if l2: total, l2 = total + l2.val, l2.next
+        carry, digit = divmod(total, 10)
+        tail.next = ListNode(digit)
+        tail = tail.next
+    return dummy.next
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(max(n, m)), Space O(max(n, m)) for the result list.
 
 
 ## 12. LeetCode Practice Set

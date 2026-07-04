@@ -247,15 +247,20 @@ vector<vector<int>> merge(vector<vector<int>>& intervals) {
 ## 9. Solved Example 1
 
 ### Problem — Skyline (LeetCode 218)
-A representative **Sweep Line** problem. The signal: sort start/end events and sweep a line to track active state.
+Given buildings as `[left, right, height]`, return the skyline as a list of key points `[x, height]` where the visible height changes.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sweep line, events, start end, skyline, scan).
-2. Reach for the Sweep Line template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. Turn each building into two events: a start `(left, -height)` and an end `(right, +height)`; sort events (starts before ends at equal x, taller starts first via the negative height).
+2. Sweep x left to right maintaining a multiset of active heights (a max-heap with lazy deletion).
+3. Whenever the current max height changes after processing an event's x, emit a key point.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Buildings `[[2,9,10],[3,7,15]]`.
+- Events sorted: `(2,-10),(3,-15),(7,15),(9,10)`.
+- x=2: add 10, max 0→10 → emit `[2,10]`.
+- x=3: add 15, max 10→15 → emit `[3,15]`.
+- x=7: remove 15, max 15→10 → emit `[7,10]`.
+- x=9: remove 10, max 10→0 → emit `[9,0]`.
 
 ### Visualization
 ```
@@ -266,32 +271,51 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
+import heapq
+
+def getSkyline(buildings):
+    events = []
+    for l, r, h in buildings:
+        events.append((l, -h))   # start: negative height
+        events.append((r, h))    # end: positive height
+    events.sort()
     res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
-        else:
-            res.append([s, e])
+    heap = [0]                   # max-heap via negation
+    active = {0: 1}
+    prev = 0
+    for x, h in events:
+        if h < 0:                # building starts
+            heapq.heappush(heap, h)
+            active[-h] = active.get(-h, 0) + 1
+        else:                    # building ends
+            active[h] -= 1
+        while active.get(-heap[0], 0) == 0:  # lazy delete
+            heapq.heappop(heap)
+        cur = -heap[0]
+        if cur != prev:
+            res.append([x, cur])
+            prev = cur
     return res
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n log n), Space O(n). Sorting events plus heap operations per event.
 
 ## 10. Solved Example 2
 
 ### Problem — Meeting Rooms II (LeetCode 253)
-A representative **Sweep Line** problem. The signal: sort start/end events and sweep a line to track active state.
+Given meeting intervals, find the minimum number of rooms needed — solved here with a pure event sweep.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sweep line, events, start end, skyline, scan).
-2. Reach for the Sweep Line template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. Split each meeting into a `+1` start event and a `-1` end event on the timeline.
+2. Sort all events by time; at equal time, process ends before starts so a room freed exactly at another's start is reused.
+3. Sweep left to right accumulating the running count of concurrent meetings; the peak is the answer.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[[0,30],[5,10],[15,20]]`.
+- Events: `(0,+1),(5,+1),(10,-1),(15,+1),(20,-1),(30,-1)`.
+- Sweep count: 0→1 (at 0), →2 (at 5), →1 (at 10), →2 (at 15), →1 (at 20), →0 (at 30).
+- Peak = 2 rooms.
 
 ### Visualization
 ```
@@ -302,32 +326,37 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
+def minMeetingRooms(intervals):
+    events = []
     for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
-        else:
-            res.append([s, e])
-    return res
+        events.append((s, 1))    # meeting starts
+        events.append((e, -1))   # meeting ends
+    events.sort(key=lambda x: (x[0], x[1]))  # end (-1) before start (+1)
+    cur = best = 0
+    for _, delta in events:
+        cur += delta
+        best = max(best, cur)
+    return best
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n log n), Space O(n). Sorting the 2n events dominates the linear sweep.
 
 ## 11. Solved Example 3
 
 ### Problem — Flight Bookings (LeetCode 1109)
-A representative **Sweep Line** problem. The signal: sort start/end events and sweep a line to track active state.
+Given bookings `[first, last, seats]` over `n` flights (1-indexed), return the total seats reserved on each flight.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sweep line, events, start end, skyline, scan).
-2. Reach for the Sweep Line template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. Each booking adds `seats` to a contiguous range of flights — a range-update, point-query task, ideal for a difference array.
+2. For booking `[first, last, seats]`, do `diff[first-1] += seats` and `diff[last] -= seats`.
+3. A prefix sum over the difference array reconstructs each flight's total.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`bookings=[[1,2,10],[2,3,20]]`, `n=3`.
+- diff (size 4): +10 at 0, -10 at 2; +20 at 1, -20 at 3 → `[10,20,-10,-20]`.
+- Prefix over first n: 10, 10+20=30, 30-10=20.
+- Answer `[10,30,20]`.
 
 ### Visualization
 ```
@@ -338,19 +367,20 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
-        else:
-            res.append([s, e])
+def corpFlightBookings(bookings, n):
+    diff = [0] * (n + 1)
+    for first, last, seats in bookings:
+        diff[first - 1] += seats
+        diff[last] -= seats
+    res, running = [], 0
+    for i in range(n):
+        running += diff[i]
+        res.append(running)
     return res
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n + m) for m bookings, Space O(n) for the difference array.
 
 
 ## 12. LeetCode Practice Set

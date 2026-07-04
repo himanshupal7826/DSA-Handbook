@@ -246,15 +246,19 @@ vector<vector<int>> merge(vector<vector<int>>& intervals) {
 ## 9. Solved Example 1
 
 ### Problem — Merge Intervals (LeetCode 56)
-A representative **Merge Intervals** problem. The signal: sort by start, then merge overlapping intervals in one pass.
+Given an array of intervals, merge all overlapping ones and return the non-overlapping intervals that cover the same ranges.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (intervals, merge, overlap, sort by start, union).
-2. Reach for the Merge Intervals template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. Sort intervals by start so any interval that overlaps the running one comes immediately after it.
+2. Keep the last interval in the result; for each new interval, if its start is ≤ the last end, extend the last end to the max of the two.
+3. Otherwise there is a gap, so push the new interval as a fresh block.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[[1,3],[2,6],[8,10],[15,18]]` (already sorted by start).
+- `[1,3]` → res `[[1,3]]`.
+- `[2,6]`: 2 ≤ 3, extend → res `[[1,6]]`.
+- `[8,10]`: 8 > 6, new block → `[[1,6],[8,10]]`.
+- `[15,18]`: 15 > 10, new block → `[[1,6],[8,10],[15,18]]`.
 
 ### Visualization
 ```
@@ -282,15 +286,18 @@ Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
 ## 10. Solved Example 2
 
 ### Problem — Insert Interval (LeetCode 57)
-A representative **Merge Intervals** problem. The signal: sort by start, then merge overlapping intervals in one pass.
+Given a sorted list of non-overlapping intervals, insert a new interval and merge if necessary, keeping the list sorted and non-overlapping.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (intervals, merge, overlap, sort by start, union).
-2. Reach for the Merge Intervals template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. The list is already sorted, so walk it once in three phases instead of re-sorting.
+2. Copy every interval that ends before the new one starts (no overlap, strictly left).
+3. Absorb every interval that overlaps the new one by widening the new interval's start/end, then push it; finally copy the remaining right-side intervals.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`intervals=[[1,3],[6,9]]`, `newInterval=[2,5]`.
+- `[1,3]`: 3 ≥ 2, overlaps → new becomes `[min(1,2),max(3,5)] = [1,5]`.
+- `[6,9]`: 6 > 5, right side → after pushing new `[1,5]`, append `[6,9]`.
+- Result `[[1,5],[6,9]]`.
 
 ### Visualization
 ```
@@ -301,32 +308,39 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
-        else:
-            res.append([s, e])
+def insert(intervals, newInterval):
+    res, i, n = [], 0, len(intervals)
+    s, e = newInterval
+    while i < n and intervals[i][1] < s:      # strictly left
+        res.append(intervals[i]); i += 1
+    while i < n and intervals[i][0] <= e:     # overlapping
+        s = min(s, intervals[i][0])
+        e = max(e, intervals[i][1]); i += 1
+    res.append([s, e])
+    while i < n:                              # strictly right
+        res.append(intervals[i]); i += 1
     return res
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n), Space O(n). Single linear pass over already-sorted intervals.
 
 ## 11. Solved Example 3
 
 ### Problem — Interval Intersection (LeetCode 986)
-A representative **Merge Intervals** problem. The signal: sort by start, then merge overlapping intervals in one pass.
+Given two lists of sorted, disjoint intervals, return the list of their pairwise intersections.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (intervals, merge, overlap, sort by start, union).
-2. Reach for the Merge Intervals template below and map the problem's entities onto it.
-3. Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
+1. Both lists are sorted, so advance two pointers together across them.
+2. The intersection of the current pair is `[max(starts), min(ends)]`; keep it only if that range is valid (lo ≤ hi).
+3. Discard whichever interval ends first (smaller end) by advancing its pointer, since it can't intersect anything further right.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`A=[[0,2],[5,10]]`, `B=[[1,5],[8,12]]`.
+- `[0,2]`&`[1,5]`: `[max(0,1),min(2,5)]=[1,2]` valid → add; A ends first, i→1.
+- `[5,10]`&`[1,5]`: `[5,5]` valid → add; B ends first, j→1.
+- `[5,10]`&`[8,12]`: `[8,10]` valid → add; A ends first, i→2 → stop.
+- Result `[[1,2],[5,5],[8,10]]`.
 
 ### Visualization
 ```
@@ -337,19 +351,22 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
+def intervalIntersection(A, B):
+    res, i, j = [], 0, 0
+    while i < len(A) and j < len(B):
+        lo = max(A[i][0], B[j][0])
+        hi = min(A[i][1], B[j][1])
+        if lo <= hi:
+            res.append([lo, hi])
+        if A[i][1] < B[j][1]:
+            i += 1
         else:
-            res.append([s, e])
+            j += 1
     return res
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(m + n), Space O(1) extra. One synchronized pass over both sorted lists.
 
 
 ## 12. LeetCode Practice Set

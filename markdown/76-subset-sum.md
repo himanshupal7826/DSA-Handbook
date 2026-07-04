@@ -238,32 +238,40 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 A representative **Subset Sum** problem. The signal: boolean dp: can a subset reach exactly the target sum?
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (subset sum, partition, dp, boolean, target).
-2. Reach for the Subset Sum template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. If the total sum is odd it can't split into two equal halves — return False immediately.
+2. Otherwise the goal is a subset summing to `target = sum // 2`; this is exact-target subset sum.
+3. Use a 1D boolean dp where `dp[j]` means "some subset sums to j"; iterate each num and update j downward so each num is used at most once.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums = [1, 5, 11, 5], sum = 22, target = 11.
+- start dp[0]=True.
+- num=1  → dp[1]=True.
+- num=5  → dp[6],dp[5] become True.
+- num=11 → dp[11] becomes True → dp[11] already reachable, answer is True.
+Subset {1,5,5} and {11} both sum to 11 → return True.
 
 ### Visualization
 ```
-input  ──▶ [ apply Subset Sum step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+nums {1,5,11,5} · target 11 ──▶ dp[11] flips True once 11 (or 1+5+5) is reachable
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def canPartition(nums):
+    total = sum(nums)
+    if total % 2:
+        return False
+    target = total // 2
+    dp = [False] * (target + 1)
+    dp[0] = True
+    for num in nums:
+        for j in range(target, num - 1, -1):
+            dp[j] |= dp[j - num]
+    return dp[target]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n × target), Space O(target) — one boolean row of size sum/2 + 1.
 
 ## 10. Solved Example 2
 
@@ -271,32 +279,39 @@ Time O(states × transitions), Space O(states). Each state computed once; space 
 A representative **Subset Sum** problem. The signal: boolean dp: can a subset reach exactly the target sum?
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (subset sum, partition, dp, boolean, target).
-2. Reach for the Subset Sum template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Assign each num a `+` or `-`; let P be the set given `+`. Then sum(P) - (total - sum(P)) = target, so sum(P) = (total + target) / 2.
+2. If (total + target) is odd or target > total, no assignment works — return 0.
+3. Count subsets that sum to P using a 1D counting dp: `dp[j] += dp[j - num]`, iterating j downward for 0/1 usage.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums = [1,1,1,1,1], target = 3, total = 5, P = (5 + 3)/2 = 4.
+- dp[0]=1, rest 0.
+- After each of the five 1's, dp counts subsets summing to each j.
+- Number of size-4 subsets of five 1's = C(5,4) = 5 → dp[4] = 5.
+return 5.
 
 ### Visualization
 ```
-input  ──▶ [ apply Subset Sum step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+nums {1,1,1,1,1} · target 3 ──▶ count subsets summing to P=4 → C(5,4)=5 ways
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def findTargetSumWays(nums, target):
+    total = sum(nums)
+    if (total + target) % 2 or target > total or -target > total:
+        return 0
+    P = (total + target) // 2
+    dp = [0] * (P + 1)
+    dp[0] = 1
+    for num in nums:
+        for j in range(P, num - 1, -1):
+            dp[j] += dp[j - num]
+    return dp[P]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n × P), Space O(P) where P = (sum + target) / 2.
 
 ## 11. Solved Example 3
 
@@ -304,32 +319,53 @@ Time O(states × transitions), Space O(states). Each state computed once; space 
 A representative **Subset Sum** problem. The signal: boolean dp: can a subset reach exactly the target sum?
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (subset sum, partition, dp, boolean, target).
-2. Reach for the Subset Sum template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Each bucket must sum to `target = total / k`; if total isn't divisible by k, or the largest element exceeds target, it's impossible.
+2. Sort descending so large elements are placed first, pruning dead branches early.
+3. Backtrack: fill one bucket to exactly target, then recurse to fill the next; a `used[]` array tracks consumed elements.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+nums = [4,3,2,3,5,2,1], k = 4, total = 20, target = 5. Sorted desc: [5,4,3,3,2,2,1].
+- bucket1: {5}=5 ✓.
+- bucket2: {4,1}=5 ✓.
+- bucket3: {3,2}=5 ✓.
+- bucket4: {3,2}=5 ✓ — all k buckets filled → return True.
 
 ### Visualization
 ```
-input  ──▶ [ apply Subset Sum step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+nums {4,3,2,3,5,2,1} · k=4 ──▶ four buckets each summing to 5: {5}{4,1}{3,2}{3,2}
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def canPartitionKSubsets(nums, k):
+    total = sum(nums)
+    if total % k:
+        return False
+    target = total // k
+    nums.sort(reverse=True)
+    if nums[0] > target:
+        return False
+    n = len(nums)
+    used = [False] * n
+
+    def dfs(start, filled, cur):
+        if filled == k:
+            return True
+        if cur == target:
+            return dfs(0, filled + 1, 0)
+        for j in range(start, n):
+            if not used[j] and cur + nums[j] <= target:
+                used[j] = True
+                if dfs(j + 1, filled, cur + nums[j]):
+                    return True
+                used[j] = False
+        return False
+
+    return dfs(0, 0, 0)
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(k × 2^n) worst case with pruning, Space O(n) for the used array and recursion.
 
 
 ## 12. LeetCode Practice Set

@@ -261,21 +261,22 @@ vector<vector<int>> subsets(vector<int>& nums) {
 ## 9. Solved Example 1
 
 ### Problem — Subsets (LeetCode 78)
-A representative **Subsets** problem. The signal: include/exclude each element to enumerate the power set.
+Given a set of **distinct** integers, return the full power set (every possible subset).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (subsets, power set, backtracking, include exclude, combinations).
-2. Reach for the Subsets template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Every element is a binary choice: include it or not — so the power set has 2^n members.
+2. DFS from a `start` index; append a *copy* of the current path at every node (every partial path is itself a valid subset).
+3. Loop `i` from `start` onward, choose `nums[i]`, recurse with `i+1`, then un-choose to explore the next branch.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+For `nums = [1,2]`:
+- dfs(0): record `[]`; pick 1 → dfs(1): record `[1]`; pick 2 → dfs(2): record `[1,2]`.
+- back to dfs(0), pick 2 → dfs(2): record `[2]`.
+- Result: `[[], [1], [1,2], [2]]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Subsets step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[]──▶ include/exclude each index ──▶ power set of 2^n subsets
 ```
 
 ### Code
@@ -283,7 +284,7 @@ output ──▶ read directly from the maintained state
 def subsets(nums):
     res, path = [], []
     def dfs(start):
-        res.append(path[:])                    # record
+        res.append(path[:])                    # every node is a subset
         for i in range(start, len(nums)):
             path.append(nums[i])               # choose
             dfs(i + 1)                          # explore
@@ -293,81 +294,89 @@ def subsets(nums):
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(n·2^n) to build all 2^n subsets, Space O(n) recursion depth (plus output).
 
 ## 10. Solved Example 2
 
 ### Problem — Subsets II (LeetCode 90)
-A representative **Subsets** problem. The signal: include/exclude each element to enumerate the power set.
+The input may contain **duplicates**; return all *unique* subsets.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (subsets, power set, backtracking, include exclude, combinations).
-2. Reach for the Subsets template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Sort first so equal values sit next to each other.
+2. Same include/exclude DFS as Subsets, but skip a value that equals its predecessor *within the same loop level* (`i > start and nums[i] == nums[i-1]`).
+3. That skip keeps only the first branch among equal siblings, eliminating duplicate subsets.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+For `nums = [1,2,2]` (already sorted):
+- record `[]`; pick 1 → `[1]`; pick 2 → `[1,2]`; pick 2 → `[1,2,2]`.
+- at level under `[1]`, second 2 has `i>start and nums[i]==nums[i-1]` → **skipped**.
+- Result: `[[], [1], [1,2], [1,2,2], [2], [2,2]]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Subsets step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+sort ──▶ skip equal siblings at same depth ──▶ unique subsets only
 ```
 
 ### Code
 ```python
-def subsets(nums):
+def subsetsWithDup(nums):
+    nums.sort()
     res, path = [], []
     def dfs(start):
-        res.append(path[:])                    # record
+        res.append(path[:])
         for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
-            path.pop()                          # un-choose
+            if i > start and nums[i] == nums[i - 1]:
+                continue                        # skip duplicate sibling
+            path.append(nums[i])
+            dfs(i + 1)
+            path.pop()
     dfs(0)
     return res
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(n·2^n) worst case, Space O(n) recursion depth (plus output).
 
 ## 11. Solved Example 3
 
 ### Problem — Combinations (LeetCode 77)
-A representative **Subsets** problem. The signal: include/exclude each element to enumerate the power set.
+Return all combinations of `k` numbers chosen from `1..n`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (subsets, power set, backtracking, include exclude, combinations).
-2. Reach for the Subsets template below and map the problem's entities onto it.
-3. DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
+1. Fixed-size subset problem: only record a path once its length reaches `k`.
+2. DFS carrying a `start` value so numbers are strictly increasing (no permutations, no reuse).
+3. Prune: stop looping once not enough numbers remain to reach length `k` (`start` too large).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+For `n = 4, k = 2`:
+- start 1 → `[1]` → then 2,3,4 give `[1,2],[1,3],[1,4]`.
+- start 2 → `[2]` → `[2,3],[2,4]`; start 3 → `[3,4]`.
+- Result: `[[1,2],[1,3],[1,4],[2,3],[2,4],[3,4]]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Subsets step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+1..n ──▶ pick increasing indices ──▶ record when len(path)==k
 ```
 
 ### Code
 ```python
-def subsets(nums):
+def combine(n, k):
     res, path = [], []
     def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
-            path.pop()                          # un-choose
-    dfs(0)
+        if len(path) == k:
+            res.append(path[:])
+            return
+        # prune: need (k-len(path)) more numbers
+        for i in range(start, n - (k - len(path)) + 2):
+            path.append(i)
+            dfs(i + 1)
+            path.pop()
+    dfs(1)
     return res
 ```
 
 ### Complexity
-Time O(branches^depth), Space O(depth). Exponential by nature; pruning cuts the constant/branches drastically.
+Time O(k·C(n,k)), Space O(k) recursion depth (plus output).
 
 
 ## 12. LeetCode Practice Set

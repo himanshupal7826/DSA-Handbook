@@ -255,12 +255,14 @@ ListNode* reverseList(ListNode* head) {
 A representative **Merge Linked Lists** problem. The signal: splice two sorted lists with a dummy head and pointer chasing.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (merge, sorted lists, linked list, dummy, two pointer).
-2. Reach for the Merge Linked Lists template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. Use a dummy head and a `tail` pointer so appending never needs a special first-node case.
+2. Compare the fronts of both lists; splice the smaller node onto `tail` and advance that list.
+3. When one list empties, attach the remaining list wholesale.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `1→2→4` and `1→3→4`.
+- 1(a) ≤ 1(b): tail→1a; then 3 vs 1b: tail→1b; 2 vs 3: tail→2; 4 vs 3: tail→3; 4 vs 4: tail→4a
+- b still has 4 → attach → `1→1→2→3→4→4`
 
 ### Visualization
 ```
@@ -271,22 +273,20 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+def mergeTwoLists(l1, l2):
+    dummy = tail = ListNode()
+    while l1 and l2:
+        if l1.val <= l2.val:
+            tail.next, l1 = l1, l1.next
+        else:
+            tail.next, l2 = l2, l2.next
+        tail = tail.next
+    tail.next = l1 or l2          # attach the leftover
+    return dummy.next
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(n + m), Space O(1). One pass over both lists, pointers only.
 
 ## 10. Solved Example 2
 
@@ -294,12 +294,15 @@ Time O(n), Space O(1). In-place pointer manipulation, single traversal.
 A representative **Merge Linked Lists** problem. The signal: splice two sorted lists with a dummy head and pointer chasing.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (merge, sorted lists, linked list, dummy, two pointer).
-2. Reach for the Merge Linked Lists template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. The smallest unused node is always at the head of one of the k lists — a min-heap gives it in O(log k).
+2. Seed the heap with the head of every non-empty list, keyed by value (tie-break on list index so nodes never compare).
+3. Pop the min, append it to the result, and push its successor; repeat until the heap drains.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `[1→4, 1→3, 2→6]`.
+- heap fronts {1a,1b,2}; pop 1a, push 4 → out `1`
+- fronts {1b,2,4}; pop 1b, push 3 → `1→1`
+- pop 2, push 6 → `1→1→2`; then 3, 4, 6 → `1→1→2→3→4→6`
 
 ### Visualization
 ```
@@ -310,22 +313,23 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
+import heapq
 
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+def mergeKLists(lists):
+    heap = [(node.val, i, node) for i, node in enumerate(lists) if node]
+    heapq.heapify(heap)
+    dummy = tail = ListNode()
+    while heap:
+        val, i, node = heapq.heappop(heap)
+        tail.next = node
+        tail = node
+        if node.next:
+            heapq.heappush(heap, (node.next.val, i, node.next))
+    return dummy.next
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(N log k) for N total nodes across k lists, Space O(k) for the heap.
 
 ## 11. Solved Example 3
 
@@ -333,12 +337,15 @@ Time O(n), Space O(1). In-place pointer manipulation, single traversal.
 A representative **Merge Linked Lists** problem. The signal: splice two sorted lists with a dummy head and pointer chasing.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (merge, sorted lists, linked list, dummy, two pointer).
-2. Reach for the Merge Linked Lists template below and map the problem's entities onto it.
-3. Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
+1. Merge sort fits linked lists perfectly: splitting and merging are pointer operations, no random access needed.
+2. Split the list in half with slow/fast pointers, cutting the link at the midpoint.
+3. Recursively sort each half, then merge the two sorted halves with the two-pointer splice.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Input `4→2→1→3`.
+- split → `4→2` and `1→3`
+- sort halves → `2→4` and `1→3`
+- merge → `1→2→3→4`
 
 ### Visualization
 ```
@@ -349,22 +356,28 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-class ListNode:
-    def __init__(self, val=0, nxt=None):
-        self.val, self.next = val, nxt
-
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+def sortList(head):
+    if not head or not head.next:
+        return head
+    slow, fast = head, head.next          # split into two halves
+    while fast and fast.next:
+        slow = slow.next
+        fast = fast.next.next
+    mid, slow.next = slow.next, None
+    left, right = sortList(head), sortList(mid)
+    dummy = tail = ListNode()             # merge sorted halves
+    while left and right:
+        if left.val <= right.val:
+            tail.next, left = left, left.next
+        else:
+            tail.next, right = right, right.next
+        tail = tail.next
+    tail.next = left or right
+    return dummy.next
 ```
 
 ### Complexity
-Time O(n), Space O(1). In-place pointer manipulation, single traversal.
+Time O(n log n), Space O(log n) for the recursion stack.
 
 
 ## 12. LeetCode Practice Set

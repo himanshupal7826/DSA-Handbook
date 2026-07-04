@@ -239,110 +239,125 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — First Last Position (LeetCode 34)
-A representative **Last Occurrence** problem. The signal: bias binary search right to find the last matching index.
+Given a sorted array with duplicates, return `[first, last]` — the leftmost and rightmost indices of `target`, or `[-1, -1]` if absent.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (last, rightmost, binary search, duplicates, boundary).
-2. Reach for the Last Occurrence template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. Run a lower-bound search: first index with `nums[i] >= target`. That is the *first* occurrence (if it equals target).
+2. For the *last* occurrence, run an upper-bound search: first index with `nums[i] > target`, then subtract 1 — this is the Last Occurrence move.
+3. Guard the empty/absent case: if the first index is out of range or `nums[first] != target`, return `[-1, -1]`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [5,7,7,8,8,10], target = 8`
+- lower_bound(8) → first index with value ≥ 8 → index 3.
+- upper_bound(8) → first index with value > 8 → index 5; last = 5 - 1 = 4.
+- `nums[3] == 8`, so answer = `[3, 4]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Last Occurrence step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[5,7,7,8,8,10]  target=8
+        ^   ^
+     first=3 last=upper(5)-1=4  ──▶ [3,4]
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
-        else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+def searchRange(nums, target):
+    def lower_bound(x):
+        lo, hi = 0, len(nums)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if nums[mid] < x:
+                lo = mid + 1
+            else:
+                hi = mid
+        return lo
+
+    first = lower_bound(target)
+    if first == len(nums) or nums[first] != target:
+        return [-1, -1]
+    last = lower_bound(target + 1) - 1   # upper bound - 1
+    return [first, last]
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n) — two binary searches; Space O(1).
 
 ## 10. Solved Example 2
 
 ### Problem — K Closest (LeetCode 658)
-A representative **Last Occurrence** problem. The signal: bias binary search right to find the last matching index.
+Given a sorted array `arr`, return the `k` elements closest to `x`, in ascending order (ties prefer the smaller value).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (last, rightmost, binary search, duplicates, boundary).
-2. Reach for the Last Occurrence template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. The answer is a contiguous window of length `k`. We only need its left index `lo`, which ranges over `[0, len(arr) - k]`.
+2. Binary search that left bound: compare the window edges. If `x - arr[mid] > arr[mid + k] - x`, the right edge is closer, so slide right (`lo = mid + 1`); otherwise keep left (`hi = mid`).
+3. When `lo` converges, `arr[lo : lo + k]` is the closest window, already sorted.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`arr = [1,2,3,4,5], k = 4, x = 3`, search lo in `[0,1]`.
+- mid=0: `x-arr[0]=2` vs `arr[4]-x=2` → not greater → `hi = 0`.
+- lo==hi==0 → window `arr[0:4]` = `[1,2,3,4]`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Last Occurrence step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[1,2,3,4,5] k=4 x=3
+ lo=0 ─────┘ window arr[0:4] = [1,2,3,4]
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def findClosestElements(arr, k, x):
+    lo, hi = 0, len(arr) - k          # left bound of the window
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        if x - arr[mid] > arr[mid + k] - x:
+            lo = mid + 1              # right edge closer → shift window right
         else:
             hi = mid
-    return lo                     # first index with a[i] >= target
+    return arr[lo:lo + k]
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log(n - k) + k) — binary search plus slicing the window; Space O(1) extra.
 
 ## 11. Solved Example 3
 
 ### Problem — Single Element (LeetCode 540)
-A representative **Last Occurrence** problem. The signal: bias binary search right to find the last matching index.
+In a sorted array where every element appears exactly twice except one, find the single element in O(log n) time.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (last, rightmost, binary search, duplicates, boundary).
-2. Reach for the Last Occurrence template below and map the problem's entities onto it.
-3. If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
+1. Pairs `(0,1),(2,3),...` start at even indices. Before the single element, each pair's first member sits at an even index and equals its right neighbor.
+2. Binary search on even indices. Use `mid ^ 1` to get mid's pair partner (flips the low bit): if `nums[mid] == nums[mid ^ 1]`, the single element is to the right (`lo = mid + 2`); else it's at `mid` or to the left (`hi = mid`).
+3. Keep `lo` even so the invariant holds; `lo` converges on the answer.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums = [1,1,2,3,3,4,4]`, lo=0, hi=6.
+- mid=2 (even), `mid^1=3`: `nums[2]=2 != nums[3]=3` → `hi = 2`.
+- mid=0, `mid^1=1`: `nums[0]=1 == nums[1]=1` → `lo = 2`.
+- lo==hi==2 → answer `nums[2] = 2`.
 
 ### Visualization
 ```
-input  ──▶ [ apply Last Occurrence step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+[1,1,2,3,3,4,4]
+     ^ pairs break here → single = nums[2] = 2
 ```
 
 ### Code
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def singleNonDuplicate(nums):
+    lo, hi = 0, len(nums) - 1
     while lo < hi:
         mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        if mid % 2 == 1:          # keep mid on an even index
+            mid -= 1
+        if nums[mid] == nums[mid + 1]:
+            lo = mid + 2          # pair intact → single is to the right
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            hi = mid              # break here or earlier
+    return nums[lo]
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the range; iterative form uses constant space.
+Time O(log n) — binary search over pairs; Space O(1).
 
 
 ## 12. LeetCode Practice Set

@@ -241,101 +241,143 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — Edit Distance (LeetCode 72)
-A representative **DP on Strings** problem. The signal: substring/subsequence dp for edit distance, matching, palindromes.
+Return the minimum number of single-character insert / delete / replace operations to turn `word1` into `word2`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (string dp, edit distance, palindrome, interleaving, matching).
-2. Reach for the DP on Strings template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Let `dp[i][j]` = edit distance between the first `i` chars of `word1` and first `j` chars of `word2`.
+2. Base cases: `dp[i][0] = i` (delete all), `dp[0][j] = j` (insert all).
+3. If `word1[i-1] == word2[j-1]`, characters align: `dp[i][j] = dp[i-1][j-1]`.
+4. Otherwise take `1 + min(dp[i-1][j]` delete, `dp[i][j-1]` insert, `dp[i-1][j-1]` replace`)`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`word1="horse", word2="ros"` → answer 3.
+- `horse → rorse` (replace h→r), then `rorse → rose` (delete r), then `rose → ros` (delete e).
+- Table corner `dp[5][3] = 3`, matching the three operations traced above.
 
 ### Visualization
 ```
-input  ──▶ [ apply DP on Strings step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+input  ──▶ [ fill dp[i][j] over the two strings ]
+state  ──▶ each cell reuses the three neighbors above/left/diagonal
+output ──▶ dp[m][n] holds the minimum edit distance
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def minDistance(word1, word2):
+    m, n = len(word1), len(word2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(m + 1):
+        dp[i][0] = i
+    for j in range(n + 1):
+        dp[0][j] = j
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if word1[i - 1] == word2[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1]
+            else:
+                dp[i][j] = 1 + min(dp[i - 1][j],      # delete
+                                   dp[i][j - 1],      # insert
+                                   dp[i - 1][j - 1])  # replace
+    return dp[m][n]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(m·n), Space O(m·n) (reducible to O(n) with a rolling row).
 
 ## 10. Solved Example 2
 
 ### Problem — Longest Palindrome (LeetCode 5)
-A representative **DP on Strings** problem. The signal: substring/subsequence dp for edit distance, matching, palindromes.
+Return the longest contiguous substring of `s` that reads the same forwards and backwards.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (string dp, edit distance, palindrome, interleaving, matching).
-2. Reach for the DP on Strings template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Every palindrome has a center: either one character (odd length) or a gap between two characters (even length).
+2. For each of the `2n-1` possible centers, expand outward while the two ends match.
+3. Track the widest `[left, right]` window found and return that slice at the end.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`s = "babad"` → answer "bab" (or "aba").
+- Center at index 1 ('a'): expand to `b a b` → length 3, record [0,2].
+- Center at index 2 ('b'): expand to `a b a` → length 3, no improvement; best stays "bab".
 
 ### Visualization
 ```
-input  ──▶ [ apply DP on Strings step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+input  ──▶ [ try each center, expand outward ]
+state  ──▶ best [left, right] window widens only when both ends match
+output ──▶ s[left : right + 1] is the longest palindrome
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def longestPalindrome(s):
+    if not s:
+        return ""
+    start, end = 0, 0
+
+    def expand(l, r):
+        while l >= 0 and r < len(s) and s[l] == s[r]:
+            l -= 1
+            r += 1
+        return l + 1, r - 1        # last valid window
+
+    for i in range(len(s)):
+        l1, r1 = expand(i, i)      # odd-length center
+        l2, r2 = expand(i, i + 1)  # even-length center
+        if r1 - l1 > end - start:
+            start, end = l1, r1
+        if r2 - l2 > end - start:
+            start, end = l2, r2
+    return s[start:end + 1]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(n²), Space O(1).
 
 ## 11. Solved Example 3
 
 ### Problem — Regex Match (LeetCode 10)
-A representative **DP on Strings** problem. The signal: substring/subsequence dp for edit distance, matching, palindromes.
+Return whether the full string `s` matches pattern `p`, where `.` matches any single char and `*` matches zero or more of the preceding element.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (string dp, edit distance, palindrome, interleaving, matching).
-2. Reach for the DP on Strings template below and map the problem's entities onto it.
-3. Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
+1. Let `dp[i][j]` = does `s[:i]` match `p[:j]`. Answer is `dp[len(s)][len(p)]`.
+2. A plain char or `.` at `p[j-1]` consumes one char: `dp[i][j] = dp[i-1][j-1]` if they align.
+3. A `*` gives two choices — zero occurrences: `dp[i][j-2]`; or one more occurrence when `p[j-2]` matches `s[i-1]`: `dp[i-1][j]`.
+4. Seed `dp[0][0]=True` and precompute empty-string-vs-pattern for leading `x*` groups.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`s = "aab", p = "c*a*b"` → True.
+- `c*` matches zero 'c' → `dp[0][2]=True`.
+- `a*` absorbs both 'a's → `dp[2][4]=True`.
+- final `b` matches `b` → `dp[3][5]=True`.
 
 ### Visualization
 ```
-input  ──▶ [ apply DP on Strings step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+input  ──▶ [ fill dp[i][j] over string s and pattern p ]
+state  ──▶ '*' branches into zero-use (j-2) or one-more-use (i-1)
+output ──▶ dp[len(s)][len(p)] is the match verdict
 ```
 
 ### Code
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def isMatch(s, p):
+    m, n = len(s), len(p)
+    dp = [[False] * (n + 1) for _ in range(m + 1)]
+    dp[0][0] = True
+    for j in range(1, n + 1):                 # empty s vs pattern (x* groups)
+        if p[j - 1] == '*':
+            dp[0][j] = dp[0][j - 2]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if p[j - 1] == '*':
+                dp[i][j] = dp[i][j - 2]        # zero of preceding element
+                if p[j - 2] == s[i - 1] or p[j - 2] == '.':
+                    dp[i][j] = dp[i][j] or dp[i - 1][j]
+            elif p[j - 1] == '.' or p[j - 1] == s[i - 1]:
+                dp[i][j] = dp[i - 1][j - 1]
+    return dp[m][n]
 ```
 
 ### Complexity
-Time O(states × transitions), Space O(states). Each state computed once; space often reducible to a rolling row.
+Time O(m·n), Space O(m·n).
 
 
 ## 12. LeetCode Practice Set

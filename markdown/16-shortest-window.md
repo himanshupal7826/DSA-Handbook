@@ -255,39 +255,52 @@ int longestWindow(const string& s) {
 A representative **Shortest Window** problem. The signal: minimize window length; shrink aggressively while validity holds.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (shortest, minimum window, cover, at least, min length).
-2. Reach for the Shortest Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. Count how many of each character `t` needs; `required` = number of distinct chars to satisfy.
+2. Expand `right`, and when a char's window count reaches its needed count, increment `formed`.
+3. While `formed == required` (window covers `t`), record the smallest window, then shrink from `left` to try to do better.
+4. Return the best window found, or `""` if none covers `t`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+s = "ADOBECODEBANC", t = "ABC" → need {A:1,B:1,C:1}, required=3.
+- Expand to "ADOBEC" → formed=3, window len 6, best="ADOBEC".
+- Shrink past A/D/O/B/E; then expand to "...CODEBA" re-covers, shrink to "BANC" len 4.
+- No shorter valid window → answer **"BANC"**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Shortest Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+right expands to cover all of t ──▶ formed == required
+left shrinks while still covered ──▶ record the shortest span
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
+def minWindow(s, t):
+    from collections import Counter
+    if not t or not s:
+        return ""
+    need = Counter(t)
+    required = len(need)
+    window = {}
+    formed = 0
+    left = 0
+    best_len, best_l = float("inf"), 0
     for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
+        window[ch] = window.get(ch, 0) + 1
+        if ch in need and window[ch] == need[ch]:
+            formed += 1
+        while formed == required:
+            if right - left + 1 < best_len:
+                best_len, best_l = right - left + 1, left
+            lch = s[left]
+            window[lch] -= 1
+            if lch in need and window[lch] < need[lch]:
+                formed -= 1
             left += 1
-        best = max(best, right - left + 1)
-    return best
+    return "" if best_len == float("inf") else s[best_l:best_l + best_len]
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(|s| + |t|), Space O(|t|) for the need/window counts (bounded by the alphabet).
 
 ## 10. Solved Example 2
 
@@ -295,39 +308,40 @@ Time O(n), Space O(k). Each index is added and removed at most once; k = window/
 A representative **Shortest Window** problem. The signal: minimize window length; shrink aggressively while validity holds.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (shortest, minimum window, cover, at least, min length).
-2. Reach for the Shortest Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. Nums are positive, so a running window sum grows on expand and shrinks on contract — monotonic behaviour we can exploit.
+2. Add `nums[right]` to `total`; while `total >= target` the window is valid.
+3. While valid, record its length and shrink from the left (subtracting `nums[left]`) to find the smallest valid length.
+4. Return the minimum length, or `0` if no window ever reaches `target`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+target = 7, nums = [2,3,1,2,4,3].
+- Expand until total ≥ 7: [2,3,1,2] total=8 → len 4, shrink drops 2 → [3,1,2] total=6 (<7) stop.
+- Continue: add 4 → [3,1,2,4] total=10 → shrink to [2,4] total=6, best len 2.
+- Add 3 → [4,3] total=7 → len 2. Answer **2**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Shortest Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+right adds nums[right] to total ──▶ total >= target
+left shrinks while total >= target ──▶ record shortest length
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
+def minSubArrayLen(target, nums):
+    left = 0
+    total = 0
+    best = float("inf")
+    for right, x in enumerate(nums):
+        total += x
+        while total >= target:
+            best = min(best, right - left + 1)
+            total -= nums[left]
             left += 1
-        best = max(best, right - left + 1)
-    return best
+    return 0 if best == float("inf") else best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n), Space O(1). Each index enters and leaves the window once.
 
 ## 11. Solved Example 3
 
@@ -335,39 +349,45 @@ Time O(n), Space O(k). Each index is added and removed at most once; k = window/
 A representative **Shortest Window** problem. The signal: minimize window length; shrink aggressively while validity holds.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (shortest, minimum window, cover, at least, min length).
-2. Reach for the Shortest Window template below and map the problem's entities onto it.
-3. A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
+1. Let `k = n/4`. The window is the part we will replace; it's valid if every char OUTSIDE the window appears at most `k` times (the freedom inside lets us rebalance).
+2. Count total frequencies, then slide: as `right` advances, that char leaves the "outside" (decrement its outside count).
+3. While all outside counts are `<= k`, the window is replaceable — record its length and shrink from `left`, adding that char back to the outside counts.
+4. Return the smallest valid window length (0 if already balanced).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+s = "QWER", n=4, k=1 → each char already appears once.
+- count = {Q:1,W:1,E:1,R:1}; all ≤ 1 with empty window → best 0.
+- Answer **0** (no replacement needed).
+For "QQWE" (k=1): outside has Q:2 initially; must include one Q in window → min length **1**.
 
 ### Visualization
 ```
-input  ──▶ [ apply Shortest Window step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+right expands ──▶ char leaves the 'outside' bucket
+window valid when every outside count <= n/4 ──▶ shrink for shortest
 ```
 
 ### Code
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
+def balancedString(s):
+    from collections import Counter
+    n = len(s)
+    k = n // 4
+    count = Counter(s)
+    if all(v == k for v in count.values()):
+        return 0
+    best = n
+    left = 0
     for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
+        count[ch] -= 1                     # ch now inside the replaceable window
+        while left < n and all(count[c] <= k for c in "QWER"):
+            best = min(best, right - left + 1)
+            count[s[left]] += 1            # s[left] returns to the outside
             left += 1
-        best = max(best, right - left + 1)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is added and removed at most once; k = window/alphabet size.
+Time O(n) (the inner `all` scans a fixed 4-char alphabet), Space O(1).
 
 
 ## 12. LeetCode Practice Set

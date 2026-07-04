@@ -251,12 +251,15 @@ vector<int> nextGreater(vector<int>& nums) {
 A representative **Next Greater Element** problem. The signal: stack scan to find each element's next strictly greater neighbor.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (next greater, monotonic stack, circular, to the right).
-2. Reach for the Next Greater Element template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. Scan `nums2` with a decreasing monotonic stack; when the current value exceeds the stack top, it is that top's next greater element — record it in a hash map.
+2. Any values still on the stack at the end have no greater element, so they default to -1.
+3. Answer each query in `nums1` by a direct lookup in the map (nums1 is a subset of nums2).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums1=[4,1,2]`, `nums2=[1,3,4,2]`.
+- 1 pushed; 3>1 → map[1]=3, push 3; 4>3 → map[3]=4, push 4; 2<4 → push 2. Leftover 4,2 → -1.
+- map={1:3, 3:4, 4:-1, 2:-1}.
+- Lookups: 4→-1, 1→3, 2→-1 ⇒ `[-1, 3, -1]`.
 
 ### Visualization
 ```
@@ -267,18 +270,18 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
-        stack.append(i)
-    return res
+def nextGreaterElement(nums1, nums2):
+    next_greater = {}
+    stack = []                      # values, decreasing
+    for v in nums2:
+        while stack and stack[-1] < v:
+            next_greater[stack.pop()] = v
+        stack.append(v)
+    return [next_greater.get(v, -1) for v in nums1]
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(n + m), Space O(n) for the stack and map (n = len(nums2), m = len(nums1)).
 
 ## 10. Solved Example 2
 
@@ -286,12 +289,16 @@ Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved ind
 A representative **Next Greater Element** problem. The signal: stack scan to find each element's next strictly greater neighbor.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (next greater, monotonic stack, circular, to the right).
-2. Reach for the Next Greater Element template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. The array is circular, so simulate two passes by iterating indices `0 .. 2n-1` and using `i % n` to wrap around.
+2. Keep a decreasing monotonic stack of indices; when the current value beats the value at the stack top, that top's next greater element is found.
+3. Only assign results during the first conceptual pass isn't needed — the modulo indexing lets later elements resolve earlier ones; leftovers stay -1.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`nums=[1,2,1]`, n=3, loop i=0..5 (index = i % n).
+- i=0 (1): push 0 → stack=[0]. i=1 (2): nums[0]=1<2 → res[0]=2, pop; push 1 → stack=[1].
+- i=2 (1): 2<1? no; push 2 → stack=[1,2]. i=3 (1): no pop, i≥n so no push.
+- i=4 (2): nums[2]=1<2 → res[2]=2, pop → stack=[1]. i=5 (1): no pop.
+- Result `[2, -1, 2]`.
 
 ### Visualization
 ```
@@ -302,18 +309,21 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
+def nextGreaterElements(nums):
+    n = len(nums)
+    res = [-1] * n
     stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
+    for i in range(2 * n):
+        v = nums[i % n]
         while stack and nums[stack[-1]] < v:
             res[stack.pop()] = v
-        stack.append(i)
+        if i < n:
+            stack.append(i)
     return res
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(n), Space O(n). Two passes over n elements; each index pushed/popped at most once.
 
 ## 11. Solved Example 3
 
@@ -321,12 +331,15 @@ Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved ind
 A representative **Next Greater Element** problem. The signal: stack scan to find each element's next strictly greater neighbor.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (next greater, monotonic stack, circular, to the right).
-2. Reach for the Next Greater Element template below and map the problem's entities onto it.
-3. A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
+1. This is the "next permutation" of `n`'s digits: scan from the right for the first index `i` where `d[i] < d[i+1]` (the pivot). If none exists the digits are descending — no greater permutation, return -1.
+2. Scan from the right for the smallest digit greater than `d[i]` and swap it with `d[i]`.
+3. Reverse the suffix after `i` to make it the smallest arrangement, then check the result fits in a 32-bit signed int (≤ 2^31 − 1).
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+`n=12` → digits `[1,2]`.
+- Pivot: rightmost `i` with `d[i]<d[i+1]` is i=0 (1<2).
+- Swap d[0] with smallest larger digit to its right (2) → `[2,1]`.
+- Reverse suffix after i=0 (single digit) → `21`; fits in 32-bit ⇒ answer **21**.
 
 ### Visualization
 ```
@@ -337,18 +350,24 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
-        stack.append(i)
-    return res
+def nextGreaterElement(n):
+    d = list(str(n))
+    i = len(d) - 2
+    while i >= 0 and d[i] >= d[i + 1]:
+        i -= 1
+    if i < 0:
+        return -1
+    j = len(d) - 1
+    while d[j] <= d[i]:
+        j -= 1
+    d[i], d[j] = d[j], d[i]
+    d[i + 1:] = reversed(d[i + 1:])
+    ans = int("".join(d))
+    return ans if ans <= 2**31 - 1 else -1
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index pushed/popped once; stack holds unresolved indices.
+Time O(k), Space O(k) where k is the number of digits in n.
 
 
 ## 12. LeetCode Practice Set

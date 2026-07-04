@@ -262,12 +262,16 @@ vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
 A representative **Graph BFS** problem. The signal: layered queue expansion for shortest paths in unweighted graphs.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (graph bfs, shortest path, unweighted, queue, levels).
-2. Reach for the Graph BFS template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Seed a queue with **all** rotten oranges (value 2) at once — this is multi-source BFS, so every rotten cell starts at time 0. Count the fresh oranges (value 1) as we go.
+2. Process the queue one layer (minute) at a time; each rotten orange rots its 4-neighbour fresh cells, which join the next layer and decrement the fresh count.
+3. The answer is the number of layers processed. If any fresh orange remains after the queue drains, it is unreachable — return -1.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+grid `[[2,1,1],[1,1,0],[0,1,1]]`, fresh=6, queue=[(0,0)].
+- min 1: (0,0) rots (0,1) and (1,0) → fresh=4.
+- min 2: rots (0,2) and (1,1) → fresh=2.
+- min 3: rots (2,1) → fresh=1.
+- min 4: rots (2,2) → fresh=0. Queue empties → answer **4**.
 
 ### Visualization
 ```
@@ -279,21 +283,33 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+
+def orangesRotting(grid):
+    rows, cols = len(grid), len(grid[0])
+    q = deque()
+    fresh = 0
+    for r in range(rows):
+        for c in range(cols):
+            if grid[r][c] == 2:
+                q.append((r, c))
+            elif grid[r][c] == 1:
+                fresh += 1
+    minutes = 0
+    while q and fresh:
+        for _ in range(len(q)):        # process one minute's layer
+            r, c = q.popleft()
+            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1:
+                    grid[nr][nc] = 2
+                    fresh -= 1
+                    q.append((nr, nc))
+        minutes += 1
+    return -1 if fresh else minutes
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(R·C), Space O(R·C) — every cell is enqueued at most once.
 
 ## 10. Solved Example 2
 
@@ -301,12 +317,16 @@ Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
 A representative **Graph BFS** problem. The signal: layered queue expansion for shortest paths in unweighted graphs.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (graph bfs, shortest path, unweighted, queue, levels).
-2. Reach for the Graph BFS template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Model each word as a node; two words are adjacent if they differ by exactly one letter. The shortest transformation is the shortest path in this unweighted graph, so BFS is exact.
+2. From each dequeued word, generate every one-letter mutation; keep only mutations present in the word set and not yet seen, tagging each with `steps + 1`.
+3. Return `steps` when `endWord` is dequeued; if the queue empties first, no ladder exists → 0.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+begin `hit`, end `cog`, list `[hot,dot,dog,cog]`.
+- q=[(hit,1)] → mutate hit → `hot` in set → q=[(hot,2)].
+- (hot,2) → `dot`, `lot`(not in set) → q=[(dot,3)].
+- (dot,3) → `dog` → q=[(dog,4)]; (dog,4) → `cog` → q=[(cog,5)].
+- (cog,5) == endWord → answer **5**.
 
 ### Visualization
 ```
@@ -318,21 +338,28 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
+
+def ladderLength(beginWord, endWord, wordList):
+    words = set(wordList)
+    if endWord not in words:
+        return 0
+    q = deque([(beginWord, 1)])
+    seen = {beginWord}
     while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+        word, steps = q.popleft()
+        if word == endWord:
+            return steps
+        for i in range(len(word)):
+            for ch in "abcdefghijklmnopqrstuvwxyz":
+                nxt = word[:i] + ch + word[i + 1:]
+                if nxt in words and nxt not in seen:
+                    seen.add(nxt)
+                    q.append((nxt, steps + 1))
+    return 0
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(N·L·26) where N = word count, L = word length; Space O(N·L).
 
 ## 11. Solved Example 3
 
@@ -340,12 +367,16 @@ Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
 A representative **Graph BFS** problem. The signal: layered queue expansion for shortest paths in unweighted graphs.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (graph bfs, shortest path, unweighted, queue, levels).
-2. Reach for the Graph BFS template below and map the problem's entities onto it.
-3. Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
+1. Treat each 0-cell as a node with up to 8 neighbours (all directions). The shortest clear path length equals the BFS distance in this unweighted grid, so BFS gives the exact minimum.
+2. Start BFS at the top-left carrying the path length (1). Mark cells visited by writing 1 into the grid so they are never re-enqueued.
+3. Return the length when the bottom-right cell is dequeued. If either corner is blocked, or the queue drains first, return -1.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+grid `[[0,0,0],[1,1,0],[1,1,0]]`, n=3.
+- q=[(0,0,1)]; expand → (0,1,2),(1,2 blocked)… enqueue (0,1,2),(0,2 via diag? later).
+- (0,1,2) → (0,2,3),(1,2,3).
+- (0,2,3) → (1,2 already) ; (1,2,3) → (2,2,4).
+- (2,2,4) is bottom-right → answer **4**.
 
 ### Visualization
 ```
@@ -357,21 +388,29 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
+
+def shortestPathBinaryMatrix(grid):
+    n = len(grid)
+    if grid[0][0] == 1 or grid[n - 1][n - 1] == 1:
+        return -1
+    q = deque([(0, 0, 1)])
+    grid[0][0] = 1                     # mark visited
+    dirs = [(-1, -1), (-1, 0), (-1, 1), (0, -1),
+            (0, 1), (1, -1), (1, 0), (1, 1)]
     while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+        r, c, dist = q.popleft()
+        if r == n - 1 and c == n - 1:
+            return dist
+        for dr, dc in dirs:
+            nr, nc = r + dr, c + dc
+            if 0 <= nr < n and 0 <= nc < n and grid[nr][nc] == 0:
+                grid[nr][nc] = 1
+                q.append((nr, nc, dist + 1))
+    return -1
 ```
 
 ### Complexity
-Time O(V + E), Space O(V). Each vertex and edge processed once for BFS/DFS.
+Time O(N²), Space O(N²) — each of the N² cells is visited at most once.
 
 
 ## 12. LeetCode Practice Set

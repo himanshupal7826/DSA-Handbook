@@ -237,15 +237,17 @@ int maxNonOverlap(vector<vector<int>>& intervals) {
 ## 9. Solved Example 1
 
 ### Problem — Min Cost Sticks (LeetCode 1167)
-A representative **Huffman Greedy** problem. The signal: repeatedly merge the two smallest weights via a heap for optimal cost.
+Connecting two sticks costs their sum; connect all sticks into one at minimum total cost.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (huffman, greedy, heap, encoding, merge cost, optimal).
-2. Reach for the Huffman Greedy template below and map the problem's entities onto it.
-3. When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
+1. This is Huffman merging: always combine the two smallest sticks so heavy sticks are re-added fewest times.
+2. Keep sticks in a min-heap; pop the two smallest, push their sum back, and add that sum to the running cost.
+3. Repeat until a single stick remains.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+sticks = [2,4,3]
+heap [2,3,4]: pop 2,3 cost=5 push 5 → [4,5]; pop 4,5 cost+=9=14 push 9.
+total = 14.
 
 ### Visualization
 ```
@@ -256,31 +258,36 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
-            end = e
-    return count
+import heapq
+
+def connectSticks(sticks):
+    heapq.heapify(sticks)
+    total = 0
+    while len(sticks) > 1:
+        a = heapq.heappop(sticks)             # two smallest
+        b = heapq.heappop(sticks)
+        total += a + b                        # cost of this merge
+        heapq.heappush(sticks, a + b)
+    return total
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
+Time O(n log n), Space O(n). Each merge is one heap push and two pops.
 
 ## 10. Solved Example 2
 
 ### Problem — Last Stone (LeetCode 1046)
-A representative **Huffman Greedy** problem. The signal: repeatedly merge the two smallest weights via a heap for optimal cost.
+Repeatedly smash the two heaviest stones; return the weight of the last remaining stone, or 0.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (huffman, greedy, heap, encoding, merge cost, optimal).
-2. Reach for the Huffman Greedy template below and map the problem's entities onto it.
-3. When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
+1. Each round needs the two largest stones — a max-heap (negated min-heap in Python) delivers them in O(log n).
+2. Pop the two biggest; if their weights differ, push the difference back.
+3. Continue until at most one stone remains.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+stones = [2,7,4,1,8,1]
+tops 8,7 → push 1; 4,2 → push 2; 2,1 → push 1; 1,1 → equal, nothing back.
+one stone left: 1. answer = 1.
 
 ### Visualization
 ```
@@ -291,31 +298,35 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
-            end = e
-    return count
+import heapq
+
+def lastStoneWeight(stones):
+    heap = [-s for s in stones]               # max-heap via negation
+    heapq.heapify(heap)
+    while len(heap) > 1:
+        y = -heapq.heappop(heap)              # heaviest
+        x = -heapq.heappop(heap)              # next heaviest
+        if y != x:
+            heapq.heappush(heap, -(y - x))
+    return -heap[0] if heap else 0
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
+Time O(n log n), Space O(n). Each smash is a pair of heap operations.
 
 ## 11. Solved Example 3
 
 ### Problem — Largest Number (LeetCode 2231)
-A representative **Huffman Greedy** problem. The signal: repeatedly merge the two smallest weights via a heap for optimal cost.
+Swap digits of the same parity any number of times to form the largest possible number.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (huffman, greedy, heap, encoding, merge cost, optimal).
-2. Reach for the Huffman Greedy template below and map the problem's entities onto it.
-3. When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
+1. Digits can only trade places within their parity class, so sort even digits and odd digits independently in descending order.
+2. Rebuild left to right, and at each position emit the next-largest digit whose parity matches the original digit there.
+3. Greedily placing the biggest allowed digit first maximizes the value.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+num = 1234 → digits [1,2,3,4]; odds sorted [3,1], evens sorted [4,2]
+pos0 odd→3; pos1 even→4; pos2 odd→1; pos3 even→2 → 3412.
 
 ### Visualization
 ```
@@ -326,18 +337,22 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
-            end = e
-    return count
+def largestInteger(num):
+    digits = [int(c) for c in str(num)]
+    evens = sorted((d for d in digits if d % 2 == 0), reverse=True)
+    odds = sorted((d for d in digits if d % 2 == 1), reverse=True)
+    ei = oi = 0
+    out = []
+    for d in digits:
+        if d % 2 == 0:
+            out.append(evens[ei]); ei += 1    # biggest even still available
+        else:
+            out.append(odds[oi]); oi += 1     # biggest odd still available
+    return int(''.join(map(str, out)))
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
+Time O(k log k) for k digits, Space O(k). Sorting the two parity groups dominates.
 
 
 ## 12. LeetCode Practice Set

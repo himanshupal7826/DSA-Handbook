@@ -247,15 +247,19 @@ int height(TreeNode* node) {
 ## 9. Solved Example 1
 
 ### Problem — Level Order (LeetCode 102)
-A representative **Tree BFS** problem. The signal: queue-based level traversal for level-aggregate problems.
+Return the node values grouped level by level, top to bottom.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (bfs, tree, level order, queue, breadth).
-2. Reach for the Tree BFS template below and map the problem's entities onto it.
-3. Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
+1. Process the tree one level at a time with a FIFO queue.
+2. Snapshot the queue length at the start of a level — that is exactly its node count.
+3. Drain that many nodes into a list, enqueuing their children for the next level.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Tree `[3,9,20,null,null,15,7]`:
+- q=[3] → level [3]; enqueue 9,20
+- q=[9,20] → level [9,20]; enqueue 15,7
+- q=[15,7] → level [15,7]
+- answer [[3],[9,20],[15,7]]
 
 ### Visualization
 ```
@@ -266,37 +270,46 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
+from collections import deque
+
 class TreeNode:
     def __init__(self, val=0, left=None, right=None):
         self.val, self.left, self.right = val, left, right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+def levelOrder(root):
+    if not root:
+        return []
+    out, q = [], deque([root])
+    while q:
+        level = []
+        for _ in range(len(q)):
+            node = q.popleft()
+            level.append(node.val)
+            if node.left:  q.append(node.left)
+            if node.right: q.append(node.right)
+        out.append(level)
+    return out
 ```
 
 ### Complexity
-Time O(n), Space O(h). Visit each node once; recursion stack is O(height).
+Time O(n), Space O(n) for the queue.
 
 ## 10. Solved Example 2
 
 ### Problem — Zigzag (LeetCode 103)
-A representative **Tree BFS** problem. The signal: queue-based level traversal for level-aggregate problems.
+Level order, but alternate the reading direction on each successive level.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (bfs, tree, level order, queue, breadth).
-2. Reach for the Tree BFS template below and map the problem's entities onto it.
-3. Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
+1. Run a standard level-order BFS.
+2. Keep a direction flag: append values on left-to-right levels, prepend on right-to-left levels.
+3. Flip the flag after finishing each level.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Tree `[3,9,20,null,null,15,7]`:
+- level 0 (L→R): [3]
+- level 1 (R→L): prepend 9 then 20 → [20,9]
+- level 2 (L→R): [15,7]
+- answer [[3],[20,9],[15,7]]
 
 ### Visualization
 ```
@@ -307,24 +320,33 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
+from collections import deque
+
 class TreeNode:
     def __init__(self, val=0, left=None, right=None):
         self.val, self.left, self.right = val, left, right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+def zigzagLevelOrder(root):
+    if not root:
+        return []
+    out, q, left_to_right = [], deque([root]), True
+    while q:
+        level = deque()
+        for _ in range(len(q)):
+            node = q.popleft()
+            if left_to_right:
+                level.append(node.val)
+            else:
+                level.appendleft(node.val)
+            if node.left:  q.append(node.left)
+            if node.right: q.append(node.right)
+        out.append(list(level))
+        left_to_right = not left_to_right
+    return out
 ```
 
 ### Complexity
-Time O(n), Space O(h). Visit each node once; recursion stack is O(height).
+Time O(n), Space O(n) for the queue.
 
 ## 11. Solved Example 3
 

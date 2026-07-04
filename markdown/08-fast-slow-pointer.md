@@ -247,15 +247,19 @@ pair<int,int> twoSumSorted(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Linked List Cycle (LeetCode 141)
-A representative **Fast and Slow Pointer** problem. The signal: two pointers at different speeds detect cycles and find midpoints.
+Determine whether a linked list contains a cycle, using O(1) extra space.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (floyd, cycle, tortoise hare, middle, linked list cycle).
-2. Reach for the Fast and Slow Pointer template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. Advance `slow` by one node and `fast` by two nodes each iteration (Floyd's tortoise and hare).
+2. If there is no cycle, `fast` reaches the end (None) and we return False.
+3. If there is a cycle, `fast` eventually laps and meets `slow`; return True.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+List 3 → 2 → 0 → -4 → (back to 2).
+- slow=3, fast=3.
+- slow=2, fast=0.
+- slow=0, fast=2.
+- slow=-4, fast=-4 → slow is fast → return True.
 
 ### Visualization
 ```
@@ -266,34 +270,33 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+def hasCycle(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow = slow.next
+        fast = fast.next.next
+        if slow is fast:
+            return True
+    return False
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time O(n), Space O(1) — two pointers, no auxiliary set.
 
 ## 10. Solved Example 2
 
 ### Problem — Cycle II (LeetCode 142)
-A representative **Fast and Slow Pointer** problem. The signal: two pointers at different speeds detect cycles and find midpoints.
+Return the node where the cycle begins, or None if there is no cycle.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (floyd, cycle, tortoise hare, middle, linked list cycle).
-2. Reach for the Fast and Slow Pointer template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. First detect a meeting point with the tortoise/hare exactly as in cycle detection.
+2. Floyd's insight: the distance from the head to the cycle start equals the distance from the meeting point to the cycle start.
+3. Reset one pointer to head, then advance both one step at a time; they meet at the cycle entry.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+List 3 → 2 → 0 → -4 → (back to 2), cycle starts at node 2.
+- slow/fast meet inside the cycle (say at -4).
+- Move p from head(3) and slow from -4 one step each: p=2, slow=2 → equal → return node 2.
 
 ### Visualization
 ```
@@ -304,34 +307,38 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+def detectCycle(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow = slow.next
+        fast = fast.next.next
+        if slow is fast:
+            p = head
+            while p is not slow:
+                p = p.next
+                slow = slow.next
+            return p
+    return None
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time O(n), Space O(1) — detection plus a second linear walk to the entry.
 
 ## 11. Solved Example 3
 
 ### Problem — Middle of List (LeetCode 876)
-A representative **Fast and Slow Pointer** problem. The signal: two pointers at different speeds detect cycles and find midpoints.
+Return the middle node of a linked list; for an even count return the second of the two middle nodes.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (floyd, cycle, tortoise hare, middle, linked list cycle).
-2. Reach for the Fast and Slow Pointer template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. Move `slow` one step and `fast` two steps per iteration.
+2. When `fast` runs off the end, `slow` has covered exactly half the list.
+3. The loop condition `fast and fast.next` naturally lands `slow` on the second middle for even lengths.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+List 1 → 2 → 3 → 4 → 5.
+- slow=1, fast=1.
+- slow=2, fast=3.
+- slow=3, fast=5 → fast.next is None → stop → return node 3.
 
 ### Visualization
 ```
@@ -342,21 +349,16 @@ output ──▶ read directly from the maintained state
 
 ### Code
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+def middleNode(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow = slow.next
+        fast = fast.next.next
+    return slow
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time O(n), Space O(1) — one pass with two pointers.
 
 
 ## 12. LeetCode Practice Set

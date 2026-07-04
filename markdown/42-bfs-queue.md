@@ -262,12 +262,15 @@ vector<int> maxSlidingWindow(vector<int>& nums, int k) {
 A representative **BFS Queue Pattern** problem. The signal: queue-driven level-by-level expansion for shortest unweighted paths.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (bfs, queue, level order, shortest path, unweighted).
-2. Reach for the BFS Queue Pattern template below and map the problem's entities onto it.
-3. A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier.
+1. Seed a FIFO queue with the root; each outer loop iteration processes exactly one full level.
+2. Snapshot `len(queue)` before the level loop so you only pop nodes belonging to the current level.
+3. Collect each popped node's value, enqueue its children, and append the level list to the result.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Tree `[3,9,20,null,null,15,7]`, queue=[3] → pop 3, enqueue 9,20, level=[3].
+Level size 2: pop 9,20, enqueue 15,7, level=[9,20].
+Level size 2: pop 15,7 (no children), level=[15,7].
+Result → `[[3],[9,20],[15,7]]`.
 
 ### Visualization
 ```
@@ -279,21 +282,25 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def max_sliding_window(nums, k):
-    dq, res = deque(), []          # dq holds indices, values decreasing
-    for i, v in enumerate(nums):
-        while dq and nums[dq[-1]] < v:
-            dq.pop()
-        dq.append(i)
-        if dq[0] <= i - k:
-            dq.popleft()
-        if i >= k - 1:
-            res.append(nums[dq[0]])
+def levelOrder(root):
+    if not root:
+        return []
+    res, q = [], deque([root])
+    while q:
+        level = []
+        for _ in range(len(q)):          # fix this level's node count
+            node = q.popleft()
+            level.append(node.val)
+            if node.left:
+                q.append(node.left)
+            if node.right:
+                q.append(node.right)
+        res.append(level)
     return res
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits each node/edge once.
+Time O(n), Space O(n). Each node is enqueued and dequeued once; the queue holds at most one level.
 
 ## 10. Solved Example 2
 
@@ -301,12 +308,15 @@ Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits eac
 A representative **BFS Queue Pattern** problem. The signal: queue-driven level-by-level expansion for shortest unweighted paths.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (bfs, queue, level order, shortest path, unweighted).
-2. Reach for the BFS Queue Pattern template below and map the problem's entities onto it.
-3. A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier.
+1. This is multi-source BFS: enqueue every rotten orange at time 0 and count the fresh ones.
+2. Each BFS level equals one minute; rot all 4-directional fresh neighbours of the current frontier.
+3. Stop when the queue empties; if fresh remain unreachable, return -1, else the elapsed minutes.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+Grid `[[2,1,1],[1,1,0],[0,1,1]]`, fresh=6, queue=[(0,0)].
+Min 1: rot (0,1),(1,0) → fresh=4. Min 2: rot (0,2),(1,1) → fresh=2.
+Min 3: rot (2,1) → fresh=1. Min 4: rot (2,2) → fresh=0.
+Queue empties with fresh=0 → answer `4`.
 
 ### Visualization
 ```
@@ -318,21 +328,31 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def max_sliding_window(nums, k):
-    dq, res = deque(), []          # dq holds indices, values decreasing
-    for i, v in enumerate(nums):
-        while dq and nums[dq[-1]] < v:
-            dq.pop()
-        dq.append(i)
-        if dq[0] <= i - k:
-            dq.popleft()
-        if i >= k - 1:
-            res.append(nums[dq[0]])
-    return res
+def orangesRotting(grid):
+    rows, cols = len(grid), len(grid[0])
+    q, fresh = deque(), 0
+    for r in range(rows):
+        for c in range(cols):
+            if grid[r][c] == 2:
+                q.append((r, c))
+            elif grid[r][c] == 1:
+                fresh += 1
+    minutes = 0
+    while q and fresh:
+        minutes += 1
+        for _ in range(len(q)):          # one full minute per level
+            r, c = q.popleft()
+            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1:
+                    grid[nr][nc] = 2
+                    fresh -= 1
+                    q.append((nr, nc))
+    return -1 if fresh else minutes
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits each node/edge once.
+Time O(rows*cols), Space O(rows*cols). Each cell is visited and enqueued at most once.
 
 ## 11. Solved Example 3
 
@@ -340,12 +360,14 @@ Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits eac
 A representative **BFS Queue Pattern** problem. The signal: queue-driven level-by-level expansion for shortest unweighted paths.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (bfs, queue, level order, shortest path, unweighted).
-2. Reach for the BFS Queue Pattern template below and map the problem's entities onto it.
-3. A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier.
+1. Model each word as a graph node; edges connect words differing by exactly one letter.
+2. BFS from `beginWord` finds the fewest transformations — the shortest unweighted path length.
+3. Generate neighbours by swapping each position with 'a'..'z'; remove visited words from the set to avoid cycles.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+begin="hit", end="cog", words={hot,dot,dog,lot,log,cog}.
+Level 1: hit(1). Level 2: hot(2). Level 3: dot,lot(3). Level 4: dog,log(4).
+Level 5: cog(5) → equals endWord → return `5`.
 
 ### Visualization
 ```
@@ -357,21 +379,26 @@ output ──▶ read directly from the maintained state
 ### Code
 ```python
 from collections import deque
-def max_sliding_window(nums, k):
-    dq, res = deque(), []          # dq holds indices, values decreasing
-    for i, v in enumerate(nums):
-        while dq and nums[dq[-1]] < v:
-            dq.pop()
-        dq.append(i)
-        if dq[0] <= i - k:
-            dq.popleft()
-        if i >= k - 1:
-            res.append(nums[dq[0]])
-    return res
+def ladderLength(beginWord, endWord, wordList):
+    words = set(wordList)
+    if endWord not in words:
+        return 0
+    q = deque([(beginWord, 1)])
+    while q:
+        word, steps = q.popleft()
+        if word == endWord:
+            return steps
+        for i in range(len(word)):
+            for c in "abcdefghijklmnopqrstuvwxyz":
+                nxt = word[:i] + c + word[i + 1:]
+                if nxt in words:
+                    words.remove(nxt)        # mark visited
+                    q.append((nxt, steps + 1))
+    return 0
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each element enters/leaves the deque once; BFS visits each node/edge once.
+Time O(N * L * 26), Space O(N * L) for N words of length L (neighbour strings and the set).
 
 
 ## 12. LeetCode Practice Set
