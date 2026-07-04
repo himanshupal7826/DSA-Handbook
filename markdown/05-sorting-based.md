@@ -69,6 +69,26 @@ Trade O(n) extra space for O(1) lookups, collapsing nested work into independent
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 240" width="100%" height="240" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="sb-05" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Merge Intervals: sort by start, then scan &amp; merge overlaps</text>
+  <text x="40" y="72" fill="#64748b">sorted</text>
+  <!-- sorted intervals as bars: [1,3] [2,6] overlap, [8,10] apart -->
+  <rect x="110" y="56" width="100" height="28" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="160" y="75" text-anchor="middle" fill="#1e293b">[1,3]</text>
+  <rect x="160" y="90" width="200" height="28" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="260" y="109" text-anchor="middle" fill="#1e293b">[2,6]</text>
+  <rect x="410" y="56" width="100" height="28" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="460" y="75" text-anchor="middle" fill="#1e293b">[8,10]</text>
+  <text x="235" y="140" text-anchor="middle" fill="#d97706">[1,3] and [2,6] overlap (2 ≤ 3)</text>
+  <line x1="300" y1="150" x2="300" y2="176" stroke="#475569" marker-end="url(#sb-05)"/>
+  <text x="40" y="200" fill="#64748b">merged</text>
+  <!-- merged result -->
+  <rect x="110" y="182" width="250" height="28" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="235" y="201" text-anchor="middle" fill="#1e293b">[1,6]</text>
+  <rect x="410" y="182" width="100" height="28" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="460" y="201" text-anchor="middle" fill="#1e293b">[8,10]</text>
+  <text x="320" y="232" text-anchor="middle" fill="#059669" font-weight="700">one left-to-right pass after sorting</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Sorting Based Prob: maintain state, update in O(1)/O(log n) ──▶ fast

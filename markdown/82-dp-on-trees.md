@@ -69,6 +69,28 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 258" width="100%" height="258" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs>
+    <marker id="arr82" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#059669"/></marker>
+  </defs>
+  <text x="310" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Tree DP: each node returns {rob, skip}, combined bottom-up</text>
+  <line x1="290" y1="82" x2="212" y2="150" stroke="#475569"/>
+  <line x1="330" y1="82" x2="408" y2="150" stroke="#475569"/>
+  <line x1="200" y1="150" x2="290" y2="90" stroke="#059669" marker-end="url(#arr82)"/>
+  <line x1="420" y1="150" x2="330" y2="90" stroke="#059669" marker-end="url(#arr82)"/>
+  <circle cx="310" cy="72" r="26" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="310" y="77" text-anchor="middle" font-weight="700" fill="#1e293b">3</text>
+  <circle cx="190" cy="168" r="24" fill="#eff6ff" stroke="#2563eb"/><text x="190" y="173" text-anchor="middle" fill="#1e293b">4</text>
+  <circle cx="430" cy="168" r="24" fill="#eff6ff" stroke="#2563eb"/><text x="430" y="173" text-anchor="middle" fill="#1e293b">5</text>
+  <text x="150" y="210" text-anchor="middle" fill="#64748b">{rob 4, skip 0}</text>
+  <text x="470" y="210" text-anchor="middle" fill="#64748b">{rob 5, skip 0}</text>
+  <text x="310" y="120" text-anchor="middle" fill="#64748b">rob = 3 + skipL + skipR = 3</text>
+  <text x="310" y="137" text-anchor="middle" fill="#64748b">skip = max(4,0) + max(5,0) = 9</text>
+  <text x="310" y="238" text-anchor="middle" fill="#059669" font-weight="700">answer = max(rob, skip) = 9</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 DP on Trees       : maintain state, update in O(1)/O(log n) ──▶ fast

@@ -69,6 +69,32 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 260" width="100%" height="260" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="mm-94" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">n=4 [3,1,4,2], target=6: split, enumerate 2² each, combine</text>
+  <!-- left half cells -->
+  <rect x="120" y="40" width="46" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="143" y="66" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="170" y="40" width="46" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="193" y="66" text-anchor="middle" fill="#1e293b">1</text>
+  <text x="168" y="98" text-anchor="middle" fill="#64748b">left half</text>
+  <!-- right half cells -->
+  <rect x="424" y="40" width="46" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="447" y="66" text-anchor="middle" fill="#1e293b">4</text>
+  <rect x="474" y="40" width="46" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="497" y="66" text-anchor="middle" fill="#1e293b">2</text>
+  <text x="472" y="98" text-anchor="middle" fill="#64748b">right half</text>
+  <!-- subset sums -->
+  <text x="168" y="128" text-anchor="middle" fill="#2563eb" font-weight="700">A subset sums</text>
+  <rect x="90"  y="140" width="156" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="168" y="160" text-anchor="middle" fill="#1e293b">{ 0, 3, 1, 4 }</text>
+  <text x="472" y="128" text-anchor="middle" fill="#059669" font-weight="700">B sums (sorted)</text>
+  <rect x="394" y="140" width="156" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="472" y="160" text-anchor="middle" fill="#1e293b">{ 0, 2, 4, 6 }</text>
+  <!-- combine arrows -->
+  <line x1="246" y1="185" x2="300" y2="205" stroke="#475569" marker-end="url(#mm-94)"/>
+  <line x1="394" y1="185" x2="340" y2="205" stroke="#475569" marker-end="url(#mm-94)"/>
+  <text x="320" y="216" text-anchor="middle" fill="#1e293b" font-weight="700">for a in A: binary-search (6 − a) in B</text>
+  <text x="320" y="240" text-anchor="middle" fill="#059669" font-weight="700">a=4 needs 2 ✓  ──▶  4 + 2 = 6 in O(2^(n/2) · n) not O(2^n)</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Meet in the Middle: maintain state, update in O(1)/O(log n) ──▶ fast

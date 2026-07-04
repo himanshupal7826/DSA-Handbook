@@ -69,6 +69,42 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 290" width="100%" height="290" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="mo-100" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Mo's: sort queries by (block of L, then R); pointers slide in O((n+q)√n)</text>
+  <!-- array with blocks of size 3 -->
+  <text x="30" y="55" fill="#64748b" font-weight="700">array (block size √9 = 3)</text>
+  <g>
+    <rect x="40" y="65" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="70" y="90" text-anchor="middle" fill="#1e293b">0</text>
+    <rect x="100" y="65" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="130" y="90" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="160" y="65" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="190" y="90" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="220" y="65" width="60" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="250" y="90" text-anchor="middle" fill="#1e293b">3</text>
+    <rect x="280" y="65" width="60" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="310" y="90" text-anchor="middle" fill="#1e293b">4</text>
+    <rect x="340" y="65" width="60" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="370" y="90" text-anchor="middle" fill="#1e293b">5</text>
+    <rect x="400" y="65" width="60" height="40" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="430" y="90" text-anchor="middle" fill="#1e293b">6</text>
+    <rect x="460" y="65" width="60" height="40" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="490" y="90" text-anchor="middle" fill="#1e293b">7</text>
+    <rect x="520" y="65" width="60" height="40" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="550" y="90" text-anchor="middle" fill="#1e293b">8</text>
+  </g>
+  <text x="130" y="124" text-anchor="middle" fill="#2563eb">block 0</text>
+  <text x="310" y="124" text-anchor="middle" fill="#059669">block 1</text>
+  <text x="490" y="124" text-anchor="middle" fill="#d97706">block 2</text>
+  <!-- unsorted queries -->
+  <text x="30" y="160" fill="#64748b" font-weight="700">queries [L,R]</text>
+  <text x="180" y="160" fill="#1e293b">Q1[5,7]  Q2[0,4]  Q3[1,8]  Q4[3,6]</text>
+  <line x1="300" y1="175" x2="300" y2="205" stroke="#475569" stroke-width="1.5" marker-end="url(#mo-100)"/>
+  <text x="410" y="196" text-anchor="middle" fill="#64748b">sort by (L / block, then R)</text>
+  <!-- sorted order -->
+  <text x="30" y="235" fill="#64748b" font-weight="700">sorted order</text>
+  <rect x="160" y="220" width="90" height="26" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="205" y="238" text-anchor="middle" fill="#1e293b">Q2[0,4]</text>
+  <rect x="256" y="220" width="90" height="26" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="301" y="238" text-anchor="middle" fill="#1e293b">Q3[1,8]</text>
+  <rect x="352" y="220" width="90" height="26" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="397" y="238" text-anchor="middle" fill="#1e293b">Q4[3,6]</text>
+  <rect x="448" y="220" width="90" height="26" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="493" y="238" text-anchor="middle" fill="#1e293b">Q1[5,7]</text>
+  <text x="320" y="272" text-anchor="middle" fill="#64748b">grouped by L-block; within a block R only moves forward, so pointers travel little</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Mo's Algorithm    : maintain state, update in O(1)/O(log n) ──▶ fast

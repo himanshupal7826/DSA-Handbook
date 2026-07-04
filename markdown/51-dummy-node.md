@@ -69,6 +69,31 @@ Most list problems are pointer-rewiring; a dummy sentinel removes head edge case
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 210" width="100%" height="210" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="dmy51" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Sentinel dummy points at head, so deleting node 1 needs no special case</text>
+  <!-- dummy -->
+  <rect x="40" y="55" width="60" height="34" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="70" y="77" text-anchor="middle" fill="#1e293b">dummy</text>
+  <text x="70" y="108" text-anchor="middle" fill="#d97706" font-weight="700">sentinel</text>
+  <!-- nodes -->
+  <rect x="150" y="55" width="46" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="173" y="77" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="270" y="55" width="46" height="34" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="293" y="77" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="390" y="55" width="46" height="34" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="413" y="77" text-anchor="middle" fill="#1e293b">3</text>
+  <line x1="100" y1="72" x2="148" y2="72" stroke="#475569" marker-end="url(#dmy51)"/>
+  <line x1="196" y1="72" x2="268" y2="72" stroke="#64748b" stroke-dasharray="3,3"/>
+  <line x1="316" y1="72" x2="388" y2="72" stroke="#475569" marker-end="url(#dmy51)"/>
+  <!-- deletion of node 1 -->
+  <line x1="150" y1="95" x2="196" y2="55" stroke="#b91c1c" stroke-width="2"/>
+  <line x1="196" y1="95" x2="150" y2="55" stroke="#b91c1c" stroke-width="2"/>
+  <text x="173" y="110" text-anchor="middle" fill="#b91c1c" font-weight="700">removed</text>
+  <!-- rewired dummy to 2 -->
+  <path d="M70,89 C70,150 293,155 293,91" fill="none" stroke="#059669" stroke-width="2" marker-end="url(#dmy51)"/>
+  <text x="200" y="175" text-anchor="middle" fill="#059669" font-weight="700">dummy.next = node 2 — return dummy.next</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Dummy Node Pattern: maintain state, update in O(1)/O(log n) ──▶ fast

@@ -69,6 +69,34 @@ DFS over the decision tree with pruning. Each recursion makes a choice, recurses
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 660 290" width="100%" height="290" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-70" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="330" y="18" text-anchor="middle" font-weight="700" fill="#1e293b">C(4,2): pick increasing numbers, prune branches too short</text>
+  <!-- level 1 edges -->
+  <line x1="330" y1="50" x2="120" y2="105" stroke="#475569" marker-end="url(#a-70)"/>
+  <line x1="330" y1="50" x2="300" y2="105" stroke="#475569" marker-end="url(#a-70)"/>
+  <line x1="330" y1="50" x2="440" y2="105" stroke="#475569" marker-end="url(#a-70)"/>
+  <line x1="330" y1="50" x2="580" y2="105" stroke="#d97706" stroke-dasharray="4 3" marker-end="url(#a-70)"/>
+  <!-- level 2 edges under [1] -->
+  <line x1="120" y1="135" x2="55"  y2="200" stroke="#475569" marker-end="url(#a-70)"/>
+  <line x1="120" y1="135" x2="145" y2="200" stroke="#475569" marker-end="url(#a-70)"/>
+  <line x1="120" y1="135" x2="235" y2="200" stroke="#475569" marker-end="url(#a-70)"/>
+  <!-- nodes -->
+  <rect x="298" y="35"  width="64" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="330" y="55"  text-anchor="middle" fill="#1e293b">[ ]</text>
+  <rect x="88"  y="105" width="64" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="120" y="125" text-anchor="middle" fill="#1e293b">[1]</text>
+  <rect x="268" y="105" width="64" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="300" y="125" text-anchor="middle" fill="#1e293b">[2]</text>
+  <rect x="408" y="105" width="64" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="440" y="125" text-anchor="middle" fill="#1e293b">[3]</text>
+  <rect x="540" y="105" width="80" height="30" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="580" y="125" text-anchor="middle" fill="#b91c1c">4: ✗ &lt;k left</text>
+  <rect x="23"  y="200" width="64" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="55"  y="220" text-anchor="middle" fill="#1e293b">[1,2]</text>
+  <rect x="113" y="200" width="64" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="145" y="220" text-anchor="middle" fill="#1e293b">[1,3]</text>
+  <rect x="203" y="200" width="64" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="235" y="220" text-anchor="middle" fill="#1e293b">[1,4]</text>
+  <text x="440" y="165" text-anchor="middle" fill="#64748b">[2] &amp; [3] expand the same way</text>
+  <text x="145" y="262" text-anchor="middle" fill="#059669" font-weight="700">size == k ──▶ record combination</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Combinations      : maintain state, update in O(1)/O(log n) ──▶ fast

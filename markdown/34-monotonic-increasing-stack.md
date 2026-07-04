@@ -69,6 +69,28 @@ A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relat
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="ar-34" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Increasing stack: pop while top &gt; incoming (nearest smaller)</text>
+  <text x="130" y="52" text-anchor="middle" fill="#64748b">scan array →</text>
+  <rect x="30"  y="60" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="52"  y="88" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="78"  y="60" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="100" y="88" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="126" y="60" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="148" y="88" text-anchor="middle" fill="#1e293b">5</text>
+  <rect x="174" y="60" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="196" y="88" text-anchor="middle" fill="#1e293b">6</text>
+  <rect x="222" y="60" width="44" height="44" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="244" y="88" text-anchor="middle" fill="#1e293b" font-weight="700">3</text>
+  <text x="244" y="122" text-anchor="middle" fill="#059669" font-weight="700">incoming</text>
+  <text x="490" y="52" text-anchor="middle" fill="#64748b">stack (bottom → top)</text>
+  <rect x="452" y="150" width="76" height="34" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="490" y="172" text-anchor="middle" fill="#1e293b">1  keep</text>
+  <rect x="452" y="112" width="76" height="34" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="490" y="134" text-anchor="middle" fill="#1e293b">5  pop</text>
+  <rect x="452" y="74"  width="76" height="34" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="490" y="96"  text-anchor="middle" fill="#1e293b">6  pop</text>
+  <line x1="270" y1="82" x2="448" y2="90" stroke="#475569" marker-end="url(#ar-34)"/>
+  <text x="360" y="76" text-anchor="middle" fill="#d97706">3 &lt; 6 and 3 &lt; 5 → pop</text>
+  <text x="490" y="214" text-anchor="middle" fill="#059669" font-weight="700">then push 3 → stack [1, 3]</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Monotonic Increasi: maintain state, update in O(1)/O(log n) ──▶ fast

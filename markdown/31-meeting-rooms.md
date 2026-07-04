@@ -69,6 +69,37 @@ Sorting linearizes the geometry so a single left-to-right sweep resolves all ove
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 220" width="100%" height="220" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="mtg31" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Concurrent meetings → rooms needed = peak overlap</text>
+  <rect x="145" y="36" width="85" height="86" fill="#ecfdf5" opacity="0.6"/>
+  <rect x="315" y="36" width="85" height="86" fill="#ecfdf5" opacity="0.6"/>
+  <rect x="60"  y="40" width="510" height="20" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="315" y="54" text-anchor="middle" fill="#1e293b">[0,30]</text>
+  <rect x="145" y="64" width="85"  height="20" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="187" y="78" text-anchor="middle" fill="#1e293b">[5,10]</text>
+  <rect x="315" y="88" width="85"  height="20" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="357" y="102" text-anchor="middle" fill="#1e293b">[15,20]</text>
+  <line x1="60" y1="128" x2="570" y2="128" stroke="#cbd5e1"/>
+  <g fill="#64748b" text-anchor="middle">
+    <line x1="60"  y1="124" x2="60"  y2="132" stroke="#94a3b8"/><text x="60"  y="146">0</text>
+    <line x1="145" y1="124" x2="145" y2="132" stroke="#94a3b8"/><text x="145" y="146">5</text>
+    <line x1="230" y1="124" x2="230" y2="132" stroke="#94a3b8"/><text x="230" y="146">10</text>
+    <line x1="315" y1="124" x2="315" y2="132" stroke="#94a3b8"/><text x="315" y="146">15</text>
+    <line x1="400" y1="124" x2="400" y2="132" stroke="#94a3b8"/><text x="400" y="146">20</text>
+    <line x1="570" y1="124" x2="570" y2="132" stroke="#94a3b8"/><text x="570" y="146">30</text>
+  </g>
+  <text x="30" y="176" fill="#64748b">rooms</text>
+  <g text-anchor="middle" font-weight="700">
+    <text x="102" y="176" fill="#64748b">1</text>
+    <text x="187" y="176" fill="#059669">2</text>
+    <text x="272" y="176" fill="#64748b">1</text>
+    <text x="357" y="176" fill="#059669">2</text>
+    <text x="485" y="176" fill="#64748b">1</text>
+  </g>
+  <text x="320" y="204" text-anchor="middle" fill="#059669" font-weight="700">peak = 2 → need 2 rooms</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Meeting Rooms     : maintain state, update in O(1)/O(log n) ──▶ fast

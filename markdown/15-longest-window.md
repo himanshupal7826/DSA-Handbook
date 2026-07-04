@@ -69,6 +69,27 @@ A window with incrementally maintained aggregates means each element enters and 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 180" width="100%" height="180" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-15" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Longest window: keep growing, shrink ONLY when invalid</text>
+  <g>
+    <rect x="40"  y="55" width="46" height="46" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="63"  y="83" text-anchor="middle" fill="#1e293b">a</text>
+    <rect x="90"  y="55" width="46" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="113" y="83" text-anchor="middle" fill="#1e293b">b</text>
+    <rect x="140" y="55" width="46" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="163" y="83" text-anchor="middle" fill="#1e293b">c</text>
+    <rect x="190" y="55" width="46" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="213" y="83" text-anchor="middle" fill="#1e293b">b</text>
+    <rect x="240" y="55" width="46" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="263" y="83" text-anchor="middle" fill="#1e293b">d</text>
+    <rect x="290" y="55" width="46" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="313" y="83" text-anchor="middle" fill="#1e293b">a</text>
+  </g>
+  <rect x="86" y="51" width="204" height="54" rx="8" fill="none" stroke="#059669" stroke-width="2"/>
+  <text x="188" y="122" text-anchor="middle" fill="#059669" font-weight="700">longest valid window = 4</text>
+  <line x1="300" y1="126" x2="360" y2="126" stroke="#475569" marker-end="url(#a-15)"/>
+  <text x="330" y="120" text-anchor="middle" fill="#64748b">grow →</text>
+  <text x="320" y="152" text-anchor="middle" fill="#64748b">'a' repeats ⇒ shrink L past old 'a', then track best length</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Longest Window    : maintain state, update in O(1)/O(log n) ──▶ fast

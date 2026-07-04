@@ -69,6 +69,28 @@ Pick the traversal by structure: BFS for unweighted shortest paths, DFS for conn
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="arw-64" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Union-Find: child pointers climb to the set root</text>
+  <!-- parent pointers (child -> parent) -->
+  <line x1="128" y1="140" x2="185" y2="80"  stroke="#475569" marker-end="url(#arw-64)"/>
+  <line x1="292" y1="140" x2="235" y2="80"  stroke="#475569" marker-end="url(#arw-64)"/>
+  <line x1="120" y1="215" x2="120" y2="168" stroke="#475569" marker-end="url(#arw-64)"/>
+  <!-- set A tree rooted at 1 -->
+  <circle cx="210" cy="60"  r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="210" y="65"  text-anchor="middle" font-weight="700" fill="#1e293b">1</text><text x="210" y="35" text-anchor="middle" fill="#059669">root</text>
+  <circle cx="110" cy="150" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="110" y="155" text-anchor="middle" font-weight="700" fill="#1e293b">2</text>
+  <circle cx="310" cy="150" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="310" y="155" text-anchor="middle" font-weight="700" fill="#1e293b">3</text>
+  <circle cx="110" cy="235" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="110" y="240" text-anchor="middle" font-weight="700" fill="#1e293b">4</text>
+  <!-- separate singleton set -->
+  <circle cx="520" cy="120" r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="520" y="125" text-anchor="middle" font-weight="700" fill="#1e293b">5</text><text x="520" y="95" text-anchor="middle" fill="#059669">root</text>
+  <text x="400" y="70"  text-anchor="middle" fill="#64748b">find(4) → 1</text>
+  <text x="400" y="90"  text-anchor="middle" fill="#64748b">find(5) → 5</text>
+  <text x="400" y="115" text-anchor="middle" fill="#1e293b" font-weight="700">1 ≠ 5 → separate sets</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Union Find        : maintain state, update in O(1)/O(log n) ──▶ fast

@@ -69,6 +69,32 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 190" width="100%" height="190" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="as-76" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="18" text-anchor="middle" font-weight="700" fill="#1e293b">Subset Sum (boolean): dp[s] = dp[s] OR dp[s-num]  · nums {2,3,4}, target 6</text>
+  <text x="120" y="52" text-anchor="middle" fill="#64748b">s=0</text>
+  <text x="186" y="52" text-anchor="middle" fill="#64748b">1</text>
+  <text x="252" y="52" text-anchor="middle" fill="#64748b">2</text>
+  <text x="318" y="52" text-anchor="middle" fill="#64748b">3</text>
+  <text x="384" y="52" text-anchor="middle" fill="#64748b">4</text>
+  <text x="450" y="52" text-anchor="middle" fill="#64748b">5</text>
+  <text x="516" y="52" text-anchor="middle" fill="#64748b">6</text>
+  <rect x="90"  y="60" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="120" y="85" text-anchor="middle" fill="#1e293b">T</text>
+  <rect x="156" y="60" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="186" y="85" text-anchor="middle" fill="#64748b">F</text>
+  <rect x="222" y="60" width="60" height="40" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="252" y="85" text-anchor="middle" fill="#1e293b">T</text>
+  <rect x="288" y="60" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="318" y="85" text-anchor="middle" fill="#1e293b">T</text>
+  <rect x="354" y="60" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="384" y="85" text-anchor="middle" fill="#1e293b">T</text>
+  <rect x="420" y="60" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="450" y="85" text-anchor="middle" fill="#1e293b">T</text>
+  <rect x="486" y="60" width="60" height="40" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="516" y="85" text-anchor="middle" fill="#1e293b" font-weight="700">T</text>
+  <path d="M252,58 Q384,24 516,58" fill="none" stroke="#475569" marker-end="url(#as-76)"/>
+  <text x="384" y="28" text-anchor="middle" fill="#64748b">add num=4: dp[6] |= dp[6-4] = dp[2]</text>
+  <text x="320" y="130" text-anchor="middle" fill="#059669" font-weight="700">dp[6] = true  answer · subset {2,4} sums to 6</text>
+  <text x="320" y="152" text-anchor="middle" fill="#64748b">loop s downward so each number is used at most once</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Subset Sum        : maintain state, update in O(1)/O(log n) ──▶ fast

@@ -69,6 +69,32 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs>
+    <marker id="arr81" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker>
+    <marker id="arr81a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#d97706"/></marker>
+  </defs>
+  <text x="310" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Unique Paths: dp[i][j] = dp[i-1][j] + dp[i][j-1]</text>
+  <rect x="250" y="52"  width="48" height="48" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="274" y="81"  text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="302" y="52"  width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="326" y="81"  text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="354" y="52"  width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="378" y="81"  text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="250" y="104" width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="274" y="133" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="302" y="104" width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="326" y="133" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="354" y="104" width="48" height="48" rx="6" fill="#fff7ed" stroke="#d97706" stroke-width="2"/><text x="378" y="133" text-anchor="middle" font-weight="700" fill="#1e293b">3</text>
+  <rect x="250" y="156" width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="274" y="185" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="302" y="156" width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="326" y="185" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="354" y="156" width="48" height="48" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="378" y="185" text-anchor="middle" font-weight="700" fill="#1e293b">6</text>
+  <line x1="378" y1="80" x2="378" y2="102" stroke="#d97706" marker-end="url(#arr81a)"/>
+  <line x1="328" y1="128" x2="352" y2="128" stroke="#d97706" marker-end="url(#arr81a)"/>
+  <text x="472" y="124" fill="#d97706" font-weight="700">up 1 + left 2</text>
+  <text x="472" y="142" fill="#64748b">= 3</text>
+  <text x="274" y="228" text-anchor="middle" fill="#059669">start</text>
+  <text x="378" y="228" text-anchor="middle" fill="#059669" font-weight="700">answer = 6</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 DP on Grids       : maintain state, update in O(1)/O(log n) ──▶ fast

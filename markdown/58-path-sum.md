@@ -69,6 +69,33 @@ Trees are recursive: solve children first, combine their results at the parent. 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 560 265" width="100%" height="265" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="psum-58" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="280" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">DFS carries a running sum down each root-to-leaf path (target 11)</text>
+  <!-- highlighted path A-C-F -->
+  <line x1="294" y1="54" x2="366" y2="96" stroke="#059669" stroke-width="4"/>
+  <line x1="394" y1="124" x2="426" y2="166" stroke="#059669" stroke-width="4"/>
+  <!-- other edges -->
+  <line x1="266" y1="54" x2="194" y2="96" stroke="#475569"/>
+  <line x1="166" y1="124" x2="134" y2="166" stroke="#475569"/>
+  <line x1="194" y1="124" x2="226" y2="166" stroke="#475569"/>
+  <!-- nodes with values -->
+  <circle cx="280" cy="40" r="20" fill="#ecfdf5" stroke="#059669"/><text x="280" y="45" text-anchor="middle" fill="#1e293b">5</text>
+  <circle cx="180" cy="110" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="180" y="115" text-anchor="middle" fill="#1e293b">4</text>
+  <circle cx="380" cy="110" r="20" fill="#ecfdf5" stroke="#059669"/><text x="380" y="115" text-anchor="middle" fill="#1e293b">4</text>
+  <circle cx="120" cy="180" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="120" y="185" text-anchor="middle" fill="#1e293b">8</text>
+  <circle cx="240" cy="180" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="240" y="185" text-anchor="middle" fill="#1e293b">2</text>
+  <circle cx="440" cy="180" r="20" fill="#ecfdf5" stroke="#059669"/><text x="440" y="185" text-anchor="middle" fill="#1e293b">2</text>
+  <text x="308" y="44"  text-anchor="start" fill="#059669" font-weight="700">acc=5</text>
+  <text x="404" y="114" text-anchor="start" fill="#059669" font-weight="700">acc=9</text>
+  <text x="466" y="184" text-anchor="start" fill="#059669" font-weight="700">acc=11</text>
+  <line x1="120" y1="215" x2="440" y2="215" stroke="#475569" marker-end="url(#psum-58)"/>
+  <text x="280" y="252" text-anchor="middle" fill="#059669" font-weight="700">leaf reached with acc == target, so 5 + 4 + 2 = 11 is a hit</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Path Sum          : maintain state, update in O(1)/O(log n) ──▶ fast

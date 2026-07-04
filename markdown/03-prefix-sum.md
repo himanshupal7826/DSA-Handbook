@@ -69,6 +69,37 @@ Trade O(n) extra space for O(1) lookups, collapsing nested work into independent
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 660 240" width="100%" height="240" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="ps-03" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="330" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">nums = [2,4,1,3,5]: build prefix, then rangeSum(1,3) = pre[4] − pre[1]</text>
+  <text x="40" y="72" fill="#64748b">nums</text>
+  <!-- nums row, range 1..3 highlighted -->
+  <g>
+    <rect x="120" y="52" width="56" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="148" y="78" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="180" y="52" width="56" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="208" y="78" text-anchor="middle" fill="#1e293b">4</text>
+    <rect x="240" y="52" width="56" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="268" y="78" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="300" y="52" width="56" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="328" y="78" text-anchor="middle" fill="#1e293b">3</text>
+    <rect x="360" y="52" width="56" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="388" y="78" text-anchor="middle" fill="#1e293b">5</text>
+  </g>
+  <text x="298" y="112" text-anchor="middle" fill="#059669" font-weight="700">range [1..3] sum = 8</text>
+  <text x="40" y="162" fill="#64748b">pre</text>
+  <!-- prefix row of n+1 cells -->
+  <g>
+    <rect x="90"  y="142" width="56" height="40" rx="6" fill="#fff7ed" stroke="#d97706" stroke-width="2"/><text x="118" y="168" text-anchor="middle" fill="#1e293b">0</text>
+    <rect x="150" y="142" width="56" height="40" rx="6" fill="#fff7ed" stroke="#d97706" stroke-width="2"/><text x="178" y="168" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="210" y="142" width="56" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="238" y="168" text-anchor="middle" fill="#1e293b">6</text>
+    <rect x="270" y="142" width="56" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="298" y="168" text-anchor="middle" fill="#1e293b">7</text>
+    <rect x="330" y="142" width="56" height="40" rx="6" fill="#fff7ed" stroke="#d97706" stroke-width="2"/><text x="358" y="168" text-anchor="middle" fill="#1e293b">10</text>
+    <rect x="390" y="142" width="56" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="418" y="168" text-anchor="middle" fill="#1e293b">15</text>
+  </g>
+  <text x="178" y="202" text-anchor="middle" fill="#d97706">pre[1]=2</text>
+  <text x="358" y="202" text-anchor="middle" fill="#d97706">pre[4]=10</text>
+  <text x="530" y="168" text-anchor="middle" fill="#059669" font-weight="700">10 − 2 = 8</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Prefix Sum        : maintain state, update in O(1)/O(log n) ──▶ fast

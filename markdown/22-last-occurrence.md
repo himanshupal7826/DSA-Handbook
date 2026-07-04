@@ -69,6 +69,28 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 200" width="100%" height="200" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="bs-22" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="310" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Last occurrence of 4: on a match, bias RIGHT (lo = mid + 1)</text>
+  <rect x="24"  y="52" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="58"  y="81" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="96"  y="52" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="130" y="81" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="168" y="52" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="202" y="81" text-anchor="middle" fill="#1e293b">4</text>
+  <rect x="240" y="52" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="274" y="81" text-anchor="middle" fill="#1e293b">4</text>
+  <rect x="312" y="52" width="68" height="48" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="346" y="81" text-anchor="middle" fill="#1e293b" font-weight="700">4</text>
+  <rect x="384" y="52" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="418" y="81" text-anchor="middle" fill="#1e293b">6</text>
+  <rect x="456" y="52" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="490" y="81" text-anchor="middle" fill="#1e293b">8</text>
+  <rect x="528" y="52" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="562" y="81" text-anchor="middle" fill="#1e293b">9</text>
+  <line x1="384" y1="44" x2="384" y2="112" stroke="#059669" stroke-width="2" stroke-dasharray="4 3"/>
+  <text x="346" y="150" text-anchor="middle" fill="#059669" font-weight="700">last index with a[i] = 4</text>
+  <text x="472" y="130" text-anchor="middle" fill="#2563eb">a[i] &gt; 4</text>
+  <text x="210" y="130" text-anchor="middle" fill="#d97706">← earlier matches skipped</text>
+  <line x1="290" y1="168" x2="390" y2="168" stroke="#475569" marker-end="url(#bs-22)"/>
+  <text x="340" y="188" text-anchor="middle" fill="#64748b">keep the rightmost boundary</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Last Occurrence   : maintain state, update in O(1)/O(log n) ──▶ fast

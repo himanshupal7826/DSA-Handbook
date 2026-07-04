@@ -69,6 +69,28 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 200" width="100%" height="200" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="bs-20" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="310" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Search 13 in a sorted array: compare a[mid], discard the wrong half</text>
+  <rect x="24"  y="52" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="58"  y="81" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="96"  y="52" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="130" y="81" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="168" y="52" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="202" y="81" text-anchor="middle" fill="#1e293b">5</text>
+  <rect x="240" y="52" width="68" height="48" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="274" y="81" text-anchor="middle" fill="#1e293b" font-weight="700">7</text>
+  <rect x="312" y="52" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="346" y="81" text-anchor="middle" fill="#1e293b">9</text>
+  <rect x="384" y="52" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="418" y="81" text-anchor="middle" fill="#1e293b">11</text>
+  <rect x="456" y="52" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="490" y="81" text-anchor="middle" fill="#1e293b">13</text>
+  <rect x="528" y="52" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="562" y="81" text-anchor="middle" fill="#1e293b">15</text>
+  <text x="58"  y="124" text-anchor="middle" fill="#64748b" font-weight="700">lo</text>
+  <text x="274" y="124" text-anchor="middle" fill="#059669" font-weight="700">mid</text>
+  <text x="562" y="124" text-anchor="middle" fill="#64748b" font-weight="700">hi</text>
+  <text x="130" y="150" text-anchor="middle" fill="#d97706">discarded half</text>
+  <line x1="300" y1="168" x2="470" y2="168" stroke="#475569" marker-end="url(#bs-20)"/>
+  <text x="385" y="188" text-anchor="middle" fill="#64748b">a[mid]=7 &lt; 13  →  lo = mid + 1, keep right half</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Classic Binary Sea: maintain state, update in O(1)/O(log n) ──▶ fast

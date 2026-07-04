@@ -69,6 +69,43 @@ A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand fro
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="bfs-42" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">BFS: a FIFO queue expands the frontier level by level</text>
+  <!-- tree -->
+  <text x="18" y="70" fill="#64748b">L0</text>
+  <text x="18" y="135" fill="#64748b">L1</text>
+  <text x="18" y="200" fill="#64748b">L2</text>
+  <line x1="110" y1="80" x2="72" y2="120" stroke="#475569"/>
+  <line x1="110" y1="80" x2="160" y2="120" stroke="#475569"/>
+  <line x1="70" y1="146" x2="49" y2="185" stroke="#475569"/>
+  <line x1="70" y1="146" x2="95" y2="185" stroke="#475569"/>
+  <line x1="162" y1="146" x2="162" y2="185" stroke="#475569"/>
+  <circle cx="110" cy="65" r="18" fill="#ecfdf5" stroke="#059669"/><text x="110" y="70" text-anchor="middle" fill="#1e293b">1</text>
+  <circle cx="70" cy="130" r="18" fill="#eff6ff" stroke="#2563eb"/><text x="70" y="135" text-anchor="middle" fill="#1e293b">2</text>
+  <circle cx="162" cy="130" r="18" fill="#eff6ff" stroke="#2563eb"/><text x="162" y="135" text-anchor="middle" fill="#1e293b">3</text>
+  <circle cx="47" cy="195" r="18" fill="#eff6ff" stroke="#2563eb"/><text x="47" y="200" text-anchor="middle" fill="#1e293b">4</text>
+  <circle cx="97" cy="195" r="18" fill="#eff6ff" stroke="#2563eb"/><text x="97" y="200" text-anchor="middle" fill="#1e293b">5</text>
+  <circle cx="162" cy="195" r="18" fill="#eff6ff" stroke="#2563eb"/><text x="162" y="200" text-anchor="middle" fill="#1e293b">6</text>
+  <!-- queue popped level by level -->
+  <line x1="300" y1="52" x2="300" y2="200" stroke="#475569" marker-end="url(#bfs-42)"/>
+  <text x="300" y="222" text-anchor="middle" fill="#64748b">pop order</text>
+  <text x="325" y="72" fill="#64748b">L0</text>
+  <rect x="358" y="52" width="34" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="375" y="72" text-anchor="middle" fill="#1e293b">1</text>
+  <text x="325" y="125" fill="#64748b">L1</text>
+  <rect x="358" y="105" width="34" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="375" y="125" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="398" y="105" width="34" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="415" y="125" text-anchor="middle" fill="#1e293b">3</text>
+  <text x="325" y="178" fill="#64748b">L2</text>
+  <rect x="358" y="158" width="34" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="375" y="178" text-anchor="middle" fill="#1e293b">4</text>
+  <rect x="398" y="158" width="34" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="415" y="178" text-anchor="middle" fill="#1e293b">5</text>
+  <rect x="438" y="158" width="34" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="455" y="178" text-anchor="middle" fill="#1e293b">6</text>
+  <text x="560" y="116" text-anchor="middle" fill="#64748b">dequeue front,</text>
+  <text x="560" y="134" text-anchor="middle" fill="#64748b">enqueue its children</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 BFS Queue Pattern : maintain state, update in O(1)/O(log n) ──▶ fast

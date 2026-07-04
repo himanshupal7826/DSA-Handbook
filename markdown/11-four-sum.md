@@ -69,6 +69,31 @@ Maintain two indices and an invariant that tells you which pointer to advance, e
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 190" width="100%" height="190" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="fos-11" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Sorted · fix a[i], a[j], then two-pointer the rest (k-sum → 2-sum)</text>
+  <g>
+    <rect x="50"  y="46" width="62" height="46" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="81"  y="74" text-anchor="middle" fill="#1e293b">-2</text>
+    <rect x="120" y="46" width="62" height="46" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="151" y="74" text-anchor="middle" fill="#1e293b">-1</text>
+    <rect x="190" y="46" width="62" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="221" y="74" text-anchor="middle" fill="#1e293b">0</text>
+    <rect x="260" y="46" width="62" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="291" y="74" text-anchor="middle" fill="#1e293b">0</text>
+    <rect x="330" y="46" width="62" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="361" y="74" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="400" y="46" width="62" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="431" y="74" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="470" y="46" width="62" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="501" y="74" text-anchor="middle" fill="#1e293b">3</text>
+    <rect x="540" y="46" width="62" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="571" y="74" text-anchor="middle" fill="#1e293b">4</text>
+  </g>
+  <text x="81"  y="112" text-anchor="middle" fill="#d97706" font-weight="700">i</text>
+  <text x="151" y="112" text-anchor="middle" fill="#d97706" font-weight="700">j</text>
+  <text x="221" y="112" text-anchor="middle" fill="#059669" font-weight="700">L</text>
+  <text x="571" y="112" text-anchor="middle" fill="#059669" font-weight="700">R</text>
+  <line x1="221" y1="126" x2="284" y2="126" stroke="#475569" marker-end="url(#fos-11)"/>
+  <line x1="571" y1="126" x2="508" y2="126" stroke="#475569" marker-end="url(#fos-11)"/>
+  <text x="320" y="164" text-anchor="middle" fill="#1e293b">two outer loops fix i &amp; j; inner L,R sweep for the remaining sum</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Four Sum Pattern  : maintain state, update in O(1)/O(log n) ──▶ fast

@@ -69,6 +69,40 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 280" width="100%" height="280" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="tarjan-99" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">low-link on the DFS tree: a back edge lowers low; a tree edge with low(child) &gt; disc(u) is a bridge</text>
+  <!-- tree edges -->
+  <line x1="120" y1="72" x2="120" y2="127" stroke="#475569" stroke-width="2"/>
+  <line x1="120" y1="145" x2="120" y2="200" stroke="#475569" stroke-width="2"/>
+  <line x1="140" y1="140" x2="270" y2="200" stroke="#d97706" stroke-width="3"/>
+  <!-- back edge 3 -> 1 (dashed) -->
+  <path d="M105,205 C40,160 40,110 105,80" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#tarjan-99)"/>
+  <text x="45" y="145" text-anchor="middle" fill="#2563eb" font-weight="700">back edge</text>
+  <!-- bridge label -->
+  <text x="230" y="160" text-anchor="middle" fill="#d97706" font-weight="700">bridge</text>
+  <!-- nodes with disc/low -->
+  <circle cx="120" cy="72" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="120" y="76" text-anchor="middle" fill="#1e293b">1</text>
+  <circle cx="120" cy="135" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="120" y="139" text-anchor="middle" fill="#1e293b">2</text>
+  <circle cx="120" cy="210" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="120" y="214" text-anchor="middle" fill="#1e293b">3</text>
+  <circle cx="285" cy="210" r="20" fill="#fff7ed" stroke="#d97706"/><text x="285" y="214" text-anchor="middle" fill="#1e293b">4</text>
+  <text x="160" y="70" fill="#64748b">disc=1 low=1</text>
+  <text x="160" y="135" fill="#64748b">disc=2 low=1</text>
+  <text x="160" y="240" text-anchor="middle" fill="#64748b">disc=3 low=1</text>
+  <text x="285" y="245" text-anchor="middle" fill="#d97706" font-weight="700">disc=4 low=4</text>
+  <!-- explanation box -->
+  <text x="470" y="90" text-anchor="middle" fill="#1e293b" font-weight="700">rule</text>
+  <text x="470" y="115" text-anchor="middle" fill="#64748b">low(u) = min( disc(u),</text>
+  <text x="470" y="133" text-anchor="middle" fill="#64748b">low(child), disc(back-target) )</text>
+  <text x="470" y="165" text-anchor="middle" fill="#2563eb">3→1 back edge: low(3)=1</text>
+  <text x="470" y="183" text-anchor="middle" fill="#2563eb">propagates up: low(2)=1</text>
+  <text x="470" y="212" text-anchor="middle" fill="#d97706">edge 2-4: low(4)=4 &gt; disc(2)=2</text>
+  <text x="470" y="230" text-anchor="middle" fill="#d97706" font-weight="700">so 2-4 is a bridge</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Tarjan Algorithm  : maintain state, update in O(1)/O(log n) ──▶ fast

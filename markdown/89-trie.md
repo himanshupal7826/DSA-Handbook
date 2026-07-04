@@ -69,6 +69,36 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="tr-89" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Trie of {cat, car, dog} &amp; one shared prefix "ca"</text>
+  <!-- edges -->
+  <line x1="320" y1="52" x2="210" y2="92"  stroke="#475569" marker-end="url(#tr-89)"/>
+  <line x1="320" y1="52" x2="450" y2="92"  stroke="#475569" marker-end="url(#tr-89)"/>
+  <line x1="200" y1="112" x2="200" y2="152" stroke="#475569" marker-end="url(#tr-89)"/>
+  <line x1="190" y1="172" x2="150" y2="202" stroke="#475569" marker-end="url(#tr-89)"/>
+  <line x1="210" y1="172" x2="255" y2="202" stroke="#475569" marker-end="url(#tr-89)"/>
+  <line x1="450" y1="112" x2="450" y2="152" stroke="#475569" marker-end="url(#tr-89)"/>
+  <line x1="450" y1="172" x2="450" y2="202" stroke="#475569" marker-end="url(#tr-89)"/>
+  <!-- root -->
+  <circle cx="320" cy="42" r="16" fill="#eff6ff" stroke="#2563eb"/><text x="320" y="46" text-anchor="middle" fill="#64748b">•</text>
+  <!-- c / d -->
+  <circle cx="200" cy="102" r="16" fill="#eff6ff" stroke="#2563eb"/><text x="200" y="107" text-anchor="middle" fill="#1e293b">c</text>
+  <circle cx="450" cy="102" r="16" fill="#eff6ff" stroke="#2563eb"/><text x="450" y="107" text-anchor="middle" fill="#1e293b">d</text>
+  <!-- a / o -->
+  <circle cx="200" cy="162" r="16" fill="#eff6ff" stroke="#2563eb"/><text x="200" y="167" text-anchor="middle" fill="#1e293b">a</text>
+  <circle cx="450" cy="162" r="16" fill="#eff6ff" stroke="#2563eb"/><text x="450" y="167" text-anchor="middle" fill="#1e293b">o</text>
+  <!-- leaves (end of word) -->
+  <circle cx="145" cy="216" r="16" fill="#ecfdf5" stroke="#059669"/><text x="145" y="221" text-anchor="middle" fill="#1e293b">t</text>
+  <circle cx="260" cy="216" r="16" fill="#ecfdf5" stroke="#059669"/><text x="260" y="221" text-anchor="middle" fill="#1e293b">r</text>
+  <circle cx="450" cy="216" r="16" fill="#ecfdf5" stroke="#059669"/><text x="450" y="221" text-anchor="middle" fill="#1e293b">g</text>
+  <text x="540" y="212" text-anchor="middle" fill="#059669" font-weight="700">green =</text>
+  <text x="540" y="228" text-anchor="middle" fill="#059669" font-weight="700">isEnd</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Trie              : maintain state, update in O(1)/O(log n) ──▶ fast

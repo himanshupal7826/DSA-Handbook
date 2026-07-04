@@ -412,3 +412,13 @@ a:hover { text-decoration: underline; }
   color: var(--text); font-size: 13.5px; font-weight: 600;
 }
 .content .video-cta:hover { border-color: #ff0000; color: #ff0000; text-decoration: none; }
+
+/* Per-section "listen from here" play button (injected on H2/H3 in Listen mode) */
+.content .listen-seg {
+  margin-left: 8px; border: none; background: none; cursor: pointer;
+  color: var(--text-faint); font-size: .6em; vertical-align: middle;
+  opacity: .4; padding: 2px 6px; border-radius: 5px; line-height: 1;
+}
+.content .listen-seg:hover,
+.content .listen-seg.playing { opacity: 1; color: var(--accent); background: var(--accent-soft); }
+.listen-bar .listen-sel { padding: 6px 10px; }

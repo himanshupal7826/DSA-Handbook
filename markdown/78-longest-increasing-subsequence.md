@@ -69,6 +69,29 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 220" width="100%" height="220" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="al-78" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="310" y="18" text-anchor="middle" font-weight="700" fill="#1e293b">LIS: dp[i] = 1 + max(dp[j]) for j &lt; i with a[j] &lt; a[i]</text>
+  <text x="70" y="80" text-anchor="middle" fill="#64748b">a[i]</text>
+  <text x="70" y="134" text-anchor="middle" fill="#64748b">dp[i]</text>
+  <rect x="120" y="56" width="54" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="147" y="81" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="190" y="56" width="54" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="217" y="81" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="260" y="56" width="54" height="40" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="287" y="81" text-anchor="middle" fill="#1e293b">4</text>
+  <rect x="330" y="56" width="54" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="357" y="81" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="400" y="56" width="54" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="427" y="81" text-anchor="middle" fill="#1e293b">5</text>
+  <rect x="120" y="110" width="54" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="147" y="135" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="190" y="110" width="54" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="217" y="135" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="260" y="110" width="54" height="40" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="287" y="135" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="330" y="110" width="54" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="357" y="135" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="400" y="110" width="54" height="40" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="427" y="135" text-anchor="middle" fill="#1e293b" font-weight="700">3</text>
+  <path d="M287,152 Q357,190 427,152" fill="none" stroke="#475569" marker-end="url(#al-78)"/>
+  <text x="357" y="184" text-anchor="middle" fill="#64748b">a[2]=4 &lt; a[4]=5, so dp[4] = dp[2] + 1</text>
+  <text x="310" y="210" text-anchor="middle" fill="#059669" font-weight="700">LIS length = max dp = 3  (subsequence 3, 4, 5)</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Longest Increasing: maintain state, update in O(1)/O(log n) ──▶ fast

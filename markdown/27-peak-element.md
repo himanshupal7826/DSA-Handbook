@@ -69,6 +69,26 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 210" width="100%" height="210" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="bs-27" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="310" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Peak element: a[mid] &lt; a[mid+1] means a peak lies to the right</text>
+  <rect x="36"  y="141" width="44" height="19" rx="4" fill="#fff7ed" stroke="#d97706"/><text x="58"  y="176" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="108" y="119" width="44" height="41" rx="4" fill="#fff7ed" stroke="#d97706"/><text x="130" y="176" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="180" y="97"  width="44" height="63" rx="4" fill="#fff7ed" stroke="#d97706"/><text x="202" y="176" text-anchor="middle" fill="#1e293b">5</text>
+  <rect x="252" y="75"  width="44" height="85" rx="4" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="274" y="176" text-anchor="middle" fill="#1e293b" font-weight="700">7</text>
+  <rect x="324" y="86"  width="44" height="74" rx="4" fill="#eff6ff" stroke="#2563eb"/><text x="346" y="176" text-anchor="middle" fill="#1e293b">6</text>
+  <rect x="396" y="108" width="44" height="52" rx="4" fill="#eff6ff" stroke="#2563eb"/><text x="418" y="176" text-anchor="middle" fill="#1e293b">4</text>
+  <rect x="468" y="130" width="44" height="30" rx="4" fill="#eff6ff" stroke="#2563eb"/><text x="490" y="176" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="540" y="141" width="44" height="19" rx="4" fill="#eff6ff" stroke="#2563eb"/><text x="562" y="176" text-anchor="middle" fill="#1e293b">1</text>
+  <line x1="202" y1="90" x2="266" y2="70" stroke="#475569" marker-end="url(#bs-27)"/>
+  <text x="202" y="196" text-anchor="middle" fill="#64748b" font-weight="700">mid</text>
+  <text x="274" y="196" text-anchor="middle" fill="#059669" font-weight="700">peak</text>
+  <text x="150" y="196" text-anchor="middle" fill="#d97706">drop left half (lo = mid + 1)</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Peak Element      : maintain state, update in O(1)/O(log n) ──▶ fast

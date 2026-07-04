@@ -69,6 +69,37 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 210" width="100%" height="210" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="bs-28" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="310" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Monotonic predicate f(x): F...F then T...T — locate the flip</text>
+  <rect x="24"  y="52" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="58"  y="81" text-anchor="middle" fill="#d97706" font-weight="700">F</text>
+  <rect x="96"  y="52" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="130" y="81" text-anchor="middle" fill="#d97706" font-weight="700">F</text>
+  <rect x="168" y="52" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="202" y="81" text-anchor="middle" fill="#d97706" font-weight="700">F</text>
+  <rect x="240" y="52" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="274" y="81" text-anchor="middle" fill="#d97706" font-weight="700">F</text>
+  <rect x="312" y="52" width="68" height="48" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="346" y="81" text-anchor="middle" fill="#059669" font-weight="700">T</text>
+  <rect x="384" y="52" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="418" y="81" text-anchor="middle" fill="#2563eb" font-weight="700">T</text>
+  <rect x="456" y="52" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="490" y="81" text-anchor="middle" fill="#2563eb" font-weight="700">T</text>
+  <rect x="528" y="52" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="562" y="81" text-anchor="middle" fill="#2563eb" font-weight="700">T</text>
+  <text x="58"  y="120" text-anchor="middle" fill="#64748b">x0</text>
+  <text x="130" y="120" text-anchor="middle" fill="#64748b">x1</text>
+  <text x="202" y="120" text-anchor="middle" fill="#64748b">x2</text>
+  <text x="274" y="120" text-anchor="middle" fill="#64748b">x3</text>
+  <text x="346" y="120" text-anchor="middle" fill="#64748b">x4</text>
+  <text x="418" y="120" text-anchor="middle" fill="#64748b">x5</text>
+  <text x="490" y="120" text-anchor="middle" fill="#64748b">x6</text>
+  <text x="562" y="120" text-anchor="middle" fill="#64748b">x7</text>
+  <line x1="312" y1="44" x2="312" y2="132" stroke="#059669" stroke-width="2" stroke-dasharray="4 3"/>
+  <text x="185" y="150" text-anchor="middle" fill="#d97706">test mid: if false, go right</text>
+  <text x="470" y="150" text-anchor="middle" fill="#2563eb">if true, keep mid, go left</text>
+  <text x="346" y="172" text-anchor="middle" fill="#059669" font-weight="700">first true = answer</text>
+  <line x1="470" y1="188" x2="330" y2="188" stroke="#475569" marker-end="url(#bs-28)"/>
+  <line x1="150" y1="188" x2="300" y2="188" stroke="#475569" marker-end="url(#bs-28)"/>
+  <text x="310" y="204" text-anchor="middle" fill="#64748b">converge on the F→T boundary in O(log n)</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Monotonic Function: maintain state, update in O(1)/O(log n) ──▶ fast

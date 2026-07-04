@@ -69,6 +69,33 @@ Pick the traversal by structure: BFS for unweighted shortest paths, DFS for conn
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 230" width="100%" height="230" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="arw-61" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">BFS from source A: distance = layer number</text>
+  <!-- layer guides -->
+  <text x="80"  y="200" text-anchor="middle" fill="#64748b">layer 0</text>
+  <text x="250" y="200" text-anchor="middle" fill="#64748b">layer 1</text>
+  <text x="430" y="200" text-anchor="middle" fill="#64748b">layer 2</text>
+  <text x="580" y="200" text-anchor="middle" fill="#64748b">layer 3</text>
+  <!-- edges -->
+  <line x1="102" y1="105" x2="228" y2="70"  stroke="#475569" marker-end="url(#arw-61)"/>
+  <line x1="102" y1="115" x2="228" y2="150" stroke="#475569" marker-end="url(#arw-61)"/>
+  <line x1="272" y1="65"  x2="408" y2="65"  stroke="#475569" marker-end="url(#arw-61)"/>
+  <line x1="272" y1="155" x2="408" y2="155" stroke="#475569" marker-end="url(#arw-61)"/>
+  <line x1="452" y1="72"  x2="558" y2="105" stroke="#475569" marker-end="url(#arw-61)"/>
+  <line x1="452" y1="148" x2="558" y2="115" stroke="#475569" marker-end="url(#arw-61)"/>
+  <!-- nodes -->
+  <circle cx="80"  cy="110" r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="80"  y="115" text-anchor="middle" font-weight="700" fill="#1e293b">A</text><text x="80"  y="160" text-anchor="middle" fill="#059669">d=0</text>
+  <circle cx="250" cy="65"  r="22" fill="#eff6ff" stroke="#2563eb"/><text x="250" y="70"  text-anchor="middle" font-weight="700" fill="#1e293b">B</text><text x="250" y="40" text-anchor="middle" fill="#64748b">d=1</text>
+  <circle cx="250" cy="155" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="250" y="160" text-anchor="middle" font-weight="700" fill="#1e293b">C</text><text x="250" y="130" text-anchor="middle" fill="#64748b">d=1</text>
+  <circle cx="430" cy="65"  r="22" fill="#eff6ff" stroke="#2563eb"/><text x="430" y="70"  text-anchor="middle" font-weight="700" fill="#1e293b">D</text><text x="430" y="40" text-anchor="middle" fill="#64748b">d=2</text>
+  <circle cx="430" cy="155" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="430" y="160" text-anchor="middle" font-weight="700" fill="#1e293b">E</text><text x="430" y="130" text-anchor="middle" fill="#64748b">d=2</text>
+  <circle cx="580" cy="110" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="580" y="115" text-anchor="middle" font-weight="700" fill="#1e293b">F</text><text x="580" y="160" text-anchor="middle" fill="#64748b">d=3</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Graph BFS         : maintain state, update in O(1)/O(log n) ──▶ fast

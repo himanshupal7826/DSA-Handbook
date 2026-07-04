@@ -69,6 +69,47 @@ A heap gives O(1) access to the extreme element and O(log n) updates — perfect
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="mkl-46" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Min-heap pulls the smallest head across k sorted lists</text>
+  <!-- k lists, heads highlighted -->
+  <g font-size="12">
+    <rect x="20" y="52" width="30" height="26" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="35" y="70" text-anchor="middle" fill="#1e293b">1</text>
+    <line x1="52" y1="65" x2="66" y2="65" stroke="#475569" marker-end="url(#mkl-46)"/>
+    <rect x="68" y="52" width="30" height="26" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="83" y="70" text-anchor="middle" fill="#1e293b">4</text>
+    <line x1="100" y1="65" x2="114" y2="65" stroke="#475569" marker-end="url(#mkl-46)"/>
+    <rect x="116" y="52" width="30" height="26" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="131" y="70" text-anchor="middle" fill="#1e293b">7</text>
+    <rect x="20" y="102" width="30" height="26" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="35" y="120" text-anchor="middle" fill="#1e293b">2</text>
+    <line x1="52" y1="115" x2="66" y2="115" stroke="#475569" marker-end="url(#mkl-46)"/>
+    <rect x="68" y="102" width="30" height="26" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="83" y="120" text-anchor="middle" fill="#1e293b">5</text>
+    <rect x="20" y="152" width="30" height="26" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="35" y="170" text-anchor="middle" fill="#1e293b">3</text>
+    <line x1="52" y1="165" x2="66" y2="165" stroke="#475569" marker-end="url(#mkl-46)"/>
+    <rect x="68" y="152" width="30" height="26" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="83" y="170" text-anchor="middle" fill="#1e293b">6</text>
+    <line x1="100" y1="165" x2="114" y2="165" stroke="#475569" marker-end="url(#mkl-46)"/>
+    <rect x="116" y="152" width="30" height="26" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="131" y="170" text-anchor="middle" fill="#1e293b">8</text>
+  </g>
+  <text x="90" y="200" text-anchor="middle" fill="#64748b">k sorted lists (heads shaded)</text>
+  <!-- heap of heads -->
+  <line x1="170" y1="115" x2="255" y2="115" stroke="#475569" marker-end="url(#mkl-46)"/>
+  <text x="360" y="52" text-anchor="middle" fill="#64748b">min-heap of current heads</text>
+  <line x1="360" y1="94" x2="325" y2="136" stroke="#475569"/>
+  <line x1="360" y1="94" x2="395" y2="136" stroke="#475569"/>
+  <circle cx="360" cy="80" r="20" fill="#ecfdf5" stroke="#059669"/><text x="360" y="85" text-anchor="middle" fill="#1e293b">1</text>
+  <circle cx="325" cy="150" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="325" y="155" text-anchor="middle" fill="#1e293b">2</text>
+  <circle cx="395" cy="150" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="395" y="155" text-anchor="middle" fill="#1e293b">3</text>
+  <text x="360" y="200" text-anchor="middle" fill="#64748b">pop 1, push its next 4</text>
+  <!-- output -->
+  <line x1="418" y1="80" x2="470" y2="80" stroke="#475569" marker-end="url(#mkl-46)"/>
+  <text x="560" y="60" text-anchor="middle" fill="#64748b">merged output</text>
+  <rect x="480" y="70" width="30" height="26" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="495" y="88" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="514" y="70" width="30" height="26" rx="6" fill="#eff6ff" stroke="#2563eb" stroke-dasharray="3 3"/><text x="529" y="88" text-anchor="middle" fill="#64748b">2</text>
+  <rect x="548" y="70" width="30" height="26" rx="6" fill="#eff6ff" stroke="#2563eb" stroke-dasharray="3 3"/><text x="563" y="88" text-anchor="middle" fill="#64748b">3</text>
+  <text x="560" y="120" text-anchor="middle" fill="#64748b">smallest emitted first</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Merge K Sorted Lis: maintain state, update in O(1)/O(log n) ──▶ fast

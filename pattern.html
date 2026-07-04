@@ -40,6 +40,7 @@
   <script src="assets/js/progress.js"></script>
   <script src="assets/js/search.js"></script>
   <script src="assets/js/markdown.js"></script>
+  <script src="assets/js/hb-listen.js"></script>
   <script src="assets/js/content.js" onerror="window.DSA_CONTENT=window.DSA_CONTENT||{}"></script>
   <script src="assets/js/app.js"></script>
   <script src="assets/js/journey.js"></script>
@@ -104,6 +105,7 @@
           _h1.insertAdjacentHTML("afterend", '<a class="video-cta" href="https://www.youtube.com/results?search_query=' + _vq + '" target="_blank" rel="noopener">🎥 Learn this pattern from free videos on YouTube →</a>');
         }
         DSAMarkdown.wire(container);
+        if (window.DSAListen) DSAListen.attach(container);
         // smooth-scroll if a hash is present
         if (location.hash) {
           var t = document.getElementById(location.hash.slice(1));

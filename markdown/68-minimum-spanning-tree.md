@@ -69,6 +69,29 @@ Pick the traversal by structure: BFS for unweighted shortest paths, DFS for conn
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 240" width="100%" height="240" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="arw-68" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">MST: keep cheapest edges that connect all, skip cycles</text>
+  <!-- chosen MST edges (green, thick) -->
+  <line x1="102" y1="70"  x2="248" y2="70"  stroke="#059669" stroke-width="3"/><text x="175" y="58"  text-anchor="middle" fill="#059669" font-weight="700">1</text>
+  <line x1="112" y1="90"  x2="185" y2="175" stroke="#059669" stroke-width="3"/><text x="130" y="140" text-anchor="middle" fill="#059669" font-weight="700">2</text>
+  <line x1="292" y1="80"  x2="428" y2="160" stroke="#059669" stroke-width="3"/><text x="380" y="110" text-anchor="middle" fill="#059669" font-weight="700">3</text>
+  <line x1="472" y1="170" x2="558" y2="90"  stroke="#059669" stroke-width="3"/><text x="530" y="140" text-anchor="middle" fill="#059669" font-weight="700">4</text>
+  <!-- rejected edges (muted, dashed) -->
+  <line x1="222" y1="90"  x2="215" y2="170" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4 3"/><text x="245" y="140" text-anchor="middle" fill="#d97706">8 skip</text>
+  <line x1="285" y1="70"  x2="548" y2="70"  stroke="#d97706" stroke-width="1.5" stroke-dasharray="4 3"/><text x="415" y="60" text-anchor="middle" fill="#d97706">9 skip</text>
+  <!-- nodes -->
+  <circle cx="80"  cy="70"  r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="80"  y="75"  text-anchor="middle" font-weight="700" fill="#1e293b">A</text>
+  <circle cx="270" cy="70"  r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="270" y="75"  text-anchor="middle" font-weight="700" fill="#1e293b">B</text>
+  <circle cx="200" cy="190" r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="200" y="195" text-anchor="middle" font-weight="700" fill="#1e293b">C</text>
+  <circle cx="450" cy="180" r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="450" y="185" text-anchor="middle" font-weight="700" fill="#1e293b">D</text>
+  <circle cx="575" cy="70"  r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="575" y="75"  text-anchor="middle" font-weight="700" fill="#1e293b">E</text>
+  <text x="320" y="228" text-anchor="middle" fill="#059669" font-weight="700">MST total weight = 1 + 2 + 3 + 4 = 10</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Minimum Spanning T: maintain state, update in O(1)/O(log n) ──▶ fast

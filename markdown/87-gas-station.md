@@ -69,6 +69,32 @@ When a greedy choice provably never hurts, a single sorted pass yields the optim
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 220" width="100%" height="220" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-87" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Run the tank across stations; when it drops below 0, restart start at the next station</text>
+  <!-- stations gas minus cost: +2 +3 -4 +1 -2  -->
+  <g>
+    <rect x="40"  y="55" width="100" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="90"  y="82" text-anchor="middle" fill="#1e293b">S0 +2</text>
+    <rect x="150" y="55" width="100" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="200" y="82" text-anchor="middle" fill="#1e293b">S1 +3</text>
+    <rect x="260" y="55" width="100" height="44" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="310" y="82" text-anchor="middle" fill="#d97706">S2 −4</text>
+    <rect x="370" y="55" width="100" height="44" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="420" y="82" text-anchor="middle" fill="#059669" font-weight="700">S3 +1</text>
+    <rect x="480" y="55" width="100" height="44" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="530" y="82" text-anchor="middle" fill="#059669" font-weight="700">S4 +5</text>
+  </g>
+  <!-- running tank -->
+  <text x="90"  y="130" text-anchor="middle" fill="#64748b">tank 2</text>
+  <text x="200" y="130" text-anchor="middle" fill="#64748b">5</text>
+  <text x="310" y="130" text-anchor="middle" fill="#b91c1c" font-weight="700">1 → &lt;0</text>
+  <text x="420" y="130" text-anchor="middle" fill="#059669">1</text>
+  <text x="530" y="130" text-anchor="middle" fill="#059669">6</text>
+  <line x1="360" y1="150" x2="380" y2="150" stroke="#475569" marker-end="url(#a-87)"/>
+  <text x="310" y="172" text-anchor="middle" fill="#b91c1c">tank &lt; 0 at S2</text>
+  <text x="450" y="172" text-anchor="middle" fill="#059669" font-weight="700">restart start = S3</text>
+  <text x="320" y="200" text-anchor="middle" fill="#64748b">if total sum ≥ 0, the last restart index is the unique answer</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Gas Station       : maintain state, update in O(1)/O(log n) ──▶ fast

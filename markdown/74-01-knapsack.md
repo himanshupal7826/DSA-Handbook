@@ -69,6 +69,47 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 660 220" width="100%" height="220" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="ak-74" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="330" y="18" text-anchor="middle" font-weight="700" fill="#1e293b">0/1 Knapsack table: dp[i][w] = max(skip dp[i-1][w], take dp[i-1][w-wt]+val)</text>
+  <text x="95" y="46" text-anchor="middle" fill="#64748b">item \ w</text>
+  <text x="172" y="46" text-anchor="middle" fill="#64748b">0</text>
+  <text x="216" y="46" text-anchor="middle" fill="#64748b">1</text>
+  <text x="260" y="46" text-anchor="middle" fill="#64748b">2</text>
+  <text x="304" y="46" text-anchor="middle" fill="#64748b">3</text>
+  <text x="348" y="46" text-anchor="middle" fill="#64748b">4</text>
+  <text x="392" y="46" text-anchor="middle" fill="#64748b">5</text>
+  <text x="95" y="78" text-anchor="middle" fill="#1e293b">none</text>
+  <text x="95" y="116" text-anchor="middle" fill="#1e293b">w2,v3</text>
+  <text x="95" y="154" text-anchor="middle" fill="#1e293b">w3,v4</text>
+  <rect x="150" y="54" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="172" y="78" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="194" y="54" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="216" y="78" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="238" y="54" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="260" y="78" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="282" y="54" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="304" y="78" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="326" y="54" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="348" y="78" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="370" y="54" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="392" y="78" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="150" y="92" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="172" y="116" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="194" y="92" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="216" y="116" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="238" y="92" width="44" height="38" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="260" y="116" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="282" y="92" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="304" y="116" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="326" y="92" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="348" y="116" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="370" y="92" width="44" height="38" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="392" y="116" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="150" y="130" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="172" y="154" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="194" y="130" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="216" y="154" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="238" y="130" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="260" y="154" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="282" y="130" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="304" y="154" text-anchor="middle" fill="#1e293b">4</text>
+  <rect x="326" y="130" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="348" y="154" text-anchor="middle" fill="#1e293b">4</text>
+  <rect x="370" y="130" width="44" height="38" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="392" y="154" text-anchor="middle" fill="#1e293b" font-weight="700">7</text>
+  <line x1="392" y1="111" x2="392" y2="140" stroke="#475569" marker-end="url(#ak-74)"/>
+  <line x1="262" y1="119" x2="376" y2="143" stroke="#475569" stroke-dasharray="4 3" marker-end="url(#ak-74)"/>
+  <text x="408" y="108" text-anchor="middle" fill="#64748b">skip</text>
+  <text x="300" y="120" text-anchor="middle" fill="#64748b">take</text>
+  <text x="330" y="200" text-anchor="middle" fill="#059669" font-weight="700">dp[2][5] = max(skip 3, take dp[1][2]+4 = 7) = 7  answer</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 0/1 Knapsack      : maintain state, update in O(1)/O(log n) ──▶ fast

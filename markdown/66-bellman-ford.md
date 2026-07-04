@@ -69,6 +69,26 @@ Pick the traversal by structure: BFS for unweighted shortest paths, DFS for conn
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 230" width="100%" height="230" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="arw-66" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Bellman-Ford: relax every edge V-1 times (negatives OK)</text>
+  <!-- edges with weights -->
+  <line x1="94"  y1="105" x2="206" y2="75"  stroke="#475569" marker-end="url(#arw-66)"/><text x="150" y="78"  text-anchor="middle" fill="#64748b">6</text>
+  <line x1="94"  y1="120" x2="206" y2="160" stroke="#475569" marker-end="url(#arw-66)"/><text x="150" y="155" text-anchor="middle" fill="#64748b">7</text>
+  <line x1="254" y1="90"  x2="336" y2="150" stroke="#d97706" stroke-width="2" marker-end="url(#arw-66)"/><text x="270" y="135" text-anchor="middle" fill="#d97706" font-weight="700">-3</text>
+  <line x1="256" y1="160" x2="558" y2="120" stroke="#475569" marker-end="url(#arw-66)"/><text x="410" y="150" text-anchor="middle" fill="#64748b">9</text>
+  <!-- nodes -->
+  <circle cx="70"  cy="115" r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="70"  y="120" text-anchor="middle" font-weight="700" fill="#1e293b">S</text><text x="70"  y="160" text-anchor="middle" fill="#059669">0</text>
+  <circle cx="230" cy="65"  r="22" fill="#eff6ff" stroke="#2563eb"/><text x="230" y="70"  text-anchor="middle" font-weight="700" fill="#1e293b">A</text><text x="230" y="38" text-anchor="middle" fill="#64748b">6</text>
+  <circle cx="230" cy="170" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="230" y="175" text-anchor="middle" font-weight="700" fill="#1e293b">B</text><text x="197" y="175" text-anchor="middle" fill="#64748b">7</text>
+  <circle cx="360" cy="170" r="22" fill="#fff7ed" stroke="#d97706" stroke-width="2"/><text x="360" y="175" text-anchor="middle" font-weight="700" fill="#1e293b">C</text><text x="360" y="212" text-anchor="middle" fill="#d97706">3</text>
+  <circle cx="580" cy="115" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="580" y="120" text-anchor="middle" font-weight="700" fill="#1e293b">D</text><text x="580" y="160" text-anchor="middle" fill="#64748b">12</text>
+  <text x="470" y="205" text-anchor="middle" fill="#d97706" font-weight="700">relax A→C: 6 + (-3) = 3 &lt; ∞</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Bellman Ford      : maintain state, update in O(1)/O(log n) ──▶ fast

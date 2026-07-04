@@ -69,6 +69,30 @@ Sorting linearizes the geometry so a single left-to-right sweep resolves all ove
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 215" width="100%" height="215" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="sch33" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Sort by finish, greedily keep any bar starting ≥ last kept end</text>
+  <rect x="125" y="40" width="130" height="20" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="190" y="54" text-anchor="middle" fill="#1e293b">[1,3]</text>
+  <text x="275" y="54" fill="#059669" font-weight="700">✓ keep</text>
+  <rect x="190" y="66" width="195" height="20" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="287" y="80" text-anchor="middle" fill="#1e293b">[2,5]</text>
+  <text x="405" y="80" fill="#d97706" font-weight="700">✗ starts 2 &lt; 3</text>
+  <rect x="320" y="92" width="130" height="20" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="385" y="106" text-anchor="middle" fill="#1e293b">[4,6]</text>
+  <text x="470" y="106" fill="#059669" font-weight="700">✓ keep</text>
+  <rect x="450" y="118" width="130" height="20" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="515" y="132" text-anchor="middle" fill="#1e293b">[6,8]</text>
+  <line x1="60" y1="158" x2="600" y2="158" stroke="#cbd5e1"/>
+  <g fill="#64748b" text-anchor="middle">
+    <line x1="60"  y1="154" x2="60"  y2="162" stroke="#94a3b8"/><text x="60"  y="176">0</text>
+    <line x1="190" y1="154" x2="190" y2="162" stroke="#94a3b8"/><text x="190" y="176">2</text>
+    <line x1="320" y1="154" x2="320" y2="162" stroke="#94a3b8"/><text x="320" y="176">4</text>
+    <line x1="450" y1="154" x2="450" y2="162" stroke="#94a3b8"/><text x="450" y="176">6</text>
+    <line x1="580" y1="154" x2="580" y2="162" stroke="#94a3b8"/><text x="580" y="176">8</text>
+  </g>
+  <text x="320" y="200" text-anchor="middle" fill="#059669" font-weight="700">3 non-overlapping intervals kept</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Interval Schedulin: maintain state, update in O(1)/O(log n) ──▶ fast

@@ -69,6 +69,36 @@ A heap gives O(1) access to the extreme element and O(log n) updates — perfect
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 235" width="100%" height="235" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="topk-43" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Min-heap of size k=3 keeps the k largest; root = smallest kept</text>
+  <!-- before -->
+  <text x="128" y="56" text-anchor="middle" fill="#64748b">before</text>
+  <line x1="128" y1="90" x2="95" y2="132" stroke="#475569"/>
+  <line x1="128" y1="90" x2="161" y2="132" stroke="#475569"/>
+  <circle cx="128" cy="76" r="20" fill="#fff7ed" stroke="#d97706"/><text x="128" y="81" text-anchor="middle" fill="#1e293b">5</text>
+  <circle cx="95" cy="146" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="95" y="151" text-anchor="middle" fill="#1e293b">8</text>
+  <circle cx="161" cy="146" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="161" y="151" text-anchor="middle" fill="#1e293b">12</text>
+  <text x="128" y="196" text-anchor="middle" fill="#64748b">root 5 = smallest of top-k</text>
+  <!-- new element -->
+  <line x1="200" y1="146" x2="268" y2="146" stroke="#475569" marker-end="url(#topk-43)"/>
+  <rect x="272" y="62" width="96" height="34" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="320" y="84" text-anchor="middle" fill="#1e293b">new = 10</text>
+  <text x="320" y="120" text-anchor="middle" fill="#059669">10 &gt; root 5</text>
+  <text x="320" y="138" text-anchor="middle" fill="#64748b">pop 5, push 10, sift down</text>
+  <line x1="372" y1="146" x2="418" y2="146" stroke="#475569" marker-end="url(#topk-43)"/>
+  <!-- after -->
+  <text x="500" y="56" text-anchor="middle" fill="#64748b">after</text>
+  <line x1="500" y1="90" x2="467" y2="132" stroke="#475569"/>
+  <line x1="500" y1="90" x2="533" y2="132" stroke="#475569"/>
+  <circle cx="500" cy="76" r="20" fill="#ecfdf5" stroke="#059669"/><text x="500" y="81" text-anchor="middle" fill="#1e293b">8</text>
+  <circle cx="467" cy="146" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="467" y="151" text-anchor="middle" fill="#1e293b">10</text>
+  <circle cx="533" cy="146" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="533" y="151" text-anchor="middle" fill="#1e293b">12</text>
+  <text x="500" y="196" text-anchor="middle" fill="#64748b">new root 8</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Top K Elements    : maintain state, update in O(1)/O(log n) ──▶ fast

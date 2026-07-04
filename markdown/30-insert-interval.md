@@ -69,6 +69,32 @@ Sorting linearizes the geometry so a single left-to-right sweep resolves all ove
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 210" width="100%" height="210" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="ins30" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Insert [2,5]: fuse the overlapped bars, keep the rest</text>
+  <text x="30" y="60" fill="#64748b">before</text>
+  <rect x="112" y="48" width="104" height="20" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="164" y="62" text-anchor="middle" fill="#1e293b">[1,3]</text>
+  <rect x="372" y="48" width="156" height="20" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="450" y="62" text-anchor="middle" fill="#1e293b">[6,9]</text>
+  <rect x="164" y="74" width="156" height="20" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="242" y="88" text-anchor="middle" fill="#1e293b">new [2,5]</text>
+  <text x="200" y="112" text-anchor="middle" fill="#d97706">[1,3] &amp; [2,5] touch → fuse</text>
+  <line x1="242" y1="118" x2="242" y2="150" stroke="#475569" marker-end="url(#ins30)"/>
+  <line x1="60" y1="132" x2="590" y2="132" stroke="#cbd5e1"/>
+  <g fill="#64748b" text-anchor="middle">
+    <line x1="60"  y1="128" x2="60"  y2="136" stroke="#94a3b8"/><text x="60"  y="150">0</text>
+    <line x1="164" y1="128" x2="164" y2="136" stroke="#94a3b8"/><text x="164" y="150">2</text>
+    <line x1="268" y1="128" x2="268" y2="136" stroke="#94a3b8"/><text x="268" y="150">4</text>
+    <line x1="372" y1="128" x2="372" y2="136" stroke="#94a3b8"/><text x="372" y="150">6</text>
+    <line x1="476" y1="128" x2="476" y2="136" stroke="#94a3b8"/><text x="476" y="150">8</text>
+    <line x1="580" y1="128" x2="580" y2="136" stroke="#94a3b8"/><text x="580" y="150">10</text>
+  </g>
+  <text x="30" y="182" fill="#64748b">after</text>
+  <rect x="112" y="170" width="208" height="20" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="216" y="184" text-anchor="middle" fill="#1e293b">[1,5]</text>
+  <rect x="372" y="170" width="156" height="20" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="450" y="184" text-anchor="middle" fill="#1e293b">[6,9]</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Insert Interval   : maintain state, update in O(1)/O(log n) ──▶ fast

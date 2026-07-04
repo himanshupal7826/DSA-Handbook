@@ -69,6 +69,31 @@ DFS over the decision tree with pruning. Each recursion makes a choice, recurses
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 660 270" width="100%" height="270" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-73" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="330" y="18" text-anchor="middle" font-weight="700" fill="#1e293b">Sudoku: try digits in an empty cell, prune ones that clash</text>
+  <!-- edges -->
+  <line x1="330" y1="52" x2="90"  y2="115" stroke="#d97706" stroke-dasharray="4 3" marker-end="url(#a-73)"/>
+  <line x1="330" y1="52" x2="250" y2="115" stroke="#d97706" stroke-dasharray="4 3" marker-end="url(#a-73)"/>
+  <line x1="330" y1="52" x2="410" y2="115" stroke="#d97706" stroke-dasharray="4 3" marker-end="url(#a-73)"/>
+  <line x1="330" y1="52" x2="570" y2="115" stroke="#059669" marker-end="url(#a-73)"/>
+  <line x1="570" y1="149" x2="570" y2="200" stroke="#475569" marker-end="url(#a-73)"/>
+  <!-- root -->
+  <rect x="250" y="35"  width="160" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="330" y="55"  text-anchor="middle" fill="#1e293b">empty cell (r,c)</text>
+  <!-- digit tries -->
+  <rect x="30"  y="115" width="120" height="34" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="90"  y="130" text-anchor="middle" fill="#b91c1c">try 1 ✗</text><text x="90"  y="144" text-anchor="middle" fill="#64748b">in row</text>
+  <rect x="190" y="115" width="120" height="34" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="250" y="130" text-anchor="middle" fill="#b91c1c">try 2 ✗</text><text x="250" y="144" text-anchor="middle" fill="#64748b">in column</text>
+  <rect x="350" y="115" width="120" height="34" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="410" y="130" text-anchor="middle" fill="#b91c1c">try 3 ✗</text><text x="410" y="144" text-anchor="middle" fill="#64748b">in 3x3 box</text>
+  <rect x="510" y="115" width="120" height="34" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="570" y="130" text-anchor="middle" fill="#059669" font-weight="700">try 4 ✓</text><text x="570" y="144" text-anchor="middle" fill="#64748b">valid</text>
+  <!-- recurse -->
+  <rect x="490" y="200" width="160" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="570" y="220" text-anchor="middle" fill="#1e293b">recurse next cell →</text>
+  <text x="250" y="192" text-anchor="middle" fill="#64748b">clashing digits are pruned before we recurse</text>
+  <text x="250" y="220" text-anchor="middle" fill="#475569">if the branch dead-ends, undo &amp; try the next digit</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Sudoku Solver     : maintain state, update in O(1)/O(log n) ──▶ fast

@@ -69,6 +69,29 @@ A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relat
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="ar-38" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Largest rectangle in histogram: pop fixes each bar's width</text>
+  <line x1="30" y1="200" x2="470" y2="200" stroke="#475569"/>
+  <rect x="40"  y="152" width="44" height="48"  fill="#eff6ff" stroke="#2563eb"/><text x="62"  y="220" text-anchor="middle" fill="#64748b">2</text>
+  <rect x="88"  y="176" width="44" height="24"  fill="#eff6ff" stroke="#2563eb"/><text x="110" y="220" text-anchor="middle" fill="#64748b">1</text>
+  <rect x="136" y="80"  width="44" height="120" fill="#ecfdf5" stroke="#059669"/><text x="158" y="220" text-anchor="middle" fill="#64748b">5</text>
+  <rect x="184" y="56"  width="44" height="144" fill="#ecfdf5" stroke="#059669"/><text x="206" y="220" text-anchor="middle" fill="#64748b">6</text>
+  <rect x="232" y="152" width="44" height="48"  fill="#eff6ff" stroke="#2563eb"/><text x="254" y="220" text-anchor="middle" fill="#64748b">2</text>
+  <rect x="280" y="128" width="44" height="72"  fill="#eff6ff" stroke="#2563eb"/><text x="302" y="220" text-anchor="middle" fill="#64748b">3</text>
+  <rect x="136" y="80" width="92" height="120" fill="none" stroke="#059669" stroke-width="3" stroke-dasharray="6 4"/>
+  <text x="182" y="70" text-anchor="middle" fill="#059669" font-weight="700">area = 5 × 2 = 10</text>
+  <text x="560" y="90"  text-anchor="middle" fill="#64748b">when a shorter</text>
+  <text x="560" y="108" text-anchor="middle" fill="#64748b">bar arrives, pop</text>
+  <text x="560" y="126" text-anchor="middle" fill="#64748b">taller bars and</text>
+  <text x="560" y="144" text-anchor="middle" fill="#64748b">settle their area</text>
+  <line x1="330" y1="150" x2="470" y2="150" stroke="#475569" marker-end="url(#ar-38)"/>
+  <text x="400" y="142" text-anchor="middle" fill="#d97706">2 &lt; 6 → pop</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Histogram Pattern : maintain state, update in O(1)/O(log n) ──▶ fast

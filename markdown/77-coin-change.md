@@ -69,6 +69,32 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 190" width="100%" height="190" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="ac-77" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="18" text-anchor="middle" font-weight="700" fill="#1e293b">Coin Change (min): dp[a] = min over coins of dp[a-coin] + 1  · coins {1,3,4}</text>
+  <text x="120" y="52" text-anchor="middle" fill="#64748b">a=0</text>
+  <text x="186" y="52" text-anchor="middle" fill="#64748b">1</text>
+  <text x="252" y="52" text-anchor="middle" fill="#64748b">2</text>
+  <text x="318" y="52" text-anchor="middle" fill="#64748b">3</text>
+  <text x="384" y="52" text-anchor="middle" fill="#64748b">4</text>
+  <text x="450" y="52" text-anchor="middle" fill="#64748b">5</text>
+  <text x="516" y="52" text-anchor="middle" fill="#64748b">6</text>
+  <rect x="90"  y="60" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="120" y="85" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="156" y="60" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="186" y="85" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="222" y="60" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="252" y="85" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="288" y="60" width="60" height="40" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="318" y="85" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="354" y="60" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="384" y="85" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="420" y="60" width="60" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="450" y="85" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="486" y="60" width="60" height="40" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="516" y="85" text-anchor="middle" fill="#1e293b" font-weight="700">2</text>
+  <path d="M318,58 Q417,24 516,58" fill="none" stroke="#475569" marker-end="url(#ac-77)"/>
+  <text x="417" y="28" text-anchor="middle" fill="#64748b">use coin 3: dp[6] = dp[6-3] + 1 = dp[3] + 1</text>
+  <text x="320" y="130" text-anchor="middle" fill="#059669" font-weight="700">dp[6] = 2  answer · coins 3 + 3</text>
+  <text x="320" y="152" text-anchor="middle" fill="#64748b">dp[0]=0, unreachable = INF; forward over amounts (coins reusable)</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Coin Change       : maintain state, update in O(1)/O(log n) ──▶ fast

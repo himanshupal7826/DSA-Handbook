@@ -69,6 +69,38 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 262" width="100%" height="262" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs>
+    <marker id="arr80" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker>
+    <marker id="arr80g" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#059669"/></marker>
+  </defs>
+  <text x="310" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">LCS grid: dp[i][j] over "ac" &amp; "ac"</text>
+  <text x="306" y="56" text-anchor="middle" fill="#64748b">a</text>
+  <text x="358" y="56" text-anchor="middle" fill="#64748b">c</text>
+  <text x="214" y="148" text-anchor="middle" fill="#64748b">a</text>
+  <text x="214" y="200" text-anchor="middle" fill="#64748b">c</text>
+  <rect x="230" y="64"  width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="254" y="93"  text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="282" y="64"  width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="306" y="93"  text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="334" y="64"  width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="358" y="93"  text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="230" y="116" width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="254" y="145" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="282" y="116" width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="306" y="145" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="334" y="116" width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="358" y="145" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="230" y="168" width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="254" y="197" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="282" y="168" width="48" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="306" y="197" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="334" y="168" width="48" height="48" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="358" y="197" text-anchor="middle" font-weight="700" fill="#1e293b">2</text>
+  <line x1="316" y1="150" x2="342" y2="176" stroke="#059669" marker-end="url(#arr80g)"/>
+  <line x1="358" y1="140" x2="358" y2="164" stroke="#475569" marker-end="url(#arr80)"/>
+  <line x1="308" y1="192" x2="330" y2="192" stroke="#475569" marker-end="url(#arr80)"/>
+  <text x="440" y="150" fill="#059669" font-weight="700">match c=c</text>
+  <text x="440" y="168" fill="#64748b">dp[i-1][j-1]+1</text>
+  <text x="150" y="236" fill="#059669">match: diagonal + 1</text>
+  <text x="150" y="252" fill="#64748b">else: max(up, left)</text>
+  <text x="425" y="236" fill="#059669" font-weight="700">answer = dp[n][m] = 2</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 DP on Strings     : maintain state, update in O(1)/O(log n) ──▶ fast

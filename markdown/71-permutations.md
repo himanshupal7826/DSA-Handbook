@@ -69,6 +69,36 @@ DFS over the decision tree with pruning. Each recursion makes a choice, recurses
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 660 300" width="100%" height="300" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-71" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="330" y="18" text-anchor="middle" font-weight="700" fill="#1e293b">Permutations of [1,2,3]: pick an unused element each level</text>
+  <!-- level 1 -->
+  <line x1="330" y1="50" x2="130" y2="100" stroke="#475569" marker-end="url(#a-71)"/>
+  <line x1="330" y1="50" x2="330" y2="100" stroke="#475569" marker-end="url(#a-71)"/>
+  <line x1="330" y1="50" x2="530" y2="100" stroke="#475569" marker-end="url(#a-71)"/>
+  <!-- level 2 under [1] -->
+  <line x1="130" y1="130" x2="80"  y2="185" stroke="#475569" marker-end="url(#a-71)"/>
+  <line x1="130" y1="130" x2="200" y2="185" stroke="#475569" marker-end="url(#a-71)"/>
+  <!-- level 3 -->
+  <line x1="80"  y1="215" x2="80"  y2="245" stroke="#475569" marker-end="url(#a-71)"/>
+  <line x1="200" y1="215" x2="200" y2="245" stroke="#475569" marker-end="url(#a-71)"/>
+  <!-- nodes -->
+  <rect x="298" y="35"  width="64" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="330" y="55"  text-anchor="middle" fill="#1e293b">[ ]</text>
+  <rect x="98"  y="100" width="64" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="130" y="120" text-anchor="middle" fill="#1e293b">[1]</text>
+  <rect x="298" y="100" width="64" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="330" y="120" text-anchor="middle" fill="#1e293b">[2]</text>
+  <rect x="498" y="100" width="64" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="530" y="120" text-anchor="middle" fill="#1e293b">[3]</text>
+  <rect x="48"  y="185" width="64" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="80"  y="205" text-anchor="middle" fill="#1e293b">[1,2]</text>
+  <rect x="168" y="185" width="64" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="200" y="205" text-anchor="middle" fill="#1e293b">[1,3]</text>
+  <rect x="40"  y="245" width="80" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="80"  y="265" text-anchor="middle" fill="#1e293b">[1,2,3]</text>
+  <rect x="160" y="245" width="80" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="200" y="265" text-anchor="middle" fill="#1e293b">[1,3,2]</text>
+  <text x="435" y="205" text-anchor="middle" fill="#64748b">[2] &amp; [3] branches</text>
+  <text x="435" y="222" text-anchor="middle" fill="#64748b">mirror this shape</text>
+  <text x="435" y="266" text-anchor="middle" fill="#059669" font-weight="700">3! = 6 leaves</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Permutations      : maintain state, update in O(1)/O(log n) ──▶ fast

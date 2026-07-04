@@ -69,6 +69,35 @@ Most list problems are pointer-rewiring; a dummy sentinel removes head edge case
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 240" width="100%" height="240" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="mrg50" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Merge: splice the smaller head each step into one sorted chain</text>
+  <!-- list A -->
+  <text x="40" y="65" fill="#2563eb" font-weight="700">A</text>
+  <rect x="70" y="45" width="44" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="92" y="67" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="160" y="45" width="44" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="182" y="67" text-anchor="middle" fill="#1e293b">4</text>
+  <line x1="114" y1="62" x2="158" y2="62" stroke="#475569" marker-end="url(#mrg50)"/>
+  <!-- list B -->
+  <text x="40" y="145" fill="#059669" font-weight="700">B</text>
+  <rect x="70" y="125" width="44" height="34" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="92" y="147" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="160" y="125" width="44" height="34" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="182" y="147" text-anchor="middle" fill="#1e293b">3</text>
+  <line x1="114" y1="142" x2="158" y2="142" stroke="#475569" marker-end="url(#mrg50)"/>
+  <!-- merged -->
+  <text x="30" y="212" fill="#64748b" font-weight="700">merged</text>
+  <rect x="110" y="192" width="40" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="130" y="212" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="200" y="192" width="40" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="220" y="212" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="290" y="192" width="40" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="310" y="212" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="380" y="192" width="40" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="400" y="212" text-anchor="middle" fill="#1e293b">4</text>
+  <line x1="150" y1="207" x2="198" y2="207" stroke="#475569" marker-end="url(#mrg50)"/>
+  <line x1="240" y1="207" x2="288" y2="207" stroke="#475569" marker-end="url(#mrg50)"/>
+  <line x1="330" y1="207" x2="378" y2="207" stroke="#475569" marker-end="url(#mrg50)"/>
+  <line x1="92" y1="79" x2="126" y2="190" stroke="#64748b" stroke-dasharray="3,3" marker-end="url(#mrg50)"/>
+  <line x1="92" y1="159" x2="216" y2="190" stroke="#64748b" stroke-dasharray="3,3" marker-end="url(#mrg50)"/>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Merge Linked Lists: maintain state, update in O(1)/O(log n) ──▶ fast

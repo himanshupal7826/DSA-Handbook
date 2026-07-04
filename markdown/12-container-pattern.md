@@ -69,6 +69,30 @@ Maintain two indices and an invariant that tells you which pointer to advance, e
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 240" width="100%" height="240" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="cp-12" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Area = min(height) × width · move the shorter wall inward</text>
+  <line x1="60" y1="210" x2="590" y2="210" stroke="#64748b"/>
+  <rect x="85" y="165" width="420" height="45" fill="#fff7ed" stroke="#d97706"/>
+  <text x="295" y="193" text-anchor="middle" fill="#d97706" font-weight="700">area = 3 × 6 = 18</text>
+  <g>
+    <rect x="70"  y="165" width="30" height="45"  rx="4" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+    <rect x="140" y="90"  width="30" height="120" rx="4" fill="#eff6ff" stroke="#2563eb"/>
+    <rect x="210" y="120" width="30" height="90"  rx="4" fill="#eff6ff" stroke="#2563eb"/>
+    <rect x="280" y="180" width="30" height="30"  rx="4" fill="#eff6ff" stroke="#2563eb"/>
+    <rect x="350" y="135" width="30" height="75"  rx="4" fill="#eff6ff" stroke="#2563eb"/>
+    <rect x="420" y="150" width="30" height="60"  rx="4" fill="#eff6ff" stroke="#2563eb"/>
+    <rect x="490" y="75"  width="30" height="135" rx="4" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+  </g>
+  <text x="85"  y="228" text-anchor="middle" fill="#059669" font-weight="700">L = 3</text>
+  <text x="505" y="228" text-anchor="middle" fill="#059669" font-weight="700">R = 9</text>
+  <line x1="100" y1="150" x2="150" y2="150" stroke="#475569" marker-end="url(#cp-12)"/>
+  <text x="150" y="146" text-anchor="middle" fill="#64748b">move shorter (L) →</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Container Pattern : maintain state, update in O(1)/O(log n) ──▶ fast

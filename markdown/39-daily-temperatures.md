@@ -69,6 +69,38 @@ A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relat
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 230" width="100%" height="230" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="ar-39" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Daily temperatures: days until a warmer day</text>
+  <path d="M148,78 Q267,30 386,78" fill="none" stroke="#475569" stroke-dasharray="5 4" marker-end="url(#ar-39)"/>
+  <text x="267" y="44" text-anchor="middle" fill="#059669" font-weight="700">4 days until warmer</text>
+  <text x="60" y="70" text-anchor="middle" fill="#64748b">temps</text>
+  <rect x="30"  y="78" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="52"  y="106" text-anchor="middle" fill="#1e293b">73</text>
+  <rect x="78"  y="78" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="100" y="106" text-anchor="middle" fill="#1e293b">74</text>
+  <rect x="126" y="78" width="44" height="44" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="148" y="106" text-anchor="middle" fill="#1e293b" font-weight="700">75</text>
+  <rect x="174" y="78" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="196" y="106" text-anchor="middle" fill="#1e293b">71</text>
+  <rect x="222" y="78" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="244" y="106" text-anchor="middle" fill="#1e293b">69</text>
+  <rect x="270" y="78" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="292" y="106" text-anchor="middle" fill="#1e293b">72</text>
+  <rect x="318" y="78" width="44" height="44" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="340" y="106" text-anchor="middle" fill="#1e293b" font-weight="700">76</text>
+  <rect x="366" y="78" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="388" y="106" text-anchor="middle" fill="#1e293b">73</text>
+  <text x="60" y="170" text-anchor="middle" fill="#64748b">answer</text>
+  <rect x="30"  y="150" width="44" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="52"  y="176" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="78"  y="150" width="44" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="100" y="176" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="126" y="150" width="44" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="148" y="176" text-anchor="middle" fill="#1e293b" font-weight="700">4</text>
+  <rect x="174" y="150" width="44" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="196" y="176" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="222" y="150" width="44" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="244" y="176" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="270" y="150" width="44" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="292" y="176" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="318" y="150" width="44" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="340" y="176" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="366" y="150" width="44" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="388" y="176" text-anchor="middle" fill="#1e293b">0</text>
+  <text x="530" y="120" text-anchor="middle" fill="#64748b">stack holds indices</text>
+  <text x="530" y="138" text-anchor="middle" fill="#64748b">still waiting for a</text>
+  <text x="530" y="156" text-anchor="middle" fill="#64748b">warmer day; a warmer</text>
+  <text x="530" y="174" text-anchor="middle" fill="#64748b">temp pops and dates them</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Daily Temperatures: maintain state, update in O(1)/O(log n) ──▶ fast

@@ -69,6 +69,31 @@ DFS over the decision tree with pruning. Each recursion makes a choice, recurses
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 660 290" width="100%" height="290" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-72" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="330" y="18" text-anchor="middle" font-weight="700" fill="#1e293b">4-Queens: one queen per row, prune columns that attack</text>
+  <!-- row0 to row1 choices, given queen at (row0,col1) -->
+  <line x1="330" y1="52" x2="90"  y2="110" stroke="#d97706" stroke-dasharray="4 3" marker-end="url(#a-72)"/>
+  <line x1="330" y1="52" x2="250" y2="110" stroke="#d97706" stroke-dasharray="4 3" marker-end="url(#a-72)"/>
+  <line x1="330" y1="52" x2="410" y2="110" stroke="#d97706" stroke-dasharray="4 3" marker-end="url(#a-72)"/>
+  <line x1="330" y1="52" x2="570" y2="110" stroke="#059669" marker-end="url(#a-72)"/>
+  <line x1="570" y1="140" x2="570" y2="200" stroke="#475569" marker-end="url(#a-72)"/>
+  <!-- root -->
+  <rect x="258" y="35"  width="144" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="330" y="55"  text-anchor="middle" fill="#1e293b">row0: Q at col1</text>
+  <!-- row1 candidates -->
+  <rect x="30"  y="110" width="120" height="34" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="90"  y="125" text-anchor="middle" fill="#b91c1c">r1=c0 ✗</text><text x="90"  y="139" text-anchor="middle" fill="#64748b">diagonal</text>
+  <rect x="190" y="110" width="120" height="34" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="250" y="125" text-anchor="middle" fill="#b91c1c">r1=c1 ✗</text><text x="250" y="139" text-anchor="middle" fill="#64748b">same col</text>
+  <rect x="350" y="110" width="120" height="34" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="410" y="125" text-anchor="middle" fill="#b91c1c">r1=c2 ✗</text><text x="410" y="139" text-anchor="middle" fill="#64748b">diagonal</text>
+  <rect x="510" y="110" width="120" height="34" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="570" y="125" text-anchor="middle" fill="#059669" font-weight="700">r1=c3 ✓</text><text x="570" y="139" text-anchor="middle" fill="#64748b">safe</text>
+  <!-- continue -->
+  <rect x="498" y="200" width="144" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="570" y="220" text-anchor="middle" fill="#1e293b">recurse row2 …</text>
+  <text x="250" y="185" text-anchor="middle" fill="#64748b">3 of 4 columns pruned before recursing deeper</text>
+  <text x="250" y="215" text-anchor="middle" fill="#475569">backtrack, undo the placement, try the next column</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 N Queens          : maintain state, update in O(1)/O(log n) ──▶ fast

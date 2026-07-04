@@ -69,6 +69,34 @@ A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand fro
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="ar-41" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Sliding window max (k=3): deque of indices, front = window max</text>
+  <text x="60" y="52" text-anchor="middle" fill="#64748b">nums</text>
+  <rect x="30"  y="60" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="52"  y="88" text-anchor="middle" fill="#64748b">1</text>
+  <rect x="78"  y="60" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="100" y="88" text-anchor="middle" fill="#64748b">3</text>
+  <rect x="126" y="60" width="44" height="44" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="148" y="88" text-anchor="middle" fill="#1e293b">-1</text>
+  <rect x="174" y="60" width="44" height="44" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="196" y="88" text-anchor="middle" fill="#1e293b">-3</text>
+  <rect x="222" y="60" width="44" height="44" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="244" y="88" text-anchor="middle" fill="#1e293b" font-weight="700">5</text>
+  <rect x="270" y="60" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="292" y="88" text-anchor="middle" fill="#64748b">3</text>
+  <rect x="318" y="60" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="340" y="88" text-anchor="middle" fill="#64748b">6</text>
+  <rect x="366" y="60" width="44" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="388" y="88" text-anchor="middle" fill="#64748b">7</text>
+  <rect x="122" y="56" width="148" height="52" rx="8" fill="none" stroke="#059669" stroke-width="2"/>
+  <text x="196" y="126" text-anchor="middle" fill="#64748b">window idx 2..4</text>
+  <line x1="274" y1="82" x2="330" y2="82" stroke="#475569" marker-end="url(#ar-41)"/>
+  <text x="302" y="76" text-anchor="middle" fill="#64748b">slide →</text>
+  <text x="90" y="164" text-anchor="middle" fill="#64748b">deque of indices (values decreasing)</text>
+  <rect x="30"  y="176" width="80" height="42" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="70"  y="202" text-anchor="middle" fill="#1e293b">i2 (-1) pop</text>
+  <rect x="120" y="176" width="80" height="42" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="160" y="202" text-anchor="middle" fill="#1e293b">i3 (-3) pop</text>
+  <rect x="230" y="176" width="90" height="42" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="275" y="202" text-anchor="middle" fill="#1e293b" font-weight="700">i4 (5) front</text>
+  <line x1="216" y1="197" x2="228" y2="197" stroke="#475569" marker-end="url(#ar-41)"/>
+  <text x="470" y="192" text-anchor="middle" fill="#059669" font-weight="700">5 pops smaller tails;</text>
+  <text x="470" y="210" text-anchor="middle" fill="#059669" font-weight="700">answer = nums[front] = 5</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Sliding Window Max: maintain state, update in O(1)/O(log n) ──▶ fast

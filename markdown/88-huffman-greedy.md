@@ -69,6 +69,31 @@ When a greedy choice provably never hurts, a single sorted pass yields the optim
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 240" width="100%" height="240" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-88" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Pop the two smallest weights, merge them into a parent, push it back</text>
+  <!-- min heap leaves: 2 3 5 7 -->
+  <text x="60" y="55" fill="#64748b">min-heap:</text>
+  <circle cx="150" cy="70" r="20" fill="#ecfdf5" stroke="#059669"/><text x="150" y="75" text-anchor="middle" fill="#059669" font-weight="700">2</text>
+  <circle cx="210" cy="70" r="20" fill="#ecfdf5" stroke="#059669"/><text x="210" y="75" text-anchor="middle" fill="#059669" font-weight="700">3</text>
+  <circle cx="270" cy="70" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="270" y="75" text-anchor="middle" fill="#1e293b">5</text>
+  <circle cx="330" cy="70" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="330" y="75" text-anchor="middle" fill="#1e293b">7</text>
+  <text x="180" y="105" text-anchor="middle" fill="#059669">two smallest</text>
+  <line x1="400" y1="70" x2="450" y2="70" stroke="#475569" marker-end="url(#a-88)"/>
+  <text x="425" y="60" text-anchor="middle" fill="#64748b">merge</text>
+  <!-- merged subtree: parent 5 with children 2 and 3 -->
+  <circle cx="530" cy="60" r="22" fill="#fff7ed" stroke="#d97706"/><text x="530" y="65" text-anchor="middle" fill="#d97706" font-weight="700">5</text>
+  <line x1="514" y1="75" x2="495" y2="110" stroke="#475569"/>
+  <line x1="546" y1="75" x2="565" y2="110" stroke="#475569"/>
+  <circle cx="490" cy="125" r="18" fill="#ecfdf5" stroke="#059669"/><text x="490" y="130" text-anchor="middle" fill="#059669" font-weight="700">2</text>
+  <circle cx="570" cy="125" r="18" fill="#ecfdf5" stroke="#059669"/><text x="570" y="130" text-anchor="middle" fill="#059669" font-weight="700">3</text>
+  <text x="320" y="185" text-anchor="middle" fill="#64748b">push parent 5 back → heap now {5, 5, 7}, repeat until one node remains</text>
+  <text x="320" y="212" text-anchor="middle" fill="#059669" font-weight="700">smaller weights sit deeper → shorter codes for frequent symbols</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Huffman Greedy    : maintain state, update in O(1)/O(log n) ──▶ fast

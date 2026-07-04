@@ -69,6 +69,27 @@ Pick the traversal by structure: BFS for unweighted shortest paths, DFS for conn
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 240" width="100%" height="240" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="arw-65" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Dijkstra: pop nearest, relax edges, tighten tentative dist</text>
+  <!-- edges with weights -->
+  <line x1="92"  y1="115" x2="208" y2="75"  stroke="#475569"/><text x="150" y="80"  text-anchor="middle" fill="#64748b">2</text>
+  <line x1="92"  y1="125" x2="208" y2="185" stroke="#475569"/><text x="150" y="170" text-anchor="middle" fill="#64748b">5</text>
+  <line x1="252" y1="70"  x2="368" y2="70"  stroke="#059669" stroke-width="2"/><text x="310" y="58"  text-anchor="middle" fill="#059669" font-weight="700">1</text>
+  <line x1="252" y1="185" x2="558" y2="130" stroke="#475569"/><text x="380" y="175" text-anchor="middle" fill="#64748b">2</text>
+  <line x1="412" y1="80"  x2="558" y2="115" stroke="#475569"/><text x="490" y="88"  text-anchor="middle" fill="#64748b">3</text>
+  <!-- nodes -->
+  <circle cx="70"  cy="120" r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="70"  y="125" text-anchor="middle" font-weight="700" fill="#1e293b">S</text><text x="70"  y="170" text-anchor="middle" fill="#059669">0</text>
+  <circle cx="230" cy="65"  r="22" fill="#eff6ff" stroke="#2563eb"/><text x="230" y="70"  text-anchor="middle" font-weight="700" fill="#1e293b">A</text><text x="230" y="38" text-anchor="middle" fill="#64748b">2</text>
+  <circle cx="230" cy="190" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="230" y="195" text-anchor="middle" font-weight="700" fill="#1e293b">B</text><text x="230" y="230" text-anchor="middle" fill="#64748b">5</text>
+  <circle cx="390" cy="70"  r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="390" y="75"  text-anchor="middle" font-weight="700" fill="#1e293b">C</text><text x="390" y="43" text-anchor="middle" fill="#059669">3</text>
+  <circle cx="580" cy="120" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="580" y="125" text-anchor="middle" font-weight="700" fill="#1e293b">D</text><text x="580" y="170" text-anchor="middle" fill="#64748b">6</text>
+  <text x="470" y="205" text-anchor="middle" fill="#059669" font-weight="700">relax A→C: dist[C] = 2 + 1 = 3</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Dijkstra          : maintain state, update in O(1)/O(log n) ──▶ fast

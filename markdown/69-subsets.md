@@ -69,6 +69,37 @@ DFS over the decision tree with pruning. Each recursion makes a choice, recurses
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 280" width="100%" height="280" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-69" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="18" text-anchor="middle" font-weight="700" fill="#1e293b">Subsets of [1,2]: at each element, exclude or include</text>
+  <!-- edges -->
+  <line x1="320" y1="50" x2="170" y2="100" stroke="#475569" marker-end="url(#a-69)"/>
+  <line x1="320" y1="50" x2="470" y2="100" stroke="#475569" marker-end="url(#a-69)"/>
+  <line x1="170" y1="130" x2="90"  y2="190" stroke="#475569" marker-end="url(#a-69)"/>
+  <line x1="170" y1="130" x2="250" y2="190" stroke="#475569" marker-end="url(#a-69)"/>
+  <line x1="470" y1="130" x2="390" y2="190" stroke="#475569" marker-end="url(#a-69)"/>
+  <line x1="470" y1="130" x2="550" y2="190" stroke="#475569" marker-end="url(#a-69)"/>
+  <!-- edge labels -->
+  <text x="230" y="78"  text-anchor="middle" fill="#64748b">skip 1</text>
+  <text x="410" y="78"  text-anchor="middle" fill="#64748b">take 1</text>
+  <text x="118" y="168" text-anchor="middle" fill="#64748b">skip 2</text>
+  <text x="222" y="168" text-anchor="middle" fill="#64748b">take 2</text>
+  <text x="418" y="168" text-anchor="middle" fill="#64748b">skip 2</text>
+  <text x="522" y="168" text-anchor="middle" fill="#64748b">take 2</text>
+  <!-- nodes -->
+  <rect x="285" y="35"  width="70" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="320" y="55"  text-anchor="middle" fill="#1e293b">{ }</text>
+  <rect x="135" y="100" width="70" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="170" y="120" text-anchor="middle" fill="#1e293b">{ }</text>
+  <rect x="435" y="100" width="70" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="470" y="120" text-anchor="middle" fill="#1e293b">{1}</text>
+  <rect x="55"  y="190" width="70" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="90"  y="210" text-anchor="middle" fill="#1e293b">{ }</text>
+  <rect x="215" y="190" width="70" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="250" y="210" text-anchor="middle" fill="#1e293b">{2}</text>
+  <rect x="355" y="190" width="70" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="390" y="210" text-anchor="middle" fill="#1e293b">{1}</text>
+  <rect x="515" y="190" width="70" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="550" y="210" text-anchor="middle" fill="#1e293b">{1,2}</text>
+  <text x="320" y="252" text-anchor="middle" fill="#059669" font-weight="700">leaves = all 2^n = 4 subsets</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Subsets           : maintain state, update in O(1)/O(log n) ──▶ fast

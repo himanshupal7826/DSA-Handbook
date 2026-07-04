@@ -69,6 +69,28 @@ A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand fro
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 230" width="100%" height="230" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="ar-40" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Monotonic (decreasing) deque: front = max, pop back the smaller</text>
+  <text x="120" y="88" text-anchor="middle" fill="#64748b">front</text>
+  <text x="360" y="88" text-anchor="middle" fill="#64748b">back</text>
+  <rect x="90"  y="96" width="60" height="46" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="120" y="124" text-anchor="middle" fill="#1e293b" font-weight="700">8</text>
+  <rect x="156" y="96" width="60" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="186" y="124" text-anchor="middle" fill="#1e293b">6</text>
+  <rect x="222" y="96" width="60" height="46" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="252" y="124" text-anchor="middle" fill="#1e293b">2</text>
+  <text x="120" y="164" text-anchor="middle" fill="#059669" font-weight="700">max</text>
+  <rect x="430" y="96" width="60" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="460" y="124" text-anchor="middle" fill="#1e293b" font-weight="700">4</text>
+  <text x="460" y="88" text-anchor="middle" fill="#64748b">incoming</text>
+  <line x1="424" y1="119" x2="290" y2="119" stroke="#475569" marker-end="url(#ar-40)"/>
+  <text x="356" y="112" text-anchor="middle" fill="#d97706">2 &lt; 4 → pop back</text>
+  <path d="M430,142 Q360,196 292,150" fill="none" stroke="#475569" stroke-dasharray="5 4" marker-end="url(#ar-40)"/>
+  <text x="360" y="192" text-anchor="middle" fill="#2563eb">then push 4 at back → deque [8, 6, 4]</text>
+  <line x1="120" y1="76" x2="120" y2="94" stroke="#475569" marker-end="url(#ar-40)"/>
+  <text x="120" y="70" text-anchor="middle" fill="#64748b">pop front when it exits the window</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Monotonic Queue   : maintain state, update in O(1)/O(log n) ──▶ fast

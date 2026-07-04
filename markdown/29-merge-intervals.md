@@ -69,6 +69,32 @@ Sorting linearizes the geometry so a single left-to-right sweep resolves all ove
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 210" width="100%" height="210" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="mrg29" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Sort by start, sweep left→right, fuse overlapping bars</text>
+  <text x="30" y="60" fill="#64748b">input</text>
+  <rect x="112" y="48" width="104" height="20" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="164" y="62" text-anchor="middle" fill="#1e293b">[1,3]</text>
+  <rect x="164" y="72" width="208" height="20" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="268" y="86" text-anchor="middle" fill="#1e293b">[2,6]</text>
+  <rect x="476" y="48" width="104" height="20" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="528" y="62" text-anchor="middle" fill="#1e293b">[8,10]</text>
+  <text x="268" y="108" text-anchor="middle" fill="#d97706">[1,3] &amp; [2,6] overlap</text>
+  <line x1="320" y1="114" x2="320" y2="150" stroke="#475569" marker-end="url(#mrg29)"/>
+  <line x1="60" y1="132" x2="590" y2="132" stroke="#cbd5e1"/>
+  <g fill="#64748b" text-anchor="middle">
+    <line x1="60"  y1="128" x2="60"  y2="136" stroke="#94a3b8"/><text x="60"  y="150">0</text>
+    <line x1="164" y1="128" x2="164" y2="136" stroke="#94a3b8"/><text x="164" y="150">2</text>
+    <line x1="268" y1="128" x2="268" y2="136" stroke="#94a3b8"/><text x="268" y="150">4</text>
+    <line x1="372" y1="128" x2="372" y2="136" stroke="#94a3b8"/><text x="372" y="150">6</text>
+    <line x1="476" y1="128" x2="476" y2="136" stroke="#94a3b8"/><text x="476" y="150">8</text>
+    <line x1="580" y1="128" x2="580" y2="136" stroke="#94a3b8"/><text x="580" y="150">10</text>
+  </g>
+  <text x="30" y="182" fill="#64748b">merged</text>
+  <rect x="112" y="170" width="260" height="20" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="242" y="184" text-anchor="middle" fill="#1e293b">[1,6]</text>
+  <rect x="476" y="170" width="104" height="20" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="528" y="184" text-anchor="middle" fill="#1e293b">[8,10]</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Merge Intervals   : maintain state, update in O(1)/O(log n) ──▶ fast

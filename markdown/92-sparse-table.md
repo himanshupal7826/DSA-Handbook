@@ -69,6 +69,43 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="sp-92" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Sparse table: precompute min over intervals of length 2^k</text>
+  <!-- index row 0..7 -->
+  <g>
+    <rect x="40"  y="40" width="70" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="75"  y="60" text-anchor="middle" fill="#1e293b">0</text>
+    <rect x="110" y="40" width="70" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="145" y="60" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="180" y="40" width="70" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="215" y="60" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="250" y="40" width="70" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="285" y="60" text-anchor="middle" fill="#1e293b">3</text>
+    <rect x="320" y="40" width="70" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="355" y="60" text-anchor="middle" fill="#1e293b">4</text>
+    <rect x="390" y="40" width="70" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="425" y="60" text-anchor="middle" fill="#1e293b">5</text>
+    <rect x="460" y="40" width="70" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="495" y="60" text-anchor="middle" fill="#1e293b">6</text>
+    <rect x="530" y="40" width="70" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="565" y="60" text-anchor="middle" fill="#1e293b">7</text>
+  </g>
+  <!-- k=0 length 1 -->
+  <text x="18" y="60" fill="#64748b">k0</text>
+  <!-- k=1 length 2 -->
+  <text x="18" y="98" fill="#64748b">k1</text>
+  <rect x="40"  y="82" width="140" height="26" rx="6" fill="none" stroke="#2563eb"/>
+  <rect x="180" y="82" width="140" height="26" rx="6" fill="none" stroke="#2563eb"/>
+  <rect x="320" y="82" width="140" height="26" rx="6" fill="none" stroke="#2563eb"/>
+  <rect x="460" y="82" width="140" height="26" rx="6" fill="none" stroke="#2563eb"/>
+  <text x="110" y="99" text-anchor="middle" fill="#64748b" font-size="11">len 2</text>
+  <!-- k=2 length 4 -->
+  <text x="18" y="136" fill="#64748b">k2</text>
+  <rect x="40"  y="120" width="280" height="26" rx="6" fill="none" stroke="#2563eb"/>
+  <rect x="320" y="120" width="280" height="26" rx="6" fill="none" stroke="#2563eb"/>
+  <text x="180" y="137" text-anchor="middle" fill="#64748b" font-size="11">len 4</text>
+  <!-- query [1,6] via two overlapping len-4 blocks -->
+  <rect x="110" y="164" width="280" height="26" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="250" y="181" text-anchor="middle" fill="#059669" font-size="11">[1..4]</text>
+  <rect x="250" y="196" width="280" height="26" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="390" y="213" text-anchor="middle" fill="#059669" font-size="11">[3..6]</text>
+  <text x="320" y="243" text-anchor="middle" fill="#059669" font-weight="700">query(1,6) = min( st[k2][1] , st[k2][3] ) ──▶ O(1); overlap is fine for min/max/gcd</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Sparse Table      : maintain state, update in O(1)/O(log n) ──▶ fast

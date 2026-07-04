@@ -69,6 +69,33 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 260" width="100%" height="260" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="st-90" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Segment tree over [2,1,5,3] &amp; query sum(1,3) = 9</text>
+  <!-- edges -->
+  <line x1="320" y1="58" x2="180" y2="108" stroke="#475569"/>
+  <line x1="320" y1="58" x2="460" y2="108" stroke="#475569"/>
+  <line x1="180" y1="130" x2="110" y2="176" stroke="#475569"/>
+  <line x1="180" y1="130" x2="250" y2="176" stroke="#475569"/>
+  <line x1="460" y1="130" x2="390" y2="176" stroke="#475569"/>
+  <line x1="460" y1="130" x2="530" y2="176" stroke="#475569"/>
+  <!-- root [0,3]=11 -->
+  <rect x="278" y="38" width="84" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="320" y="60" text-anchor="middle" fill="#1e293b">[0,3]=11</text>
+  <!-- [0,1]=3 -->
+  <rect x="138" y="110" width="84" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="180" y="132" text-anchor="middle" fill="#1e293b">[0,1]=3</text>
+  <!-- [2,3]=8 covers query fully -->
+  <rect x="418" y="110" width="84" height="34" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="460" y="132" text-anchor="middle" fill="#1e293b">[2,3]=8</text>
+  <!-- leaves -->
+  <rect x="72"  y="178" width="76" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="110" y="200" text-anchor="middle" fill="#1e293b">[0]=2</text>
+  <rect x="212" y="178" width="76" height="34" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="250" y="200" text-anchor="middle" fill="#1e293b">[1]=1</text>
+  <rect x="352" y="178" width="76" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="390" y="200" text-anchor="middle" fill="#1e293b">[2]=5</text>
+  <rect x="492" y="178" width="76" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="530" y="200" text-anchor="middle" fill="#1e293b">[3]=3</text>
+  <text x="320" y="240" text-anchor="middle" fill="#059669" font-weight="700">green nodes [1,1]=1 &amp; [2,3]=8 fully cover the range ──▶ 1 + 8 = 9 (O(log n))</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Segment Tree      : maintain state, update in O(1)/O(log n) ──▶ fast

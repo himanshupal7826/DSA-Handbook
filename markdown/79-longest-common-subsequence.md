@@ -69,6 +69,42 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="alc-79" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="310" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">LCS grid: match ⇒ diag+1, else max(up, left)  · X=ABC, Y=BAC</text>
+  <text x="192" y="48" text-anchor="middle" fill="#64748b">∅</text>
+  <text x="236" y="48" text-anchor="middle" fill="#1e293b" font-weight="700">B</text>
+  <text x="280" y="48" text-anchor="middle" fill="#1e293b" font-weight="700">A</text>
+  <text x="324" y="48" text-anchor="middle" fill="#1e293b" font-weight="700">C</text>
+  <text x="150" y="88" text-anchor="middle" fill="#64748b">∅</text>
+  <text x="150" y="126" text-anchor="middle" fill="#1e293b" font-weight="700">A</text>
+  <text x="150" y="164" text-anchor="middle" fill="#1e293b" font-weight="700">B</text>
+  <text x="150" y="202" text-anchor="middle" fill="#1e293b" font-weight="700">C</text>
+  <rect x="170" y="64" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="192" y="88" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="214" y="64" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="236" y="88" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="258" y="64" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="280" y="88" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="302" y="64" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="324" y="88" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="170" y="102" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="192" y="126" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="214" y="102" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="236" y="126" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="258" y="102" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="280" y="126" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="302" y="102" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="324" y="126" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="170" y="140" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="192" y="164" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="214" y="140" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="236" y="164" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="258" y="140" width="44" height="38" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="280" y="164" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="302" y="140" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="324" y="164" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="170" y="178" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="192" y="202" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="214" y="178" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="236" y="202" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="258" y="178" width="44" height="38" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="280" y="202" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="302" y="178" width="44" height="38" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="324" y="202" text-anchor="middle" fill="#1e293b" font-weight="700">2</text>
+  <line x1="290" y1="150" x2="316" y2="188" stroke="#475569" marker-end="url(#alc-79)"/>
+  <text x="440" y="150" text-anchor="middle" fill="#64748b">C = C match:</text>
+  <text x="440" y="170" text-anchor="middle" fill="#64748b">dp = diag + 1 = 2</text>
+  <text x="310" y="238" text-anchor="middle" fill="#059669" font-weight="700">LCS(ABC, BAC) = 2  (e.g. AC)</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Longest Common Sub: maintain state, update in O(1)/O(log n) ──▶ fast

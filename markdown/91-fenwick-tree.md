@@ -69,6 +69,34 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 220" width="100%" height="220" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="fw-91" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">query(7): jump i -= i &amp; (-i) ──▶ 7 → 6 → 4 → 0</text>
+  <!-- BIT index cells 1..8 -->
+  <g>
+    <rect x="40"  y="60" width="60" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="70"  y="87" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="110" y="60" width="60" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="140" y="87" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="180" y="60" width="60" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="210" y="87" text-anchor="middle" fill="#1e293b">3</text>
+    <rect x="250" y="60" width="60" height="44" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="280" y="87" text-anchor="middle" fill="#1e293b">4</text>
+    <rect x="320" y="60" width="60" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="350" y="87" text-anchor="middle" fill="#1e293b">5</text>
+    <rect x="390" y="60" width="60" height="44" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="420" y="87" text-anchor="middle" fill="#1e293b">6</text>
+    <rect x="460" y="60" width="60" height="44" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="490" y="87" text-anchor="middle" fill="#1e293b">7</text>
+    <rect x="530" y="60" width="60" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="560" y="87" text-anchor="middle" fill="#1e293b">8</text>
+  </g>
+  <!-- coverage widths under each tree node -->
+  <text x="490" y="124" text-anchor="middle" fill="#64748b">tree[7] covers [7]</text>
+  <text x="420" y="124" text-anchor="middle" fill="#64748b">tree[6] covers [5,6]</text>
+  <text x="280" y="124" text-anchor="middle" fill="#64748b">tree[4] covers [1,4]</text>
+  <!-- jump arrows 7 -> 6 -> 4 -->
+  <path d="M480,52 C455,30 440,30 420,52" fill="none" stroke="#475569" marker-end="url(#fw-91)"/>
+  <path d="M410,52 C360,20 320,20 280,52" fill="none" stroke="#475569" marker-end="url(#fw-91)"/>
+  <text x="320" y="176" text-anchor="middle" fill="#059669" font-weight="700">prefixSum[1..7] = tree[7] + tree[6] + tree[4]  (3 steps, not 7)</text>
+  <text x="320" y="198" text-anchor="middle" fill="#64748b">i &amp; (-i) isolates the lowest set bit ──▶ the block each index owns</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Fenwick Tree      : maintain state, update in O(1)/O(log n) ──▶ fast

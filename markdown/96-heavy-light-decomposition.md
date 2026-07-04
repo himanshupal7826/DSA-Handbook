@@ -69,6 +69,43 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 300" width="100%" height="300" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="hld-96" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Heavy edges (bold) form chains; each chain maps to a contiguous segment-tree range</text>
+  <!-- heavy edges (bold green) -->
+  <line x1="90" y1="55" x2="90" y2="115" stroke="#059669" stroke-width="4"/>
+  <line x1="90" y1="115" x2="90" y2="175" stroke="#059669" stroke-width="4"/>
+  <line x1="90" y1="175" x2="90" y2="235" stroke="#059669" stroke-width="4"/>
+  <line x1="200" y1="115" x2="200" y2="175" stroke="#059669" stroke-width="4"/>
+  <!-- light edge (thin dashed) -->
+  <line x1="90" y1="55" x2="200" y2="115" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="150" y="82" text-anchor="middle" fill="#94a3b8">light</text>
+  <circle cx="90" cy="55" r="16" fill="#ecfdf5" stroke="#059669"/><text x="90" y="59" text-anchor="middle" fill="#1e293b">1</text>
+  <circle cx="90" cy="115" r="16" fill="#ecfdf5" stroke="#059669"/><text x="90" y="119" text-anchor="middle" fill="#1e293b">2</text>
+  <circle cx="90" cy="175" r="16" fill="#ecfdf5" stroke="#059669"/><text x="90" y="179" text-anchor="middle" fill="#1e293b">4</text>
+  <circle cx="90" cy="235" r="16" fill="#ecfdf5" stroke="#059669"/><text x="90" y="239" text-anchor="middle" fill="#1e293b">6</text>
+  <circle cx="200" cy="115" r="16" fill="#eff6ff" stroke="#2563eb"/><text x="200" y="119" text-anchor="middle" fill="#1e293b">3</text>
+  <circle cx="200" cy="175" r="16" fill="#eff6ff" stroke="#2563eb"/><text x="200" y="179" text-anchor="middle" fill="#1e293b">5</text>
+  <text x="145" y="260" text-anchor="middle" fill="#059669" font-weight="700">chain A = 1-2-4-6</text>
+  <text x="230" y="215" text-anchor="middle" fill="#2563eb" font-weight="700">chain B = 3-5</text>
+  <!-- flattened base array by chains -->
+  <text x="470" y="70" text-anchor="middle" fill="#64748b" font-weight="700">base array (chains laid end to end)</text>
+  <rect x="330" y="85" width="44" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="352" y="110" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="374" y="85" width="44" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="396" y="110" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="418" y="85" width="44" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="440" y="110" text-anchor="middle" fill="#1e293b">4</text>
+  <rect x="462" y="85" width="44" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="484" y="110" text-anchor="middle" fill="#1e293b">6</text>
+  <rect x="518" y="85" width="44" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="540" y="110" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="562" y="85" width="44" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="584" y="110" text-anchor="middle" fill="#1e293b">5</text>
+  <text x="418" y="150" text-anchor="middle" fill="#059669">chain A range</text>
+  <text x="562" y="150" text-anchor="middle" fill="#2563eb">chain B</text>
+  <text x="470" y="200" text-anchor="middle" fill="#1e293b" font-weight="700">path 6 → 3 climbs chain A then jumps one light edge</text>
+  <line x1="360" y1="215" x2="580" y2="215" stroke="#475569" marker-end="url(#hld-96)"/>
+  <text x="470" y="240" text-anchor="middle" fill="#64748b">any root-to-node path crosses O(log n) chains</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Heavy Light Decomp: maintain state, update in O(1)/O(log n) ──▶ fast

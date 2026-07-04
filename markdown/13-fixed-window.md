@@ -69,6 +69,27 @@ A window with incrementally maintained aggregates means each element enters and 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 170" width="100%" height="170" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-13" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Fixed window k=3: drop left, add right, sum stays O(1)</text>
+  <g>
+    <rect x="40"  y="50" width="46" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="63"  y="78" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="90"  y="50" width="46" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="113" y="78" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="140" y="50" width="46" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="163" y="78" text-anchor="middle" fill="#1e293b">5</text>
+    <rect x="190" y="50" width="46" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="213" y="78" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="240" y="50" width="46" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="263" y="78" text-anchor="middle" fill="#1e293b">3</text>
+    <rect x="290" y="50" width="46" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="313" y="78" text-anchor="middle" fill="#1e293b">2</text>
+  </g>
+  <rect x="86" y="46" width="154" height="54" rx="8" fill="none" stroke="#059669" stroke-width="2"/>
+  <text x="163" y="122" text-anchor="middle" fill="#059669" font-weight="700">window sum = 1+5+1 = 7</text>
+  <line x1="250" y1="126" x2="330" y2="126" stroke="#475569" marker-end="url(#a-13)"/>
+  <text x="292" y="120" text-anchor="middle" fill="#64748b">slide →</text>
+  <text x="320" y="150" text-anchor="middle" fill="#64748b">next: sum += arr[R] &amp; sum -= arr[L] (no re-scan)</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Fixed Size Window : maintain state, update in O(1)/O(log n) ──▶ fast

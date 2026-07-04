@@ -69,6 +69,32 @@ Trees are recursive: solve children first, combine their results at the parent. 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 560 265" width="100%" height="265" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="bal-57" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="280" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">balanced if every node has |leftH - rightH| at most 1</text>
+  <!-- edges -->
+  <line x1="266" y1="54" x2="194" y2="96" stroke="#475569"/>
+  <line x1="294" y1="54" x2="366" y2="96" stroke="#475569"/>
+  <line x1="166" y1="124" x2="134" y2="166" stroke="#475569"/>
+  <line x1="194" y1="124" x2="226" y2="166" stroke="#475569"/>
+  <line x1="380" y1="130" x2="380" y2="166" stroke="#d97706" stroke-width="3"/>
+  <!-- nodes -->
+  <circle cx="280" cy="40" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="280" y="45" text-anchor="middle" fill="#1e293b">A</text>
+  <circle cx="180" cy="110" r="20" fill="#ecfdf5" stroke="#059669"/><text x="180" y="115" text-anchor="middle" fill="#1e293b">B</text>
+  <circle cx="380" cy="110" r="20" fill="#fff7ed" stroke="#d97706"/><text x="380" y="115" text-anchor="middle" fill="#1e293b">C</text>
+  <circle cx="120" cy="180" r="20" fill="#ecfdf5" stroke="#059669"/><text x="120" y="185" text-anchor="middle" fill="#1e293b">D</text>
+  <circle cx="240" cy="180" r="20" fill="#ecfdf5" stroke="#059669"/><text x="240" y="185" text-anchor="middle" fill="#1e293b">E</text>
+  <circle cx="380" cy="180" r="20" fill="#ecfdf5" stroke="#059669"/><text x="380" y="185" text-anchor="middle" fill="#1e293b">F</text>
+  <text x="304" y="36"  text-anchor="start" fill="#059669" font-weight="700">|2-2|=0 ok</text>
+  <text x="146" y="106" text-anchor="start" fill="#059669" font-weight="700">|1-1|=0 ok</text>
+  <text x="406" y="106" text-anchor="start" fill="#d97706" font-weight="700">|0-1|=1 ok</text>
+  <text x="280" y="240" text-anchor="middle" fill="#64748b">one post-order pass returns height AND a balance flag together</text>
+  <text x="280" y="258" text-anchor="middle" fill="#059669" font-weight="700">any |diff| over 1 short-circuits to false</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Balanced Tree     : maintain state, update in O(1)/O(log n) ──▶ fast

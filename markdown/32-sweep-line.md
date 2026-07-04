@@ -69,6 +69,33 @@ Sorting linearizes the geometry so a single left-to-right sweep resolves all ove
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 220" width="100%" height="220" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="swp32" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Split each interval into +1 start &amp; −1 end events, then sweep</text>
+  <rect x="112" y="34" width="208" height="18" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="216" y="47" text-anchor="middle" fill="#1e293b">[1,5]</text>
+  <rect x="164" y="56" width="208" height="18" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="268" y="69" text-anchor="middle" fill="#1e293b">[2,6]</text>
+  <rect x="476" y="34" width="104" height="18" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="528" y="47" text-anchor="middle" fill="#1e293b">[8,10]</text>
+  <g text-anchor="middle" font-size="11">
+    <path d="M112,96 l6,10 l-12,0 Z" fill="#059669"/><text x="112" y="120" fill="#059669">+1</text>
+    <path d="M164,96 l6,10 l-12,0 Z" fill="#059669"/><text x="164" y="120" fill="#059669">+1</text>
+    <path d="M320,106 l6,-10 l-12,0 Z" fill="#d97706"/><text x="320" y="120" fill="#d97706">−1</text>
+    <path d="M372,106 l6,-10 l-12,0 Z" fill="#d97706"/><text x="372" y="120" fill="#d97706">−1</text>
+    <path d="M476,96 l6,10 l-12,0 Z" fill="#059669"/><text x="476" y="120" fill="#059669">+1</text>
+    <path d="M580,106 l6,-10 l-12,0 Z" fill="#d97706"/><text x="580" y="120" fill="#d97706">−1</text>
+  </g>
+  <line x1="60" y1="184" x2="600" y2="184" stroke="#cbd5e1"/>
+  <text x="30" y="150" fill="#64748b">count</text>
+  <polyline points="60,184 112,184 112,162 164,162 164,140 320,140 320,162 372,162 372,184 476,184 476,162 580,162 580,184" fill="none" stroke="#059669" stroke-width="2"/>
+  <line x1="130" y1="140" x2="130" y2="128" stroke="#059669"/><text x="150" y="132" fill="#059669" font-weight="700">peak = 2</text>
+  <g fill="#64748b" text-anchor="middle" font-size="11">
+    <text x="112" y="200">1</text><text x="164" y="200">2</text><text x="320" y="200">5</text>
+    <text x="372" y="200">6</text><text x="476" y="200">8</text><text x="580" y="200">10</text>
+  </g>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Sweep Line        : maintain state, update in O(1)/O(log n) ──▶ fast

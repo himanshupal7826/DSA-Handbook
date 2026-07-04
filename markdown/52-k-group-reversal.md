@@ -69,6 +69,43 @@ Most list problems are pointer-rewiring; a dummy sentinel removes head edge case
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 220" width="100%" height="220" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="kgr52" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">k=3: reverse each block, stitch prev tail to new head</text>
+  <text x="60" y="60" text-anchor="middle" fill="#64748b">BEFORE</text>
+  <!-- before -->
+  <g>
+    <rect x="110" y="45" width="40" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="130" y="65" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="180" y="45" width="40" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="200" y="65" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="250" y="45" width="40" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="270" y="65" text-anchor="middle" fill="#1e293b">3</text>
+    <rect x="330" y="45" width="40" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="350" y="65" text-anchor="middle" fill="#1e293b">4</text>
+    <rect x="400" y="45" width="40" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="420" y="65" text-anchor="middle" fill="#1e293b">5</text>
+  </g>
+  <line x1="150" y1="60" x2="178" y2="60" stroke="#475569" marker-end="url(#kgr52)"/>
+  <line x1="220" y1="60" x2="248" y2="60" stroke="#475569" marker-end="url(#kgr52)"/>
+  <line x1="290" y1="60" x2="328" y2="60" stroke="#475569" marker-end="url(#kgr52)"/>
+  <line x1="370" y1="60" x2="398" y2="60" stroke="#475569" marker-end="url(#kgr52)"/>
+  <rect x="104" y="40" width="192" height="40" rx="8" fill="none" stroke="#059669" stroke-width="2"/>
+  <text x="200" y="98" text-anchor="middle" fill="#059669" font-weight="700">group of k reversed</text>
+  <text x="60" y="150" text-anchor="middle" fill="#64748b">AFTER</text>
+  <!-- after -->
+  <g>
+    <rect x="110" y="135" width="40" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="130" y="155" text-anchor="middle" fill="#1e293b">3</text>
+    <rect x="180" y="135" width="40" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="200" y="155" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="250" y="135" width="40" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="270" y="155" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="330" y="135" width="40" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="350" y="155" text-anchor="middle" fill="#1e293b">4</text>
+    <rect x="400" y="135" width="40" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="420" y="155" text-anchor="middle" fill="#1e293b">5</text>
+  </g>
+  <line x1="150" y1="150" x2="178" y2="150" stroke="#475569" marker-end="url(#kgr52)"/>
+  <line x1="220" y1="150" x2="248" y2="150" stroke="#475569" marker-end="url(#kgr52)"/>
+  <line x1="290" y1="150" x2="328" y2="150" stroke="#059669" marker-end="url(#kgr52)"/>
+  <line x1="370" y1="150" x2="398" y2="150" stroke="#475569" marker-end="url(#kgr52)"/>
+  <text x="310" y="190" text-anchor="middle" fill="#059669" font-weight="700">tail 1 stitched to next block head 4</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 K Group Reversal  : maintain state, update in O(1)/O(log n) ──▶ fast

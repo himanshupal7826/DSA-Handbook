@@ -69,6 +69,29 @@ Pick the traversal by structure: BFS for unweighted shortest paths, DFS for conn
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 240" width="100%" height="240" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="arw-62" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#059669"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">DFS from A — numbers show discovery order</text>
+  <!-- tree edges with discovery arrows -->
+  <line x1="300" y1="60"  x2="205" y2="115" stroke="#059669" stroke-width="2" marker-end="url(#arw-62)"/>
+  <line x1="185" y1="140" x2="130" y2="185" stroke="#059669" stroke-width="2" marker-end="url(#arw-62)"/>
+  <line x1="205" y1="140" x2="255" y2="185" stroke="#059669" stroke-width="2" marker-end="url(#arw-62)"/>
+  <line x1="330" y1="65"  x2="450" y2="110" stroke="#059669" stroke-width="2" marker-end="url(#arw-62)"/>
+  <line x1="470" y1="135" x2="470" y2="180" stroke="#059669" stroke-width="2" marker-end="url(#arw-62)"/>
+  <!-- nodes -->
+  <circle cx="315" cy="50"  r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="315" y="55"  text-anchor="middle" font-weight="700" fill="#1e293b">A</text><text x="315" y="30" text-anchor="middle" fill="#059669">1</text>
+  <circle cx="190" cy="125" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="190" y="130" text-anchor="middle" font-weight="700" fill="#1e293b">B</text><text x="158" y="120" text-anchor="middle" fill="#059669">2</text>
+  <circle cx="115" cy="200" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="115" y="205" text-anchor="middle" font-weight="700" fill="#1e293b">C</text><text x="115" y="180" text-anchor="middle" fill="#059669">3</text>
+  <circle cx="270" cy="200" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="270" y="205" text-anchor="middle" font-weight="700" fill="#1e293b">D</text><text x="270" y="180" text-anchor="middle" fill="#059669">4</text>
+  <circle cx="470" cy="120" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="470" y="125" text-anchor="middle" font-weight="700" fill="#1e293b">E</text><text x="502" y="115" text-anchor="middle" fill="#059669">5</text>
+  <circle cx="470" cy="200" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="470" y="205" text-anchor="middle" font-weight="700" fill="#1e293b">F</text><text x="502" y="200" text-anchor="middle" fill="#059669">6</text>
+  <text x="590" y="55" text-anchor="middle" fill="#64748b">go deep,</text>
+  <text x="590" y="72" text-anchor="middle" fill="#64748b">backtrack</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Graph DFS         : maintain state, update in O(1)/O(log n) ──▶ fast

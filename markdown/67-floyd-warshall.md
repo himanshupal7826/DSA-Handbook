@@ -69,6 +69,25 @@ Pick the traversal by structure: BFS for unweighted shortest paths, DFS for conn
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 230" width="100%" height="230" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="arw-67" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Floyd-Warshall: is going via k shorter than direct i→j?</text>
+  <!-- direct edge i -> j (weak) -->
+  <line x1="110" y1="180" x2="530" y2="180" stroke="#d97706" stroke-width="2" marker-end="url(#arw-67)"/><text x="320" y="200" text-anchor="middle" fill="#d97706">direct i→j = 9</text>
+  <!-- path via k (better) -->
+  <line x1="105" y1="160" x2="300" y2="80"  stroke="#059669" stroke-width="2" marker-end="url(#arw-67)"/><text x="180" y="110" text-anchor="middle" fill="#059669" font-weight="700">4</text>
+  <line x1="340" y1="80"  x2="535" y2="160" stroke="#059669" stroke-width="2" marker-end="url(#arw-67)"/><text x="460" y="110" text-anchor="middle" fill="#059669" font-weight="700">3</text>
+  <!-- nodes -->
+  <circle cx="80"  cy="175" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="80"  y="180" text-anchor="middle" font-weight="700" fill="#1e293b">i</text>
+  <circle cx="320" cy="70"  r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="320" y="75"  text-anchor="middle" font-weight="700" fill="#1e293b">k</text>
+  <circle cx="560" cy="175" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="560" y="180" text-anchor="middle" font-weight="700" fill="#1e293b">j</text>
+  <text x="320" y="130" text-anchor="middle" fill="#059669" font-weight="700">via k = 4 + 3 = 7</text>
+  <text x="320" y="220" text-anchor="middle" fill="#1e293b" font-weight="700">dist[i][j] = min(9, 7) = 7</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Floyd Warshall    : maintain state, update in O(1)/O(log n) ──▶ fast

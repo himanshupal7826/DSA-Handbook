@@ -69,6 +69,35 @@ A window with incrementally maintained aggregates means each element enters and 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 210" width="100%" height="210" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-17" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Anagram window: slide k=3 over "cbaebabacd", match counts to "abc"</text>
+  <g>
+    <rect x="40"  y="46" width="42" height="42" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="61"  y="73" text-anchor="middle" fill="#1e293b">c</text>
+    <rect x="86"  y="46" width="42" height="42" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="107" y="73" text-anchor="middle" fill="#1e293b">b</text>
+    <rect x="132" y="46" width="42" height="42" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="153" y="73" text-anchor="middle" fill="#1e293b">a</text>
+    <rect x="178" y="46" width="42" height="42" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="199" y="73" text-anchor="middle" fill="#1e293b">e</text>
+    <rect x="224" y="46" width="42" height="42" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="245" y="73" text-anchor="middle" fill="#1e293b">b</text>
+    <rect x="270" y="46" width="42" height="42" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="291" y="73" text-anchor="middle" fill="#1e293b">a</text>
+    <rect x="316" y="46" width="42" height="42" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="337" y="73" text-anchor="middle" fill="#1e293b">b</text>
+  </g>
+  <rect x="84" y="42" width="138" height="50" rx="8" fill="none" stroke="#059669" stroke-width="2"/>
+  <line x1="153" y1="100" x2="245" y2="100" stroke="#475569" marker-end="url(#a-17)"/>
+  <text x="200" y="94" text-anchor="middle" fill="#64748b">slide →</text>
+  <text x="470" y="52" text-anchor="middle" fill="#64748b" font-weight="700">char-count map</text>
+  <g>
+    <rect x="400" y="62" width="46" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="423" y="82" text-anchor="middle" fill="#1e293b">a:1</text>
+    <rect x="452" y="62" width="46" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="475" y="82" text-anchor="middle" fill="#1e293b">b:1</text>
+    <rect x="504" y="62" width="46" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="527" y="82" text-anchor="middle" fill="#1e293b">c:1</text>
+  </g>
+  <text x="470" y="112" text-anchor="middle" fill="#64748b">need = a:1 b:1 c:1</text>
+  <text x="320" y="150" text-anchor="middle" fill="#059669" font-weight="700">window "cba" counts == need ⇒ anagram found at index 0</text>
+  <text x="320" y="180" text-anchor="middle" fill="#64748b">on each step: add arr[R] to map, remove arr[R−k], compare to need</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Anagram Window    : maintain state, update in O(1)/O(log n) ──▶ fast

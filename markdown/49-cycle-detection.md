@@ -69,6 +69,31 @@ Most list problems are pointer-rewiring; a dummy sentinel removes head edge case
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="cyc49" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Floyd: slow +1, fast +2 — they meet inside the loop</text>
+  <!-- tail leading into loop -->
+  <rect x="40" y="60" width="44" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="62" y="82" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="120" y="60" width="44" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="142" y="82" text-anchor="middle" fill="#1e293b">2</text>
+  <line x1="86" y1="77" x2="118" y2="77" stroke="#475569" marker-end="url(#cyc49)"/>
+  <line x1="166" y1="77" x2="220" y2="90" stroke="#475569" marker-end="url(#cyc49)"/>
+  <!-- loop nodes -->
+  <rect x="230" y="80" width="44" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="252" y="102" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="360" y="80" width="44" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="382" y="102" text-anchor="middle" fill="#1e293b">4</text>
+  <rect x="360" y="170" width="44" height="34" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="382" y="192" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="230" y="170" width="44" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="252" y="192" text-anchor="middle" fill="#1e293b">1</text>
+  <line x1="274" y1="97" x2="358" y2="97" stroke="#475569" marker-end="url(#cyc49)"/>
+  <line x1="382" y1="114" x2="382" y2="168" stroke="#475569" marker-end="url(#cyc49)"/>
+  <line x1="358" y1="187" x2="276" y2="187" stroke="#475569" marker-end="url(#cyc49)"/>
+  <line x1="252" y1="168" x2="252" y2="116" stroke="#475569" marker-end="url(#cyc49)"/>
+  <!-- meeting marker -->
+  <text x="382" y="228" text-anchor="middle" fill="#059669" font-weight="700">slow &amp; fast meet here</text>
+  <circle cx="440" cy="187" r="7" fill="none" stroke="#059669" stroke-width="2"/>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Cycle Detection   : maintain state, update in O(1)/O(log n) ──▶ fast

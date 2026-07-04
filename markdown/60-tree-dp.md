@@ -69,6 +69,36 @@ Trees are recursive: solve children first, combine their results at the parent. 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 560 265" width="100%" height="265" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="tdp-60" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="280" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">dp[node] = val + dp[L] + dp[R], combined post-order</text>
+  <!-- edges with upward arrows showing values bubbling up -->
+  <line x1="194" y1="96" x2="266" y2="54" stroke="#475569" marker-end="url(#tdp-60)"/>
+  <line x1="366" y1="96" x2="294" y2="54" stroke="#475569" marker-end="url(#tdp-60)"/>
+  <line x1="134" y1="166" x2="166" y2="124" stroke="#475569" marker-end="url(#tdp-60)"/>
+  <line x1="226" y1="166" x2="194" y2="124" stroke="#475569" marker-end="url(#tdp-60)"/>
+  <line x1="426" y1="166" x2="394" y2="124" stroke="#475569" marker-end="url(#tdp-60)"/>
+  <!-- nodes: val shown inside -->
+  <circle cx="280" cy="40" r="20" fill="#ecfdf5" stroke="#059669"/><text x="280" y="45" text-anchor="middle" fill="#1e293b">5</text>
+  <circle cx="180" cy="110" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="180" y="115" text-anchor="middle" fill="#1e293b">3</text>
+  <circle cx="380" cy="110" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="380" y="115" text-anchor="middle" fill="#1e293b">2</text>
+  <circle cx="120" cy="180" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="120" y="185" text-anchor="middle" fill="#1e293b">1</text>
+  <circle cx="240" cy="180" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="240" y="185" text-anchor="middle" fill="#1e293b">4</text>
+  <circle cx="440" cy="180" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="440" y="185" text-anchor="middle" fill="#1e293b">6</text>
+  <!-- dp badges -->
+  <text x="308" y="44"  text-anchor="start" fill="#059669" font-weight="700">dp=21</text>
+  <text x="140" y="98"  text-anchor="start" fill="#059669" font-weight="700">dp=8</text>
+  <text x="404" y="98"  text-anchor="start" fill="#059669" font-weight="700">dp=8</text>
+  <text x="86"  y="176" text-anchor="start" fill="#64748b">dp=1</text>
+  <text x="266" y="176" text-anchor="start" fill="#64748b">dp=4</text>
+  <text x="466" y="176" text-anchor="start" fill="#64748b">dp=6</text>
+  <text x="280" y="242" text-anchor="middle" fill="#64748b">leaves seed dp = val; each parent folds in its children</text>
+  <text x="280" y="260" text-anchor="middle" fill="#059669" font-weight="700">root dp = 5 + 8 + 8 = 21</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Tree DP           : maintain state, update in O(1)/O(log n) ──▶ fast

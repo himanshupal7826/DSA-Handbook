@@ -69,6 +69,30 @@ When a greedy choice provably never hurts, a single sorted pass yields the optim
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-85" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Sort by finish time, greedily keep each activity that starts after the last kept finish</text>
+  <line x1="40" y1="215" x2="600" y2="215" stroke="#475569" marker-end="url(#a-85)"/>
+  <text x="605" y="219" fill="#64748b">time</text>
+  <text x="40" y="235" text-anchor="middle" fill="#64748b">1</text>
+  <text x="180" y="235" text-anchor="middle" fill="#64748b">3</text>
+  <text x="320" y="235" text-anchor="middle" fill="#64748b">5</text>
+  <text x="460" y="235" text-anchor="middle" fill="#64748b">7</text>
+  <text x="530" y="235" text-anchor="middle" fill="#64748b">8</text>
+  <!-- kept A 1 to 3 -->
+  <rect x="40" y="45" width="140" height="26" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="110" y="63" text-anchor="middle" fill="#059669" font-weight="700">A [1,3] KEEP</text>
+  <!-- skipped B 2 to 5 overlaps A -->
+  <rect x="110" y="79" width="210" height="26" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="215" y="97" text-anchor="middle" fill="#d97706">B [2,5] skip (starts 2 &lt; 3)</text>
+  <!-- kept C 4 to 7 -->
+  <rect x="250" y="113" width="210" height="26" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="355" y="131" text-anchor="middle" fill="#059669" font-weight="700">C [4,7] KEEP</text>
+  <!-- kept D 8 wide -->
+  <rect x="460" y="147" width="120" height="26" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="520" y="165" text-anchor="middle" fill="#059669" font-weight="700">D [8,9] KEEP</text>
+  <text x="320" y="200" text-anchor="middle" fill="#64748b">picked = 3 — each start ≥ previous kept finish</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Activity Selection: maintain state, update in O(1)/O(log n) ──▶ fast

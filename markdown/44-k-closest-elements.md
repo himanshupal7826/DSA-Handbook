@@ -69,6 +69,36 @@ A heap gives O(1) access to the extreme element and O(log n) updates — perfect
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 235" width="100%" height="235" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="kcl-44" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Max-heap of size k=3 by distance; root = farthest, evicted by closer</text>
+  <!-- before -->
+  <text x="128" y="56" text-anchor="middle" fill="#64748b">before</text>
+  <line x1="128" y1="90" x2="95" y2="132" stroke="#475569"/>
+  <line x1="128" y1="90" x2="161" y2="132" stroke="#475569"/>
+  <circle cx="128" cy="76" r="20" fill="#fff7ed" stroke="#d97706"/><text x="128" y="81" text-anchor="middle" fill="#1e293b">d=9</text>
+  <circle cx="95" cy="146" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="95" y="151" text-anchor="middle" fill="#1e293b">d=4</text>
+  <circle cx="161" cy="146" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="161" y="151" text-anchor="middle" fill="#1e293b">d=6</text>
+  <text x="128" y="196" text-anchor="middle" fill="#64748b">root d=9 = farthest kept</text>
+  <!-- new element -->
+  <line x1="200" y1="146" x2="268" y2="146" stroke="#475569" marker-end="url(#kcl-44)"/>
+  <rect x="272" y="62" width="96" height="34" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="320" y="84" text-anchor="middle" fill="#1e293b">new d=3</text>
+  <text x="320" y="120" text-anchor="middle" fill="#059669">3 &lt; root 9</text>
+  <text x="320" y="138" text-anchor="middle" fill="#64748b">pop d=9, push d=3, sift down</text>
+  <line x1="372" y1="146" x2="418" y2="146" stroke="#475569" marker-end="url(#kcl-44)"/>
+  <!-- after -->
+  <text x="500" y="56" text-anchor="middle" fill="#64748b">after</text>
+  <line x1="500" y1="90" x2="467" y2="132" stroke="#475569"/>
+  <line x1="500" y1="90" x2="533" y2="132" stroke="#475569"/>
+  <circle cx="500" cy="76" r="20" fill="#ecfdf5" stroke="#059669"/><text x="500" y="81" text-anchor="middle" fill="#1e293b">d=6</text>
+  <circle cx="467" cy="146" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="467" y="151" text-anchor="middle" fill="#1e293b">d=4</text>
+  <circle cx="533" cy="146" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="533" y="151" text-anchor="middle" fill="#1e293b">d=3</text>
+  <text x="500" y="196" text-anchor="middle" fill="#64748b">new farthest d=6</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 K Closest Elements: maintain state, update in O(1)/O(log n) ──▶ fast

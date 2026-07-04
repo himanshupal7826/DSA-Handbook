@@ -69,6 +69,31 @@ When a greedy choice provably never hurts, a single sorted pass yields the optim
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 200" width="100%" height="200" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-86" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Track the farthest reachable index; extend the frontier while i ≤ reach</text>
+  <!-- nums 2 3 1 1 4, indices 0..4 -->
+  <g>
+    <rect x="60"  y="60" width="80" height="50" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="100" y="90" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="150" y="60" width="80" height="50" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="190" y="90" text-anchor="middle" fill="#1e293b">3</text>
+    <rect x="240" y="60" width="80" height="50" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="280" y="90" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="330" y="60" width="80" height="50" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="370" y="90" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="420" y="60" width="80" height="50" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="460" y="90" text-anchor="middle" fill="#1e293b">4</text>
+  </g>
+  <text x="100" y="128" text-anchor="middle" fill="#64748b">i0</text>
+  <text x="190" y="128" text-anchor="middle" fill="#64748b">i1</text>
+  <text x="280" y="128" text-anchor="middle" fill="#64748b">i2</text>
+  <text x="370" y="128" text-anchor="middle" fill="#64748b">i3</text>
+  <text x="460" y="128" text-anchor="middle" fill="#64748b">i4</text>
+  <!-- reach frontier bar -->
+  <line x1="60" y1="145" x2="500" y2="145" stroke="#059669" stroke-width="3" marker-end="url(#a-86)"/>
+  <text x="280" y="165" text-anchor="middle" fill="#059669" font-weight="700">reach = max(reach, i + nums[i]) = 4 ≥ last index → reachable</text>
+  <text x="320" y="188" text-anchor="middle" fill="#64748b">at i1: reach = max(2, 1+3) = 4 covers the end</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Jump Game         : maintain state, update in O(1)/O(log n) ──▶ fast

@@ -69,6 +69,31 @@ Pick the traversal by structure: BFS for unweighted shortest paths, DFS for conn
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 220" width="100%" height="220" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="arw-63" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Topological order: every edge points forward (left → right)</text>
+  <!-- edges, all left to right -->
+  <line x1="102" y1="105" x2="208" y2="70"  stroke="#475569" marker-end="url(#arw-63)"/>
+  <line x1="102" y1="115" x2="368" y2="112" stroke="#475569" marker-end="url(#arw-63)"/>
+  <line x1="252" y1="72"  x2="368" y2="105" stroke="#475569" marker-end="url(#arw-63)"/>
+  <line x1="412" y1="110" x2="528" y2="110" stroke="#475569" marker-end="url(#arw-63)"/>
+  <!-- nodes -->
+  <circle cx="80"  cy="110" r="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="80"  y="115" text-anchor="middle" font-weight="700" fill="#1e293b">A</text>
+  <circle cx="230" cy="65"  r="22" fill="#eff6ff" stroke="#2563eb"/><text x="230" y="70"  text-anchor="middle" font-weight="700" fill="#1e293b">B</text>
+  <circle cx="390" cy="110" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="390" y="115" text-anchor="middle" font-weight="700" fill="#1e293b">C</text>
+  <circle cx="550" cy="110" r="22" fill="#eff6ff" stroke="#2563eb"/><text x="550" y="115" text-anchor="middle" font-weight="700" fill="#1e293b">D</text>
+  <!-- order strip -->
+  <text x="60"  y="185" text-anchor="middle" fill="#64748b">order:</text>
+  <rect x="150" y="168" width="34" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="167" y="188" text-anchor="middle" fill="#1e293b">A</text>
+  <rect x="190" y="168" width="34" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="207" y="188" text-anchor="middle" fill="#1e293b">B</text>
+  <rect x="230" y="168" width="34" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="247" y="188" text-anchor="middle" fill="#1e293b">C</text>
+  <rect x="270" y="168" width="34" height="30" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="287" y="188" text-anchor="middle" fill="#1e293b">D</text>
+  <text x="360" y="188" text-anchor="middle" fill="#64748b">(indegree 0 first)</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Topological Sort  : maintain state, update in O(1)/O(log n) ──▶ fast

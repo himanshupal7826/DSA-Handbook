@@ -69,6 +69,36 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 210" width="100%" height="210" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="bs-25" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="310" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Search on the ANSWER: feasible(x) is monotonic — find smallest true x</text>
+  <text x="310" y="44" text-anchor="middle" fill="#64748b">candidate answer x  (e.g. min capacity that meets the SLA)</text>
+  <rect x="24"  y="56" width="68" height="46" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="58"  y="84" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="96"  y="56" width="68" height="46" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="130" y="84" text-anchor="middle" fill="#1e293b">4</text>
+  <rect x="168" y="56" width="68" height="46" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="202" y="84" text-anchor="middle" fill="#1e293b">5</text>
+  <rect x="240" y="56" width="68" height="46" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="274" y="84" text-anchor="middle" fill="#1e293b" font-weight="700">6</text>
+  <rect x="312" y="56" width="68" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="346" y="84" text-anchor="middle" fill="#1e293b">7</text>
+  <rect x="384" y="56" width="68" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="418" y="84" text-anchor="middle" fill="#1e293b">8</text>
+  <rect x="456" y="56" width="68" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="490" y="84" text-anchor="middle" fill="#1e293b">9</text>
+  <rect x="528" y="56" width="68" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="562" y="84" text-anchor="middle" fill="#1e293b">10</text>
+  <text x="58"  y="122" text-anchor="middle" fill="#d97706">F</text>
+  <text x="130" y="122" text-anchor="middle" fill="#d97706">F</text>
+  <text x="202" y="122" text-anchor="middle" fill="#d97706">F</text>
+  <text x="274" y="122" text-anchor="middle" fill="#059669" font-weight="700">T</text>
+  <text x="346" y="122" text-anchor="middle" fill="#2563eb">T</text>
+  <text x="418" y="122" text-anchor="middle" fill="#2563eb">T</text>
+  <text x="490" y="122" text-anchor="middle" fill="#2563eb">T</text>
+  <text x="562" y="122" text-anchor="middle" fill="#2563eb">T</text>
+  <line x1="240" y1="48" x2="240" y2="132" stroke="#059669" stroke-width="2" stroke-dasharray="4 3"/>
+  <text x="150" y="152" text-anchor="middle" fill="#d97706">infeasible (too small)</text>
+  <text x="274" y="152" text-anchor="middle" fill="#059669" font-weight="700">answer = 6</text>
+  <line x1="470" y1="170" x2="300" y2="170" stroke="#475569" marker-end="url(#bs-25)"/>
+  <text x="385" y="190" text-anchor="middle" fill="#64748b">binary search the boundary instead of scanning every x</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Binary Search on A: maintain state, update in O(1)/O(log n) ──▶ fast

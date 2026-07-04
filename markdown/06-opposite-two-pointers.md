@@ -69,6 +69,27 @@ Maintain two indices and an invariant that tells you which pointer to advance, e
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 190" width="100%" height="190" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="op-06" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Sorted array · target = 10 · converge L and R</text>
+  <g>
+    <rect x="60"  y="46" width="74" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="97"  y="74" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="140" y="46" width="74" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="177" y="74" text-anchor="middle" fill="#1e293b">3</text>
+    <rect x="220" y="46" width="74" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="257" y="74" text-anchor="middle" fill="#1e293b">4</text>
+    <rect x="300" y="46" width="74" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="337" y="74" text-anchor="middle" fill="#1e293b">6</text>
+    <rect x="380" y="46" width="74" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="417" y="74" text-anchor="middle" fill="#1e293b">8</text>
+    <rect x="460" y="46" width="74" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="497" y="74" text-anchor="middle" fill="#1e293b">11</text>
+  </g>
+  <text x="97"  y="112" text-anchor="middle" fill="#059669" font-weight="700">L</text>
+  <text x="497" y="112" text-anchor="middle" fill="#059669" font-weight="700">R</text>
+  <line x1="110" y1="126" x2="176" y2="126" stroke="#475569" marker-end="url(#op-06)"/>
+  <line x1="484" y1="126" x2="418" y2="126" stroke="#475569" marker-end="url(#op-06)"/>
+  <text x="320" y="164" text-anchor="middle" fill="#1e293b">1 + 11 = 12 &gt; 10  →  move R inward to shrink the sum</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Opposite Direction: maintain state, update in O(1)/O(log n) ──▶ fast

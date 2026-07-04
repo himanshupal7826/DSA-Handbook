@@ -69,6 +69,28 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs>
+    <marker id="arr83" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker>
+  </defs>
+  <text x="310" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Stock with cooldown: 3 states, transitions per day</text>
+  <line x1="168" y1="128" x2="286" y2="92" stroke="#475569" marker-end="url(#arr83)"/>
+  <text x="205" y="98" text-anchor="middle" fill="#64748b">buy -price</text>
+  <line x1="336" y1="92" x2="452" y2="128" stroke="#475569" marker-end="url(#arr83)"/>
+  <text x="418" y="98" text-anchor="middle" fill="#64748b">sell +price</text>
+  <line x1="448" y1="152" x2="172" y2="152" stroke="#475569" marker-end="url(#arr83)"/>
+  <text x="310" y="170" text-anchor="middle" fill="#64748b">cooldown</text>
+  <circle cx="150" cy="150" r="34" fill="#eff6ff" stroke="#2563eb"/><text x="150" y="147" text-anchor="middle" fill="#1e293b">REST</text><text x="150" y="163" text-anchor="middle" fill="#64748b" font-size="11">cash</text>
+  <circle cx="310" cy="78" r="34" fill="#eff6ff" stroke="#2563eb"/><text x="310" y="75" text-anchor="middle" fill="#1e293b">HELD</text><text x="310" y="91" text-anchor="middle" fill="#64748b" font-size="11">own</text>
+  <circle cx="470" cy="150" r="34" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="470" y="147" text-anchor="middle" font-weight="700" fill="#1e293b">SOLD</text><text x="470" y="163" text-anchor="middle" fill="#64748b" font-size="11">just sold</text>
+  <text x="150" y="212" text-anchor="middle" fill="#64748b">held = max(held, rest - price)</text>
+  <text x="470" y="212" text-anchor="middle" fill="#64748b">sold = held + price</text>
+  <text x="310" y="234" text-anchor="middle" fill="#059669" font-weight="700">answer = max(sold, rest) on last day</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 State Machine DP  : maintain state, update in O(1)/O(log n) ──▶ fast

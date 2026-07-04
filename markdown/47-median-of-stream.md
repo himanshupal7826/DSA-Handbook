@@ -69,6 +69,38 @@ A heap gives O(1) access to the extreme element and O(log n) updates — perfect
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 255" width="100%" height="255" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="mds-47" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Median of a stream: two balanced heaps, read the roots</text>
+  <text x="320" y="42" text-anchor="middle" fill="#64748b">add x, then rebalance so sizes differ by at most 1</text>
+  <!-- divider -->
+  <line x1="320" y1="58" x2="320" y2="212" stroke="#64748b" stroke-dasharray="4 4"/>
+  <!-- left max-heap lower half -->
+  <text x="128" y="72" text-anchor="middle" fill="#64748b">max-heap (lower half)</text>
+  <line x1="128" y1="106" x2="93" y2="150" stroke="#475569"/>
+  <line x1="128" y1="106" x2="163" y2="150" stroke="#475569"/>
+  <circle cx="128" cy="92" r="20" fill="#ecfdf5" stroke="#059669"/><text x="128" y="97" text-anchor="middle" fill="#1e293b">4</text>
+  <circle cx="93" cy="164" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="93" y="169" text-anchor="middle" fill="#1e293b">2</text>
+  <circle cx="163" cy="164" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="163" y="169" text-anchor="middle" fill="#1e293b">3</text>
+  <text x="128" y="214" text-anchor="middle" fill="#64748b">root 4 = max of lower</text>
+  <!-- right min-heap upper half -->
+  <text x="500" y="72" text-anchor="middle" fill="#64748b">min-heap (upper half)</text>
+  <line x1="500" y1="106" x2="465" y2="150" stroke="#475569"/>
+  <line x1="500" y1="106" x2="535" y2="150" stroke="#475569"/>
+  <circle cx="500" cy="92" r="20" fill="#ecfdf5" stroke="#059669"/><text x="500" y="97" text-anchor="middle" fill="#1e293b">5</text>
+  <circle cx="465" cy="164" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="465" y="169" text-anchor="middle" fill="#1e293b">8</text>
+  <circle cx="535" cy="164" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="535" y="169" text-anchor="middle" fill="#1e293b">9</text>
+  <text x="500" y="214" text-anchor="middle" fill="#64748b">root 5 = min of upper</text>
+  <!-- median -->
+  <line x1="148" y1="92" x2="255" y2="92" stroke="#475569" marker-end="url(#mds-47)"/>
+  <line x1="480" y1="92" x2="385" y2="92" stroke="#475569" marker-end="url(#mds-47)"/>
+  <text x="320" y="88" text-anchor="middle" fill="#059669" font-weight="700">median</text>
+  <text x="320" y="106" text-anchor="middle" fill="#1e293b">(4+5)/2 = 4.5</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Median of Stream  : maintain state, update in O(1)/O(log n) ──▶ fast

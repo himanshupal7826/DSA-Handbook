@@ -69,6 +69,34 @@ A window with incrementally maintained aggregates means each element enters and 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 210" width="100%" height="210" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-18" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Distinct ≤ K=2: shrink L while map has too many keys</text>
+  <g>
+    <rect x="40"  y="46" width="42" height="42" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="61"  y="73" text-anchor="middle" fill="#1e293b">e</text>
+    <rect x="86"  y="46" width="42" height="42" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="107" y="73" text-anchor="middle" fill="#1e293b">c</text>
+    <rect x="132" y="46" width="42" height="42" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="153" y="73" text-anchor="middle" fill="#1e293b">e</text>
+    <rect x="178" y="46" width="42" height="42" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="199" y="73" text-anchor="middle" fill="#1e293b">b</text>
+    <rect x="224" y="46" width="42" height="42" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="245" y="73" text-anchor="middle" fill="#1e293b">a</text>
+    <rect x="270" y="46" width="42" height="42" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="291" y="73" text-anchor="middle" fill="#1e293b">e</text>
+  </g>
+  <rect x="84" y="42" width="138" height="50" rx="8" fill="none" stroke="#059669" stroke-width="2"/>
+  <line x1="107" y1="102" x2="70" y2="102" stroke="#d97706" marker-end="url(#a-18)"/>
+  <text x="145" y="106" text-anchor="middle" fill="#d97706">shrink L</text>
+  <text x="470" y="52" text-anchor="middle" fill="#64748b" font-weight="700">count map (window "ceb")</text>
+  <g>
+    <rect x="410" y="62" width="46" height="30" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="433" y="82" text-anchor="middle" fill="#1e293b">c:1</text>
+    <rect x="462" y="62" width="46" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="485" y="82" text-anchor="middle" fill="#1e293b">e:1</text>
+    <rect x="514" y="62" width="46" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="537" y="82" text-anchor="middle" fill="#1e293b">b:1</text>
+  </g>
+  <text x="485" y="112" text-anchor="middle" fill="#d97706">3 distinct &gt; K ⇒ evict</text>
+  <text x="320" y="150" text-anchor="middle" fill="#059669" font-weight="700">after dropping 'c': window "eb" has 2 distinct — valid</text>
+  <text x="320" y="180" text-anchor="middle" fill="#64748b">while map.size &gt; K: count[arr[L]]−−, drop key if 0, L++</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Distinct Character: maintain state, update in O(1)/O(log n) ──▶ fast

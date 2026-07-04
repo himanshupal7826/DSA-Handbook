@@ -69,6 +69,35 @@ Trade O(n) extra space for O(1) lookups, collapsing nested work into independent
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="da-04" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">add +2 to range [1..3]: mark diff[1] += 2, diff[4] −= 2</text>
+  <text x="40" y="78" fill="#64748b">diff</text>
+  <!-- diff row with +/- marks -->
+  <g>
+    <text x="118" y="52" text-anchor="middle" fill="#64748b">0</text><rect x="90"  y="58" width="56" height="42" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="118" y="85" text-anchor="middle" fill="#1e293b">0</text>
+    <text x="178" y="52" text-anchor="middle" fill="#64748b">1</text><rect x="150" y="58" width="56" height="42" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="178" y="85" text-anchor="middle" fill="#059669" font-weight="700">+2</text>
+    <text x="238" y="52" text-anchor="middle" fill="#64748b">2</text><rect x="210" y="58" width="56" height="42" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="238" y="85" text-anchor="middle" fill="#1e293b">0</text>
+    <text x="298" y="52" text-anchor="middle" fill="#64748b">3</text><rect x="270" y="58" width="56" height="42" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="298" y="85" text-anchor="middle" fill="#1e293b">0</text>
+    <text x="358" y="52" text-anchor="middle" fill="#64748b">4</text><rect x="330" y="58" width="56" height="42" rx="6" fill="#fff7ed" stroke="#d97706" stroke-width="2"/><text x="358" y="85" text-anchor="middle" fill="#d97706" font-weight="700">−2</text>
+  </g>
+  <line x1="238" y1="112" x2="238" y2="150" stroke="#475569" marker-end="url(#da-04)"/>
+  <text x="430" y="135" text-anchor="middle" fill="#64748b">running prefix of diff</text>
+  <text x="40" y="182" fill="#64748b">result</text>
+  <!-- reconstructed result -->
+  <g>
+    <rect x="90"  y="162" width="56" height="42" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="118" y="189" text-anchor="middle" fill="#1e293b">0</text>
+    <rect x="150" y="162" width="56" height="42" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="178" y="189" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="210" y="162" width="56" height="42" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="238" y="189" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="270" y="162" width="56" height="42" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="298" y="189" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="330" y="162" width="56" height="42" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="358" y="189" text-anchor="middle" fill="#1e293b">0</text>
+  </g>
+  <text x="238" y="230" text-anchor="middle" fill="#059669" font-weight="700">+2 applied across [1..3] with just two edits</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Difference Array  : maintain state, update in O(1)/O(log n) ──▶ fast

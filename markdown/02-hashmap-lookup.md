@@ -69,6 +69,28 @@ Trade O(n) extra space for O(1) lookups, collapsing nested work into independent
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 220" width="100%" height="220" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="hm-02" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Two Sum, target = 9: for each x, look up complement 9 − x</text>
+  <!-- array with indices -->
+  <g>
+    <text x="93"  y="56" text-anchor="middle" fill="#64748b">i=0</text><rect x="65"  y="62" width="56" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="93"  y="90" text-anchor="middle" fill="#1e293b">2</text>
+    <text x="163" y="56" text-anchor="middle" fill="#64748b">i=1</text><rect x="135" y="62" width="56" height="46" rx="6" fill="#fff7ed" stroke="#d97706" stroke-width="2"/><text x="163" y="90" text-anchor="middle" fill="#1e293b">7</text>
+    <text x="233" y="56" text-anchor="middle" fill="#64748b">i=2</text><rect x="205" y="62" width="56" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="233" y="90" text-anchor="middle" fill="#1e293b">11</text>
+    <text x="303" y="56" text-anchor="middle" fill="#64748b">i=3</text><rect x="275" y="62" width="56" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="303" y="90" text-anchor="middle" fill="#1e293b">15</text>
+  </g>
+  <text x="163" y="128" text-anchor="middle" fill="#d97706" font-weight="700">current x = 7</text>
+  <!-- seen map -->
+  <text x="430" y="56" text-anchor="middle" fill="#64748b">seen{ value : index }</text>
+  <rect x="380" y="62" width="100" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="430" y="90" text-anchor="middle" fill="#1e293b">2 : 0</text>
+  <line x1="163" y1="150" x2="163" y2="176" stroke="#475569" marker-end="url(#hm-02)"/>
+  <text x="320" y="170" text-anchor="middle" fill="#64748b">complement = 9 − 7 = 2, is 2 in seen?</text>
+  <text x="320" y="200" text-anchor="middle" fill="#059669" font-weight="700">yes → found at index 0 → answer (0, 1)</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Hash Map Lookup   : maintain state, update in O(1)/O(log n) ──▶ fast

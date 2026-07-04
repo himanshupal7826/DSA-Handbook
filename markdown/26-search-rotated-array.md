@@ -69,6 +69,31 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 210" width="100%" height="210" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="bs-26" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="310" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Rotated array, search 2: one side of mid is always sorted</text>
+  <rect x="24"  y="56" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="58"  y="85" text-anchor="middle" fill="#1e293b">6</text>
+  <rect x="96"  y="56" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="130" y="85" text-anchor="middle" fill="#1e293b">7</text>
+  <rect x="168" y="56" width="68" height="48" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="202" y="85" text-anchor="middle" fill="#1e293b">8</text>
+  <rect x="240" y="56" width="68" height="48" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="274" y="85" text-anchor="middle" fill="#1e293b" font-weight="700">9</text>
+  <rect x="312" y="56" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="346" y="85" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="384" y="56" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="418" y="85" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="456" y="56" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="490" y="85" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="528" y="56" width="68" height="48" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="562" y="85" text-anchor="middle" fill="#1e293b">4</text>
+  <line x1="312" y1="48" x2="312" y2="116" stroke="#b91c1c" stroke-width="2"/>
+  <text x="312" y="132" text-anchor="middle" fill="#b91c1c" font-weight="700">pivot</text>
+  <text x="58"  y="132" text-anchor="middle" fill="#64748b" font-weight="700">lo</text>
+  <text x="274" y="132" text-anchor="middle" fill="#059669" font-weight="700">mid</text>
+  <text x="562" y="132" text-anchor="middle" fill="#64748b" font-weight="700">hi</text>
+  <text x="165" y="154" text-anchor="middle" fill="#059669">left half [6..9] sorted</text>
+  <text x="165" y="172" text-anchor="middle" fill="#d97706">2 not in [6,9] → discard it</text>
+  <line x1="300" y1="188" x2="470" y2="188" stroke="#475569" marker-end="url(#bs-26)"/>
+  <text x="385" y="182" text-anchor="middle" fill="#64748b">search right half</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Search in Rotated : maintain state, update in O(1)/O(log n) ──▶ fast

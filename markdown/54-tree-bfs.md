@@ -69,6 +69,36 @@ Trees are recursive: solve children first, combine their results at the parent. 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 560 260" width="100%" height="260" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="bfs-54" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="280" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">BFS sweeps level by level using a queue</text>
+  <!-- level bands -->
+  <rect x="30" y="30" width="420" height="42" rx="8" fill="#ecfdf5" stroke="#059669" stroke-dasharray="4 3"/>
+  <rect x="30" y="92" width="420" height="42" rx="8" fill="#ecfdf5" stroke="#059669" stroke-dasharray="4 3"/>
+  <rect x="30" y="154" width="420" height="42" rx="8" fill="#ecfdf5" stroke="#059669" stroke-dasharray="4 3"/>
+  <text x="470" y="56" text-anchor="start" fill="#64748b">L0: A</text>
+  <text x="470" y="118" text-anchor="start" fill="#64748b">L1: B C</text>
+  <text x="470" y="180" text-anchor="start" fill="#64748b">L2: D E F</text>
+  <!-- edges -->
+  <line x1="226" y1="66" x2="174" y2="98" stroke="#475569"/>
+  <line x1="254" y1="66" x2="306" y2="98" stroke="#475569"/>
+  <line x1="146" y1="128" x2="114" y2="160" stroke="#475569"/>
+  <line x1="174" y1="128" x2="206" y2="160" stroke="#475569"/>
+  <line x1="334" y1="128" x2="366" y2="160" stroke="#475569"/>
+  <!-- nodes -->
+  <circle cx="240" cy="51" r="18" fill="#eff6ff" stroke="#2563eb"/><text x="240" y="56" text-anchor="middle" fill="#1e293b">A</text>
+  <circle cx="160" cy="113" r="18" fill="#eff6ff" stroke="#2563eb"/><text x="160" y="118" text-anchor="middle" fill="#1e293b">B</text>
+  <circle cx="320" cy="113" r="18" fill="#eff6ff" stroke="#2563eb"/><text x="320" y="118" text-anchor="middle" fill="#1e293b">C</text>
+  <circle cx="100" cy="175" r="18" fill="#eff6ff" stroke="#2563eb"/><text x="100" y="180" text-anchor="middle" fill="#1e293b">D</text>
+  <circle cx="220" cy="175" r="18" fill="#eff6ff" stroke="#2563eb"/><text x="220" y="180" text-anchor="middle" fill="#1e293b">E</text>
+  <circle cx="380" cy="175" r="18" fill="#eff6ff" stroke="#2563eb"/><text x="380" y="180" text-anchor="middle" fill="#1e293b">F</text>
+  <line x1="60" y1="225" x2="430" y2="225" stroke="#475569" marker-end="url(#bfs-54)"/>
+  <text x="245" y="248" text-anchor="middle" fill="#059669" font-weight="700">dequeue order: A B C D E F</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Tree BFS          : maintain state, update in O(1)/O(log n) ──▶ fast

@@ -69,6 +69,34 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 620 262" width="100%" height="262" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs>
+    <marker id="arr84" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker>
+  </defs>
+  <text x="310" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Digit DP over N = 57: tight vs free branching</text>
+  <rect x="230" y="40" width="160" height="42" rx="6" fill="#eff6ff" stroke="#2563eb"/>
+  <text x="310" y="60" text-anchor="middle" fill="#1e293b">pos 0, tight</text>
+  <text x="310" y="76" text-anchor="middle" fill="#64748b" font-size="11">first digit &#8804; 5</text>
+  <line x1="270" y1="84" x2="160" y2="134" stroke="#475569" marker-end="url(#arr84)"/>
+  <text x="188" y="112" text-anchor="middle" fill="#059669">d0 in 0..4</text>
+  <line x1="350" y1="84" x2="452" y2="134" stroke="#475569" marker-end="url(#arr84)"/>
+  <text x="432" y="112" text-anchor="middle" fill="#d97706">d0 = 5</text>
+  <rect x="60" y="136" width="180" height="44" rx="6" fill="#ecfdf5" stroke="#059669"/>
+  <text x="150" y="156" text-anchor="middle" font-weight="700" fill="#1e293b">FREE</text>
+  <text x="150" y="172" text-anchor="middle" fill="#64748b" font-size="11">below bound, unrestricted</text>
+  <rect x="380" y="136" width="180" height="44" rx="6" fill="#fff7ed" stroke="#d97706"/>
+  <text x="470" y="156" text-anchor="middle" font-weight="700" fill="#1e293b">TIGHT</text>
+  <text x="470" y="172" text-anchor="middle" fill="#64748b" font-size="11">still on the bound</text>
+  <line x1="150" y1="182" x2="150" y2="212" stroke="#475569" marker-end="url(#arr84)"/>
+  <line x1="470" y1="182" x2="470" y2="212" stroke="#475569" marker-end="url(#arr84)"/>
+  <text x="150" y="232" text-anchor="middle" fill="#059669">pos 1: digit 0..9 (any)</text>
+  <text x="470" y="232" text-anchor="middle" fill="#d97706">pos 1: digit 0..7 (&#8804; N)</text>
+  <text x="310" y="254" text-anchor="middle" fill="#64748b">memo keyed on (pos, tight) so free subtrees are reused</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Digit DP          : maintain state, update in O(1)/O(log n) ──▶ fast

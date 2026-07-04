@@ -69,6 +69,29 @@ Maintain two indices and an invariant that tells you which pointer to advance, e
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 200" width="100%" height="200" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="fs-08" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">slow +1, fast +2 each step · fast reaches the end / meets in a cycle</text>
+  <g>
+    <rect x="40"  y="50" width="62" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="71"  y="78" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="122" y="50" width="62" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="153" y="78" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="204" y="50" width="62" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="235" y="78" text-anchor="middle" fill="#1e293b">3</text>
+    <rect x="286" y="50" width="62" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="317" y="78" text-anchor="middle" fill="#1e293b">4</text>
+    <rect x="368" y="50" width="62" height="46" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="399" y="78" text-anchor="middle" fill="#1e293b">5</text>
+    <rect x="450" y="50" width="62" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="481" y="78" text-anchor="middle" fill="#1e293b">6</text>
+    <rect x="532" y="50" width="62" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="563" y="78" text-anchor="middle" fill="#1e293b">7</text>
+  </g>
+  <text x="235" y="122" text-anchor="middle" fill="#059669" font-weight="700">slow</text>
+  <text x="399" y="122" text-anchor="middle" fill="#d97706" font-weight="700">fast</text>
+  <line x1="235" y1="136" x2="313" y2="136" stroke="#475569" marker-end="url(#fs-08)"/>
+  <line x1="399" y1="150" x2="559" y2="150" stroke="#475569" marker-end="url(#fs-08)"/>
+  <text x="274" y="132" text-anchor="middle" fill="#64748b">+1</text>
+  <text x="479" y="166" text-anchor="middle" fill="#64748b">+2</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Fast and Slow Poin: maintain state, update in O(1)/O(log n) ──▶ fast

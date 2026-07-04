@@ -69,6 +69,33 @@ Maintain two indices and an invariant that tells you which pointer to advance, e
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 210" width="100%" height="210" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="dnf-09" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">One pass · three regions around the pivot</text>
+  <text x="116" y="52" text-anchor="middle" fill="#059669" font-weight="700">&lt; pivot</text>
+  <text x="256" y="52" text-anchor="middle" fill="#2563eb" font-weight="700">= pivot</text>
+  <text x="396" y="52" text-anchor="middle" fill="#64748b" font-weight="700">unknown</text>
+  <text x="536" y="52" text-anchor="middle" fill="#d97706" font-weight="700">&gt; pivot</text>
+  <g>
+    <rect x="50"  y="62" width="62" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="81"  y="90" text-anchor="middle" fill="#1e293b">0</text>
+    <rect x="120" y="62" width="62" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="151" y="90" text-anchor="middle" fill="#1e293b">0</text>
+    <rect x="190" y="62" width="62" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="221" y="90" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="260" y="62" width="62" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="291" y="90" text-anchor="middle" fill="#1e293b">1</text>
+    <rect x="330" y="62" width="62" height="46" rx="6" fill="#ffffff" stroke="#64748b"/><text x="361" y="90" text-anchor="middle" fill="#1e293b">?</text>
+    <rect x="400" y="62" width="62" height="46" rx="6" fill="#ffffff" stroke="#64748b"/><text x="431" y="90" text-anchor="middle" fill="#1e293b">?</text>
+    <rect x="470" y="62" width="62" height="46" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="501" y="90" text-anchor="middle" fill="#1e293b">2</text>
+    <rect x="540" y="62" width="62" height="46" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="571" y="90" text-anchor="middle" fill="#1e293b">2</text>
+  </g>
+  <text x="221" y="132" text-anchor="middle" fill="#1e293b" font-weight="700">low</text>
+  <text x="361" y="132" text-anchor="middle" fill="#1e293b" font-weight="700">mid</text>
+  <text x="501" y="132" text-anchor="middle" fill="#1e293b" font-weight="700">high</text>
+  <line x1="361" y1="146" x2="424" y2="146" stroke="#475569" marker-end="url(#dnf-09)"/>
+  <text x="320" y="182" text-anchor="middle" fill="#1e293b">mid scans: =0 → swap to low++; =2 → swap to high--; =1 → mid++</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Dutch National Fla: maintain state, update in O(1)/O(log n) ──▶ fast

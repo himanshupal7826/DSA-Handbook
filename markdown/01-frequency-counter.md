@@ -83,6 +83,34 @@ Build **one** frequency map for `s` (increment), then **decrement** while scanni
 
 ### Visual explanation
 
+```svg
+<svg viewBox="0 0 640 220" width="100%" height="220" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="fc-01" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">s = "anagram" vs t = "nagaram": +1 for s, then −1 for t</text>
+  <text x="55" y="82" fill="#64748b">count(s)</text>
+  <text x="55" y="182" fill="#64748b">after t</text>
+  <!-- top row: tally of s -->
+  <g>
+    <text x="163" y="58" text-anchor="middle" fill="#64748b">a</text><rect x="135" y="65" width="56" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="163" y="91" text-anchor="middle" fill="#1e293b">3</text>
+    <text x="233" y="58" text-anchor="middle" fill="#64748b">n</text><rect x="205" y="65" width="56" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="233" y="91" text-anchor="middle" fill="#1e293b">1</text>
+    <text x="303" y="58" text-anchor="middle" fill="#64748b">g</text><rect x="275" y="65" width="56" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="303" y="91" text-anchor="middle" fill="#1e293b">1</text>
+    <text x="373" y="58" text-anchor="middle" fill="#64748b">r</text><rect x="345" y="65" width="56" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="373" y="91" text-anchor="middle" fill="#1e293b">1</text>
+    <text x="443" y="58" text-anchor="middle" fill="#64748b">m</text><rect x="415" y="65" width="56" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="443" y="91" text-anchor="middle" fill="#1e293b">1</text>
+  </g>
+  <line x1="303" y1="112" x2="303" y2="158" stroke="#475569" marker-end="url(#fc-01)"/>
+  <text x="500" y="138" text-anchor="middle" fill="#64748b">scan t, decrement</text>
+  <!-- bottom row: all zero after t -->
+  <g>
+    <rect x="135" y="165" width="56" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="163" y="191" text-anchor="middle" fill="#1e293b">0</text>
+    <rect x="205" y="165" width="56" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="233" y="191" text-anchor="middle" fill="#1e293b">0</text>
+    <rect x="275" y="165" width="56" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="303" y="191" text-anchor="middle" fill="#1e293b">0</text>
+    <rect x="345" y="165" width="56" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="373" y="191" text-anchor="middle" fill="#1e293b">0</text>
+    <rect x="415" y="165" width="56" height="40" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="443" y="191" text-anchor="middle" fill="#1e293b">0</text>
+  </g>
+  <text x="540" y="191" text-anchor="middle" fill="#059669" font-weight="700">all 0 → anagram</text>
+</svg>
+```
+
 ```
 s = "anagram"        t = "nagaram"
 count(s): a:3 n:1 g:1 r:1 m:1

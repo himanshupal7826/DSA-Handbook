@@ -69,6 +69,36 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 260" width="100%" height="260" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="flow-97" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Max-flow: every edge shows flow/capacity; value = 5 = min cut</text>
+  <!-- edges (flow/cap). saturated edges in orange -->
+  <line x1="82" y1="140" x2="256" y2="80" stroke="#d97706" stroke-width="2.5" marker-end="url(#flow-97)"/>
+  <text x="150" y="98" text-anchor="middle" fill="#d97706" font-weight="700">3/3</text>
+  <line x1="82" y1="150" x2="256" y2="200" stroke="#d97706" stroke-width="2.5" marker-end="url(#flow-97)"/>
+  <text x="150" y="196" text-anchor="middle" fill="#d97706" font-weight="700">2/2</text>
+  <line x1="280" y1="98" x2="280" y2="182" stroke="#059669" stroke-width="2.5" marker-end="url(#flow-97)"/>
+  <text x="298" y="145" text-anchor="middle" fill="#059669" font-weight="700">1/1</text>
+  <line x1="304" y1="80" x2="478" y2="140" stroke="#d97706" stroke-width="2.5" marker-end="url(#flow-97)"/>
+  <text x="410" y="98" text-anchor="middle" fill="#d97706" font-weight="700">2/2</text>
+  <line x1="304" y1="200" x2="478" y2="150" stroke="#d97706" stroke-width="2.5" marker-end="url(#flow-97)"/>
+  <text x="410" y="196" text-anchor="middle" fill="#d97706" font-weight="700">3/3</text>
+  <!-- nodes -->
+  <circle cx="65" cy="145" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="65" y="149" text-anchor="middle" fill="#1e293b" font-weight="700">s</text>
+  <circle cx="280" cy="78" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="280" y="82" text-anchor="middle" fill="#1e293b" font-weight="700">a</text>
+  <circle cx="280" cy="202" r="20" fill="#eff6ff" stroke="#2563eb"/><text x="280" y="206" text-anchor="middle" fill="#1e293b" font-weight="700">b</text>
+  <circle cx="495" cy="145" r="20" fill="#ecfdf5" stroke="#059669"/><text x="495" y="149" text-anchor="middle" fill="#1e293b" font-weight="700">t</text>
+  <!-- min cut around source -->
+  <line x1="120" y1="45" x2="175" y2="235" stroke="#b91c1c" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="565" y="120" text-anchor="middle" fill="#b91c1c" font-weight="700">min cut</text>
+  <text x="565" y="138" text-anchor="middle" fill="#b91c1c">s→a + s→b</text>
+  <text x="565" y="156" text-anchor="middle" fill="#b91c1c">= 3 + 2 = 5</text>
+  <text x="320" y="248" text-anchor="middle" fill="#64748b">orange = saturated (flow = capacity); augment along residual paths until none remain</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Network Flow      : maintain state, update in O(1)/O(log n) ──▶ fast

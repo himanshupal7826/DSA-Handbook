@@ -69,6 +69,30 @@ A window with incrementally maintained aggregates means each element enters and 
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 180" width="100%" height="180" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="a-14" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="22" text-anchor="middle" font-weight="700" fill="#1e293b">Variable window: R expands, L shrinks to restore validity</text>
+  <g>
+    <rect x="40"  y="55" width="46" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="63"  y="83" text-anchor="middle" fill="#1e293b">a</text>
+    <rect x="90"  y="55" width="46" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="113" y="83" text-anchor="middle" fill="#1e293b">b</text>
+    <rect x="140" y="55" width="46" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="163" y="83" text-anchor="middle" fill="#1e293b">c</text>
+    <rect x="190" y="55" width="46" height="46" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="213" y="83" text-anchor="middle" fill="#1e293b">a</text>
+    <rect x="240" y="55" width="46" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="263" y="83" text-anchor="middle" fill="#1e293b">d</text>
+    <rect x="290" y="55" width="46" height="46" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="313" y="83" text-anchor="middle" fill="#1e293b">e</text>
+  </g>
+  <rect x="86" y="51" width="154" height="54" rx="8" fill="none" stroke="#059669" stroke-width="2"/>
+  <text x="113" y="45" text-anchor="middle" fill="#059669" font-weight="700">L</text>
+  <text x="213" y="45" text-anchor="middle" fill="#2563eb" font-weight="700">R</text>
+  <line x1="118" y1="120" x2="80" y2="120" stroke="#d97706" marker-end="url(#a-14)"/>
+  <text x="150" y="124" text-anchor="middle" fill="#d97706">shrink L</text>
+  <line x1="238" y1="120" x2="330" y2="120" stroke="#059669" marker-end="url(#a-14)"/>
+  <text x="292" y="114" text-anchor="middle" fill="#059669">expand R →</text>
+  <text x="320" y="152" text-anchor="middle" fill="#64748b">while invalid: drop arr[L], L++   ·   best = max(best, R − L + 1)</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Variable Size Wind: maintain state, update in O(1)/O(log n) ──▶ fast

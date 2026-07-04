@@ -69,6 +69,34 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 660 190" width="100%" height="190" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="au-75" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="330" y="18" text-anchor="middle" font-weight="700" fill="#1e293b">Unbounded Knapsack (1D, forward): dp[w] = max(dp[w], dp[w-wt] + val)</text>
+  <text x="97" y="52" text-anchor="middle" fill="#64748b">w=0</text>
+  <text x="159" y="52" text-anchor="middle" fill="#64748b">1</text>
+  <text x="221" y="52" text-anchor="middle" fill="#64748b">2</text>
+  <text x="283" y="52" text-anchor="middle" fill="#64748b">3</text>
+  <text x="345" y="52" text-anchor="middle" fill="#64748b">4</text>
+  <text x="407" y="52" text-anchor="middle" fill="#64748b">5</text>
+  <text x="469" y="52" text-anchor="middle" fill="#64748b">6</text>
+  <text x="531" y="52" text-anchor="middle" fill="#64748b">7</text>
+  <rect x="70"  y="60" width="54" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="97"  y="85" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="132" y="60" width="54" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="159" y="85" text-anchor="middle" fill="#1e293b">0</text>
+  <rect x="194" y="60" width="54" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="221" y="85" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="256" y="60" width="54" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="283" y="85" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="318" y="60" width="54" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="345" y="85" text-anchor="middle" fill="#1e293b">6</text>
+  <rect x="380" y="60" width="54" height="40" rx="6" fill="#fff7ed" stroke="#d97706"/><text x="407" y="85" text-anchor="middle" fill="#1e293b">6</text>
+  <rect x="442" y="60" width="54" height="40" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="469" y="85" text-anchor="middle" fill="#1e293b">9</text>
+  <rect x="504" y="60" width="54" height="40" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/><text x="531" y="85" text-anchor="middle" fill="#1e293b" font-weight="700">9</text>
+  <path d="M407,58 Q469,26 531,58" fill="none" stroke="#475569" marker-end="url(#au-75)"/>
+  <text x="469" y="30" text-anchor="middle" fill="#64748b">+val, reuse item wt2/val3 (forward)</text>
+  <text x="330" y="130" text-anchor="middle" fill="#059669" font-weight="700">dp[7] = dp[5] + 3 = 9  answer</text>
+  <text x="330" y="152" text-anchor="middle" fill="#64748b">forward loop lets the same item be picked again</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Unbounded Knapsack: maintain state, update in O(1)/O(log n) ──▶ fast

@@ -69,6 +69,40 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 4. (Optional) optimize space with rolling state.
 
 ### Visual explanation
+
+```svg
+<svg viewBox="0 0 640 250" width="100%" height="250" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">
+  <defs><marker id="euler-95" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#1e293b">Euler tour: subtree of node 2 becomes a contiguous range [in=2 .. out=4]</text>
+  <!-- tree edges drawn first -->
+  <line x1="110" y1="55" x2="80" y2="120" stroke="#475569"/>
+  <line x1="110" y1="55" x2="180" y2="120" stroke="#475569"/>
+  <line x1="80" y1="120" x2="50" y2="185" stroke="#475569"/>
+  <line x1="80" y1="120" x2="110" y2="185" stroke="#475569"/>
+  <text x="110" y="48" text-anchor="middle" fill="#64748b" font-weight="700">tree</text>
+  <circle cx="110" cy="55" r="16" fill="#eff6ff" stroke="#2563eb"/><text x="110" y="59" text-anchor="middle" fill="#1e293b">1</text>
+  <circle cx="80" cy="120" r="16" fill="#ecfdf5" stroke="#059669"/><text x="80" y="124" text-anchor="middle" fill="#1e293b">2</text>
+  <circle cx="180" cy="120" r="16" fill="#eff6ff" stroke="#2563eb"/><text x="180" y="124" text-anchor="middle" fill="#1e293b">5</text>
+  <circle cx="50" cy="185" r="16" fill="#ecfdf5" stroke="#059669"/><text x="50" y="189" text-anchor="middle" fill="#1e293b">3</text>
+  <circle cx="110" cy="185" r="16" fill="#ecfdf5" stroke="#059669"/><text x="110" y="189" text-anchor="middle" fill="#1e293b">4</text>
+  <!-- flattened in-order array -->
+  <text x="425" y="70" text-anchor="middle" fill="#64748b" font-weight="700">flatten by entry (in) time</text>
+  <rect x="270" y="85" width="62" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="301" y="112" text-anchor="middle" fill="#1e293b">1</text>
+  <rect x="332" y="85" width="62" height="44" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="363" y="112" text-anchor="middle" fill="#1e293b">2</text>
+  <rect x="394" y="85" width="62" height="44" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="425" y="112" text-anchor="middle" fill="#1e293b">3</text>
+  <rect x="456" y="85" width="62" height="44" rx="6" fill="#ecfdf5" stroke="#059669"/><text x="487" y="112" text-anchor="middle" fill="#1e293b">4</text>
+  <rect x="518" y="85" width="62" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/><text x="549" y="112" text-anchor="middle" fill="#1e293b">5</text>
+  <text x="301" y="148" text-anchor="middle" fill="#64748b">1</text>
+  <text x="363" y="148" text-anchor="middle" fill="#64748b">2</text>
+  <text x="425" y="148" text-anchor="middle" fill="#64748b">3</text>
+  <text x="487" y="148" text-anchor="middle" fill="#64748b">4</text>
+  <text x="549" y="148" text-anchor="middle" fill="#64748b">5</text>
+  <line x1="332" y1="162" x2="518" y2="162" stroke="#059669" stroke-width="2" marker-end="url(#euler-95)"/>
+  <text x="425" y="182" text-anchor="middle" fill="#059669" font-weight="700">subtree(2) = range [in=2 .. out=4]</text>
+  <text x="425" y="205" text-anchor="middle" fill="#64748b">a subtree query is now one contiguous range query</text>
+</svg>
+```
+
 ```
 brute  : recompute everything each step      ──▶ slow
 Euler Tour        : maintain state, update in O(1)/O(log n) ──▶ fast
