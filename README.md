@@ -8,12 +8,13 @@ This folder is the **zariya.in** portal: a set of comprehensive, interview-focus
 |----------|--------|------|
 | 🧠 DSA Patterns | 100 | `dsa.html` |
 | 🎸 Django | 10 | `django/` |
-| 🐹 Go | 10 | `go/` |
-| 🏛️ System Design | 12 | `system-design/` |
-| 🐳 Docker | 10 | `docker/` |
-| ☸️ Kubernetes | 10 | `kubernetes/` |
-| 🐼 NumPy & Pandas | 12 | `numpy-pandas/` |
-| 🗄️ SQL | 12 | `sql/` |
+| 🐹 Go | 129 | `go/` |
+| 🏛️ System Design | 40 | `system-design/` |
+| 🐳 Docker | 30 | `docker/` |
+| ☸️ Kubernetes | 30 | `kubernetes/` |
+| 🐼 NumPy & Pandas | 31 | `numpy-pandas/` |
+| 🗄️ SQL | 36 | `sql/` |
+| 🤖 AI Engineering | 46 | `ai-engineering/` |
 
 Each new handbook has its own `index.html` (home), `topic.html` (renderer), `data.js` (manifest), `content.js` (offline content), and `markdown/`. They share the engine in `assets/js/hb-*.js` + `markdown.js`/`theme.js` and `assets/css/style.css`. Regenerate them with `python3 tools/build_handbooks.py` (handbook specs live in `tools/src/*_hb.py`).
 
