@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apache Cassandra Handbook — zariya.in</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="icon" type="image/png" href="../assets/images/03_favicon.png">
+<script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+</head>
+<body>
+<header class="topbar" id="topbar"></header>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+<nav class="sidebar" id="sidebar"></nav>
+<main class="main">
+  <section class="hero">
+    <h1>💠 Apache Cassandra Handbook</h1>
+    <p>Beginner → Senior. Master Apache Cassandra end to end: CQL and query-first data modeling, the ring, replication and tunable consistency, write/read paths, compaction and tombstones, repair, multi-DC operations, JVM tuning, security, drivers, and production system design — with diagrams, interview banks, and a listen mode.</p>
+    <div class="stats">
+      <div class="stat"><div class="n" id="s-total">46</div><div class="l">Topics</div></div>
+      <div class="stat"><div class="n" id="s-done">0</div><div class="l">Completed</div></div>
+      <div class="stat"><div class="n" id="s-cat">9</div><div class="l">Categories</div></div>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+      <a class="btn primary" id="start-btn" href="#">▶ Start learning</a>
+      <a class="btn" href="journey.html">🗓️ 30-Day Journey</a>
+      <a class="btn" href="interview.html">🎤 Interview Mode</a>
+      <a class="btn" href="review.html">🔁 Review</a>
+      <a class="btn" href="../index.html">⌂ All handbooks</a>
+    </div>
+  </section>
+  <h2 class="section-title" id="dashboard"><span class="bar"></span>Your Progress</h2>
+  <div class="progress-bar"><span id="pbar" style="width:0%"></span></div>
+  <div class="muted" id="pmsg" style="font-size:13px;margin:6px 0 10px"></div>
+  <h2 class="section-title"><span class="bar"></span>Topics by Category</h2>
+  <div id="cat-sections"></div>
+</main>
+</div>
+<script src="../assets/js/theme.js"></script>
+<script src="data.js"></script>
+<script src="../assets/js/hb-progress.js"></script>
+<script src="../assets/js/hb-search.js"></script>
+<script src="../assets/js/markdown.js"></script>
+<script src="../assets/js/hb-listen.js"></script>
+<script src="content.js" onerror="window.HANDBOOK_CONTENT=window.HANDBOOK_CONTENT||{}"></script>
+<script src="../assets/js/hb-engine.js"></script>
+<script>
+DSAApp.initChrome(null);
+(function(){
+  var items = HANDBOOK.items;
+  document.getElementById("start-btn").href = "topic.html?p=" + items[0].slug;
+  // group by category preserving order
+  var cats = [];
+  items.forEach(function(p){ if(cats.indexOf(p.category)===-1) cats.push(p.category); });
+  var html = "";
+  cats.forEach(function(cat){
+    var inCat = items.filter(function(p){return p.category===cat;});
+    html += '<h3 style="margin:22px 0 10px">'+cat+'</h3><div class="card-grid">';
+    inCat.forEach(function(p){
+      html += '<a class="card" href="topic.html?p='+p.slug+'">'+
+        '<span class="badge lvl-'+p.level+'">'+p.level+'</span>'+
+        '<h3>'+String(p.id).padStart(2,"0")+'. '+p.name+'</h3>'+
+        '<p>'+p.summary+'</p></a>';
+    });
+    html += '</div>';
+  });
+  document.getElementById("cat-sections").innerHTML = html;
+  function refresh(){
+    var s = DSAProgress.stats();
+    document.getElementById("s-done").textContent = s.completed;
+    document.getElementById("pbar").style.width = s.pct+"%";
+    document.getElementById("pmsg").textContent = s.completed+" of "+s.total+" topics complete ("+s.pct+"%)";
+  }
+  refresh(); DSAProgress.onChange(refresh);
+})();
+</script>
+</body>
+</html>

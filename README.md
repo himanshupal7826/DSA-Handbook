@@ -15,6 +15,7 @@ This folder is the **zariya.in** portal: a set of comprehensive, interview-focus
 | 🐼 NumPy & Pandas | 31 | `numpy-pandas/` |
 | 🗄️ SQL | 36 | `sql/` |
 | 🤖 AI Engineering | 46 | `ai-engineering/` |
+| 💠 Apache Cassandra | 46 | `cassandra/` |
 
 Each new handbook has its own `index.html` (home), `topic.html` (renderer), `data.js` (manifest), `content.js` (offline content), and `markdown/`. They share the engine in `assets/js/hb-*.js` + `markdown.js`/`theme.js` and `assets/css/style.css`. Regenerate them with `python3 tools/build_handbooks.py` (handbook specs live in `tools/src/*_hb.py`).
 
