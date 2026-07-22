@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interview Mode — REST API Handbook</title>
+<meta name="description" content="Mock REST API interviews: rapid-fire question drills with hints, model answers and follow-ups, plus design rounds — fully offline.">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/sd.css">
+<link rel="icon" type="image/png" href="../assets/images/03_favicon.png">
+<script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+</head>
+<body>
+<header class="topbar" id="topbar"></header>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+<nav class="sidebar" id="sidebar"></nav>
+<main class="main sd-wrap">
+  <div class="sd-subnav">
+    <a href="journey.html">🗓️ 30-Day Journey</a>
+    <a href="interview.html" class="active">🎤 Interview Mode</a>
+    <a href="review.html">🔁 Review</a>
+    <a href="index.html">📚 All Topics</a>
+  </div>
+
+  <h1 style="margin:0 0 4px">🎤 Interview Mode</h1>
+  <p class="sd-muted">Simulate a real interview. Read the question, think it through, then reveal the model answer and grade yourself. Follow-ups mimic an interviewer going deeper.</p>
+
+  <div class="sd-subnav" style="margin-top:14px">
+    <a href="#" id="tab-qa" class="active">⚡ Rapid Q&A</a>
+    <a href="#" id="tab-design">🏗️ Design Round</a>
+  </div>
+
+  <div id="panel-qa"></div>
+  <div id="panel-design" style="display:none"></div>
+</main>
+</div>
+<div class="sd-toast" id="toast"></div>
+
+<script src="../assets/js/theme.js"></script>
+<script src="data.js"></script>
+<script src="../assets/js/hb-progress.js"></script>
+<script src="../assets/js/hb-search.js"></script>
+<script src="../assets/js/markdown.js"></script>
+<script src="content.js" onerror="window.HANDBOOK_CONTENT=window.HANDBOOK_CONTENT||{}"></script>
+<script>window.HB_JOURNEY={"practicePattern": "^(05|13|19|29|33|39|44|45|46)-", "practiceVerb": "Design", "practiceNamePrefix": "^(Design|Build):\\s*", "conceptChallenge": "Sketch how you'd apply {name} in a real public API, and name one concrete trade-off.", "practiceTabLabel": "🏗️ API Design Rounds", "practiceIntro": "Pick an API to design end to end. Work the resource model and contract yourself first — open the full chapter only after you've attempted it.", "practiceStartLabel": "Start round →", "practiceBackLabel": "← All rounds", "practiceDrillTag": "45-min round", "practiceDrillIntro": "Talk through each step aloud. Tick items as you cover them, then compare with the full chapter.", "practiceSteps": [["Clarify requirements & consumers", "Who calls this API — public, partner, or internal? Use cases, traffic, SLAs, and breaking-change tolerance."], ["Identify resources & relationships", "Find the nouns and their hierarchy and cardinality. Resist RPC-style verb endpoints."], ["Design the URI & method surface", "Endpoints, HTTP verbs, and the safety/idempotency guarantee of each operation."], ["Define payloads & schemas", "Request/response shapes, field naming, nullability, enums, dates, money, and IDs."], ["Errors & status codes", "A consistent taxonomy, RFC 9457 problem details, validation errors, and partial failures."], ["Pagination, filtering & sorting", "Cursor vs offset, page limits, defaults, and a stable total ordering."], ["AuthN, AuthZ & rate limits", "OAuth 2.0 scopes, the permission model, quotas, and tenant isolation."], ["Performance & caching", "ETags and Cache-Control, avoiding N+1 fan-out, payload size, and async for long-running work."], ["Versioning, docs & rollout", "Compatibility policy, the OpenAPI contract, deprecation plan, and what breaks at 10x traffic."]], "phases": [{"until": 4, "label": "API Foundations"}, {"until": 10, "label": "Resource Design"}, {"until": 17, "label": "Core Mechanics"}, {"until": 24, "label": "API Security"}, {"until": 30, "label": "Performance & Scale"}, {"until": 32, "label": "Versioning & Evolution"}, {"until": 35, "label": "Documentation & Contracts"}, {"until": 38, "label": "Testing & Quality"}, {"until": 43, "label": "Production & Operations"}, {"until": 46, "label": "Interview & Case Studies"}]};</script>
+<script src="../assets/js/sd-hub.js"></script>
+<script src="../assets/js/hb-engine.js"></script>
+<script>
+DSAApp.initChrome(null);
+var P=window.DSAProgress, T=document.getElementById("toast");
+function toast(m){ T.textContent=m; T.classList.add("show"); setTimeout(function(){T.classList.remove("show");},1800); }
+function pad(n){ return String(n).padStart(2,"0"); }
+
+/* per-handbook practice-round config (defaults = System Design "Design Round") */
+var CFG=window.HB_JOURNEY||{};
+var PRAC={
+  tab: CFG.practiceTabLabel || "🏗️ Design Round",
+  strip: new RegExp(CFG.practiceNamePrefix || "^Design:\\s*"),
+  intro: CFG.practiceIntro || "Pick a system to design. You get a blank checklist to drive the round like a real interview; open the full solution only after you've attempted it.",
+  start: CFG.practiceStartLabel || "Start design round →",
+  back: CFG.practiceBackLabel || "← All systems",
+  tag: CFG.practiceDrillTag || "45-min round",
+  drillIntro: CFG.practiceDrillIntro || "Talk through each step aloud. Tick items as you cover them, then compare with the full write-up.",
+  steps: CFG.practiceSteps || [
+    ["Clarify requirements","Functional + non-functional (scale, latency, availability, consistency). State assumptions and scope cuts."],
+    ["Capacity estimation","DAU, QPS (read/write, peak), storage/yr, bandwidth. Justify with math."],
+    ["API design","Key endpoints, request/response shapes, idempotency where needed."],
+    ["Data model","Entities, chosen datastore(s) and why; access patterns."],
+    ["High-level design","Client → LB → services → stores/queues/cache. Draw the boxes."],
+    ["Deep dive","The crux of THIS system — the 1–2 hard problems, with trade-offs."],
+    ["Bottlenecks & scaling","Where it breaks; sharding, caching, fan-out, hot keys."],
+    ["Failure & edge cases","What fails, blast radius, mitigation. Idempotency, retries."],
+    ["Trade-offs & wrap-up","Big decisions, what you'd change at 10×, alternatives."]
+  ]
+};
+
+/* ---- tabs ---- */
+var tabQA=document.getElementById("tab-qa"), tabD=document.getElementById("tab-design");
+tabD.textContent=PRAC.tab;
+var panelQA=document.getElementById("panel-qa"), panelD=document.getElementById("panel-design");
+tabQA.onclick=function(e){e.preventDefault(); tabQA.classList.add("active"); tabD.classList.remove("active"); panelQA.style.display=""; panelD.style.display="none";};
+tabD.onclick=function(e){e.preventDefault(); tabD.classList.add("active"); tabQA.classList.remove("active"); panelD.style.display=""; panelQA.style.display="none";};
+
+/* ================= RAPID Q&A ================= */
+var categories=(function(){var c=[]; SD.items.forEach(function(t){if(c.indexOf(t.category)===-1)c.push(t.category);}); return c;})();
+var levels=["Beginner","Intermediate","Advanced","Expert"];
+var sessKey="zariya-iv-seed-"+ (HANDBOOK.id||"sd");
+function nextSeed(){ var n=(+localStorage.getItem(sessKey)||0)+1; localStorage.setItem(sessKey,n); return n*97+SD.currentDay(); }
+
+function renderSetup(){
+  panelQA.innerHTML=
+    '<div class="sd-card" style="margin-top:16px"><div class="iv-setup">'+
+    '<label>Focus <select id="f-cat"><option value="">All categories</option>'+categories.map(function(c){return '<option>'+c+'</option>';}).join("")+'</select></label>'+
+    '<label>Level <select id="f-lvl"><option value="">All levels</option>'+levels.map(function(l){return '<option>'+l+'</option>';}).join("")+'</select></label>'+
+    '<label>Questions <select id="f-n"><option>5</option><option selected>10</option><option>15</option><option>20</option></select></label>'+
+    '<button class="btn primary" id="start-iv">▶ Start interview</button>'+
+    '</div><p class="sd-sub" style="margin:12px 0 0">Bank: '+SD.allInterview().length+' questions parsed from '+SD.items.length+' topics.</p></div>';
+  document.getElementById("start-iv").onclick=startSession;
+}
+
+var S=null; // session state
+function startSession(){
+  var cat=document.getElementById("f-cat").value, lvl=document.getElementById("f-lvl").value, n=+document.getElementById("f-n").value;
+  var bank=SD.allInterview().filter(function(q){ return (!cat||q.category===cat)&&(!lvl||q.level===lvl); });
+  if(!bank.length){ toast("No questions match that filter."); return; }
+  bank=SD.seededShuffle(bank, nextSeed()).slice(0,Math.min(n,bank.length));
+  S={ qs:bank, i:0, results:[] };
+  renderQ();
+}
+function followupsFor(q){
+  return SD.interviewBank(q.slug).filter(function(x){return x.q!==q.q;}).slice(0,2);
+}
+function renderQ(){
+  if(S.i>=S.qs.length){ return renderScore(); }
+  var q=S.qs[S.i], pct=Math.round(S.i/S.qs.length*100);
+  panelQA.innerHTML=
+    '<div class="iv-stage">'+
+    '<div class="iv-progress"><span>Q'+(S.i+1)+' / '+S.qs.length+'</span><div class="bar"><span style="width:'+pct+'%"></span></div></div>'+
+    '<div class="iv-qcard">'+
+      '<div class="iv-meta"><span class="badge lvl-'+q.level+'">'+q.level+'</span><span class="tag">'+q.category+'</span>'+
+        '<a class="sd-sub" href="topic.html?p='+q.slug+'" style="margin-left:auto">'+q.name+' ↗</a></div>'+
+      '<div class="iv-q">'+q.q+'</div>'+
+      '<div class="iv-hint" id="hint" style="display:none"><div class="callout info"><strong>Hint:</strong> Frame your answer around <b>'+q.name+'</b> ('+q.category+'). Think trade-offs, failure modes, and a concrete example.</div></div>'+
+      '<div class="iv-reveal" id="reveal" style="display:none"><div class="lbl">Model answer</div><div class="ans" id="ans"></div><div class="iv-followups" id="fups"></div></div>'+
+      '<div class="iv-controls" id="ctrls">'+
+        '<button class="btn" id="b-hint">💡 Hint</button>'+
+        '<button class="btn primary" id="b-reveal">Reveal answer</button>'+
+        '<button class="btn" id="b-skip">Skip →</button></div>'+
+      '<div class="iv-self" id="self" style="display:none">'+
+        '<span class="sd-muted" style="align-self:center">How did you do?</span>'+
+        '<button class="btn done" data-g="2">✅ Nailed it</button>'+
+        '<button class="btn" data-g="1">🟡 Partial</button>'+
+        '<button class="btn" data-g="0">🔴 Missed</button></div>'+
+    '</div></div>';
+
+  document.getElementById("b-hint").onclick=function(){ document.getElementById("hint").style.display="block"; this.style.display="none"; };
+  document.getElementById("b-skip").onclick=function(){ S.results.push({q:q,grade:-1}); S.i++; renderQ(); };
+  document.getElementById("b-reveal").onclick=function(){
+    var r=document.getElementById("reveal"); r.style.display="block";
+    document.getElementById("ans").innerHTML=DSAMarkdown.render(q.a);
+    var f=followupsFor(q);
+    document.getElementById("fups").innerHTML=f.length?('<div class="lbl" style="color:var(--accent);margin-top:12px">Interviewer follow-ups</div><ul>'+f.map(function(x){return '<li>'+x.q+'</li>';}).join("")+'</ul>'):'';
+    document.getElementById("ctrls").style.display="none";
+    document.getElementById("self").style.display="flex";
+  };
+  document.querySelectorAll("#self [data-g]").forEach(function(b){ b.onclick=function(){ S.results.push({q:q,grade:+b.dataset.g}); SD.touchToday(); S.i++; renderQ(); }; });
+}
+function renderScore(){
+  var graded=S.results.filter(function(r){return r.grade>=0;});
+  var score=graded.reduce(function(a,r){return a+r.grade;},0), max=graded.length*2;
+  var pct=max?Math.round(score/max*100):0;
+  var missed=S.results.filter(function(r){return r.grade===0;}).map(function(r){return r.q;});
+  var uniqMiss=[]; missed.forEach(function(q){ if(!uniqMiss.some(function(x){return x.slug===q.slug;})) uniqMiss.push(q); });
+  var verdict = pct>=80?"Strong hire ✅":pct>=60?"Lean hire 🟢":pct>=40?"Mixed 🟡":"Needs work 🔴";
+  panelQA.innerHTML=
+    '<div class="iv-stage"><div class="iv-qcard">'+
+    '<h2 style="margin:0 0 6px">Scorecard</h2>'+
+    '<div class="sd-xp" style="margin:10px 0 16px"><div class="lvl">'+pct+'</div><div class="xp-mid"><div class="xp-title">'+verdict+'</div>'+
+      '<div class="sd-sub">'+score+' / '+max+' points across '+graded.length+' answered'+(S.results.length-graded.length?(' ('+(S.results.length-graded.length)+' skipped)'):'')+'</div>'+
+      '<div class="sd-xpbar"><span style="width:'+pct+'%"></span></div></div></div>'+
+    (uniqMiss.length?('<div class="lbl" style="color:var(--red)">Topics to revisit</div><div class="rv-list" style="margin:8px 0 16px">'+
+      uniqMiss.map(function(q){return '<div class="rv-card"><div class="info"><div class="nm">'+q.name+'</div><div class="sd-sub">'+q.category+'</div></div><a class="btn" href="topic.html?p='+q.slug+'">Study ↗</a></div>';}).join("")+'</div>'):'<p class="sd-muted">No missed questions — nicely done.</p>')+
+    '<div class="sd-btn-row"><button class="btn primary" id="again">↻ New interview</button><a class="btn" href="journey.html">← Journey</a></div>'+
+    '</div></div>';
+  document.getElementById("again").onclick=renderSetup;
+  toast("Interview complete — "+pct+"%");
+}
+
+/* ================= PRACTICE ROUND (config-driven) ================= */
+var DESIGN_STEPS=PRAC.steps;
+function renderDesignList(){
+  var prompts=SD.designPrompts();
+  if(!prompts.length){ panelD.innerHTML='<div class="sd-card" style="margin-top:16px"><p class="sd-muted">No practice rounds in this handbook yet.</p></div>'; return; }
+  panelD.innerHTML='<div class="sd-card" style="margin-top:16px"><p class="sd-muted" style="margin:0 0 6px">'+PRAC.intro+'</p></div>'+
+    '<div class="sd-grid cols-2" style="margin-top:14px">'+prompts.map(function(t){
+      return '<div class="sd-card"><div class="iv-meta"><span class="badge lvl-'+t.level+'">'+t.level+'</span></div>'+
+        '<div style="font-weight:700;font-size:15px">'+t.name.replace(PRAC.strip,"")+'</div>'+
+        '<div class="sd-sub" style="margin:4px 0 10px">'+t.summary+'</div>'+
+        '<button class="btn primary" data-slug="'+t.slug+'">'+PRAC.start+'</button></div>';
+    }).join("")+'</div>';
+  panelD.querySelectorAll("[data-slug]").forEach(function(b){ b.onclick=function(){ renderDesignDrill(SD.bySlug(b.dataset.slug)); }; });
+}
+function renderDesignDrill(t){
+  panelD.innerHTML='<div class="iv-stage"><div class="iv-qcard">'+
+    '<div class="iv-meta"><span class="badge lvl-'+t.level+'">'+t.level+'</span><span class="tag">'+PRAC.tag+'</span></div>'+
+    '<div class="iv-q">'+t.name+'</div>'+
+    '<p class="sd-muted" style="margin-top:8px">'+PRAC.drillIntro+'</p>'+
+    '<ul class="iv-checklist">'+DESIGN_STEPS.map(function(s,i){
+      return '<li><input type="checkbox" id="ds'+i+'"><label for="ds'+i+'"><b>'+(i+1)+'. '+s[0]+'</b><div class="sd-sub">'+s[1]+'</div></label></li>';
+    }).join("")+'</ul>'+
+    '<div class="iv-progress" style="margin-top:14px"><span id="ds-count">0 / '+DESIGN_STEPS.length+'</span><div class="bar"><span id="ds-bar" style="width:0%"></span></div></div>'+
+    '<div class="sd-btn-row"><a class="btn primary" href="topic.html?p='+t.slug+'">📖 Open full solution</a>'+
+      '<button class="btn" id="ds-back">'+PRAC.back+'</button></div>'+
+    '</div></div>';
+  function upd(){ var done=DESIGN_STEPS.filter(function(_,i){return document.getElementById("ds"+i).checked;}).length;
+    document.getElementById("ds-count").textContent=done+" / "+DESIGN_STEPS.length;
+    document.getElementById("ds-bar").style.width=Math.round(done/DESIGN_STEPS.length*100)+"%";
+    if(done===DESIGN_STEPS.length){ SD.touchToday(); toast("Full checklist covered — compare with the solution."); } }
+  DESIGN_STEPS.forEach(function(_,i){ document.getElementById("ds"+i).onchange=upd; });
+  document.getElementById("ds-back").onclick=renderDesignList;
+}
+
+renderSetup();
+renderDesignList();
+</script>
+</body>
+</html>

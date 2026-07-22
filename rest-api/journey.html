@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>30-Day Journey — REST API Handbook</title>
+<meta name="description" content="A 30-day REST API study plan with spaced repetition, daily topics, revision, interview questions, XP and streaks — fully offline.">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/sd.css">
+<link rel="icon" type="image/png" href="../assets/images/03_favicon.png">
+<script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+</head>
+<body>
+<header class="topbar" id="topbar"></header>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+<nav class="sidebar" id="sidebar"></nav>
+<main class="main sd-wrap">
+  <div class="sd-subnav">
+    <a href="journey.html" class="active">🗓️ 30-Day Journey</a>
+    <a href="interview.html">🎤 Interview Mode</a>
+    <a href="review.html">🔁 Review</a>
+    <a href="index.html">📚 All Topics</a>
+  </div>
+
+  <section id="hero-wrap"></section>
+
+  <h2 class="section-title"><span class="bar"></span>Dashboard</h2>
+  <div class="sd-grid cols-4" id="rings"></div>
+  <div class="sd-card" id="level-card" style="margin-top:14px"></div>
+
+  <div class="sd-grid cols-2" style="margin-top:14px">
+    <div class="sd-card">
+      <h4 style="margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint)">Activity — last 15 weeks</h4>
+      <div class="sd-heat" id="heat"></div>
+    </div>
+    <div class="sd-card">
+      <h4 style="margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint)">Milestones</h4>
+      <div id="milestones"></div>
+    </div>
+  </div>
+
+  <h2 class="section-title"><span class="bar"></span>Your 30-Day Schedule
+    <span style="flex:1"></span>
+    <button class="btn" id="expand-all" style="font-size:12.5px">⤢ Expand all</button>
+    <button class="btn" id="collapse-all" style="font-size:12.5px">⤡ Collapse all</button>
+  </h2>
+  <p class="sd-muted">All 46 chapters distributed across 30 days with spaced-repetition revisions woven in. The full journey is shown below — today is highlighted. Click any day to collapse it.</p>
+  <div class="sd-timeline" id="timeline"></div>
+</main>
+</div>
+<div class="sd-toast" id="toast"></div>
+
+<script src="../assets/js/theme.js"></script>
+<script src="data.js"></script>
+<script src="../assets/js/hb-progress.js"></script>
+<script src="../assets/js/hb-search.js"></script>
+<script src="../assets/js/markdown.js"></script>
+<script src="content.js" onerror="window.HANDBOOK_CONTENT=window.HANDBOOK_CONTENT||{}"></script>
+<script>window.HB_JOURNEY={"practicePattern": "^(05|13|19|29|33|39|44|45|46)-", "practiceVerb": "Design", "practiceNamePrefix": "^(Design|Build):\\s*", "conceptChallenge": "Sketch how you'd apply {name} in a real public API, and name one concrete trade-off.", "practiceTabLabel": "🏗️ API Design Rounds", "practiceIntro": "Pick an API to design end to end. Work the resource model and contract yourself first — open the full chapter only after you've attempted it.", "practiceStartLabel": "Start round →", "practiceBackLabel": "← All rounds", "practiceDrillTag": "45-min round", "practiceDrillIntro": "Talk through each step aloud. Tick items as you cover them, then compare with the full chapter.", "practiceSteps": [["Clarify requirements & consumers", "Who calls this API — public, partner, or internal? Use cases, traffic, SLAs, and breaking-change tolerance."], ["Identify resources & relationships", "Find the nouns and their hierarchy and cardinality. Resist RPC-style verb endpoints."], ["Design the URI & method surface", "Endpoints, HTTP verbs, and the safety/idempotency guarantee of each operation."], ["Define payloads & schemas", "Request/response shapes, field naming, nullability, enums, dates, money, and IDs."], ["Errors & status codes", "A consistent taxonomy, RFC 9457 problem details, validation errors, and partial failures."], ["Pagination, filtering & sorting", "Cursor vs offset, page limits, defaults, and a stable total ordering."], ["AuthN, AuthZ & rate limits", "OAuth 2.0 scopes, the permission model, quotas, and tenant isolation."], ["Performance & caching", "ETags and Cache-Control, avoiding N+1 fan-out, payload size, and async for long-running work."], ["Versioning, docs & rollout", "Compatibility policy, the OpenAPI contract, deprecation plan, and what breaks at 10x traffic."]], "phases": [{"until": 4, "label": "API Foundations"}, {"until": 10, "label": "Resource Design"}, {"until": 17, "label": "Core Mechanics"}, {"until": 24, "label": "API Security"}, {"until": 30, "label": "Performance & Scale"}, {"until": 32, "label": "Versioning & Evolution"}, {"until": 35, "label": "Documentation & Contracts"}, {"until": 38, "label": "Testing & Quality"}, {"until": 43, "label": "Production & Operations"}, {"until": 46, "label": "Interview & Case Studies"}]};</script>
+<script src="../assets/js/sd-hub.js"></script>
+<script src="../assets/js/hb-engine.js"></script>
+<script>
+DSAApp.initChrome(null);
+var P = window.DSAProgress, T = document.getElementById("toast");
+var expandAll = true; // show the whole 30-day journey expanded by default
+function toast(m){ T.textContent=m; T.classList.add("show"); setTimeout(function(){T.classList.remove("show");},1800); }
+function pad(n){ return String(n).padStart(2,"0"); }
+function topicRow(t, opts){
+  opts=opts||{};
+  var done=P.isComplete(t.slug);
+  return '<div class="sd-topic-row">'+
+    '<div class="chk '+(done?"done":"")+'" data-slug="'+t.slug+'" title="Mark complete">'+(done?"✓":"")+'</div>'+
+    '<div class="tinfo"><a href="topic.html?p='+t.slug+'">'+pad(t.id)+'. '+t.name+'</a>'+
+    '<div class="sd-sub">'+t.category+' · '+t.level+' · ~'+SD.readMinutes(t.slug)+' min read</div></div>'+
+    (opts.badge?'<span class="badge lvl-'+t.level+'">'+opts.badge+'</span>':'')+'</div>';
+}
+
+/* ---------- Today's hero ---------- */
+function renderHero(){
+  var plan=SD.buildPlan(), day=SD.currentDay(), pd=plan[day-1];
+  var started=SD.started();
+  var revs = pd.revisions.length ? pd.revisions.map(function(t){return topicRow(t,{badge:"revise"});}).join("") :
+    '<p class="sd-muted">No revisions scheduled yet — they appear from Day 2 onward.</p>';
+  var q = pd.interviewQ;
+  var html='<div class="sd-hero">'+
+    '<span class="day-badge">🗓️ Day '+day+' / 30</span> <span class="sd-pill">Phase '+pd.phase.n+' · '+pd.phase.label+'</span>'+
+    '<h1>Today: '+pd.topics.map(function(t){return t.name;}).join(" + ")+'</h1>'+
+    '<div class="phase">'+pd.theme+' focus · estimated '+Math.round(pd.readingMin*1.6)+' min total (read + practice)</div>'+
+    '<div class="meta-row"><span>📖 <b>'+pd.readingMin+' min</b> reading</span>'+
+      '<span>🔁 <b>'+pd.revisions.length+'</b> revisions</span>'+
+      '<span>🎯 <b>1</b> challenge</span>'+
+      '<span>🎤 <b>1</b> interview Q</span></div>'+
+
+    '<div class="sd-plan-block"><h4>Primary topics</h4>'+pd.topics.map(function(t){return topicRow(t);}).join("")+'</div>'+
+    '<div class="sd-plan-block"><h4>Spaced-repetition revision</h4>'+revs+'</div>'+
+
+    '<div class="sd-grid cols-2" style="margin-top:14px">'+
+      '<div class="sd-card"><h4 style="margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint)">🎯 Architecture challenge</h4>'+
+        '<div style="font-weight:600">'+pd.challenge+'</div></div>'+
+      '<div class="sd-card"><h4 style="margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint)">🎤 Interview question of the day</h4>'+
+        (q?('<div style="font-weight:600">'+q.q+'</div><div id="qa-reveal" class="sd-muted" style="display:none;margin-top:8px"></div>'+
+          '<div class="sd-btn-row" style="margin-top:10px"><button class="btn" id="reveal-q">Reveal answer</button><a class="btn" href="interview.html">Full mock →</a></div>')
+        :'<div class="sd-muted">—</div>')+'</div>'+
+    '</div>'+
+
+    '<div class="sd-btn-row">'+
+      (started?'':'<button class="btn primary" id="start-j">▶ Start the 30-day journey</button>')+
+      '<button class="btn '+(pd.topics.every(function(t){return P.isComplete(t.slug);})?"done":"primary")+'" id="done-day">✓ Mark today complete</button>'+
+      (started?'<button class="btn" id="restart-j">↻ Restart from today</button>':'')+
+    '</div></div>';
+  document.getElementById("hero-wrap").innerHTML=html;
+
+  var rb=document.getElementById("reveal-q");
+  if(rb) rb.onclick=function(){ var el=document.getElementById("qa-reveal"); el.style.display="block"; el.innerHTML=DSAMarkdown.render(q.a); rb.style.display="none"; };
+  var sj=document.getElementById("start-j");
+  if(sj) sj.onclick=function(){ SD.startJourney(); SD.touchToday(); toast("Journey started — good luck!"); renderAll(); };
+  document.getElementById("done-day").onclick=function(){
+    pd.topics.forEach(function(t){ if(!P.isComplete(t.slug)) P.toggleComplete(t.slug); });
+    SD.touchToday(); toast("Day "+day+" complete! +XP"); renderAll();
+  };
+  var rj=document.getElementById("restart-j");
+  if(rj) rj.onclick=function(){ if(confirm("Restart the journey from today? Your completed topics stay.")){ SD.restart(); toast("Restarted from today."); renderAll(); } };
+}
+
+/* ---------- Dashboard ---------- */
+function ring(pct,val,cap){ return '<div class="sd-ring"><div class="ring" style="--p:'+pct+'"><span class="v">'+val+'</span></div><div class="cap">'+cap+'</div></div>'; }
+function renderRings(){
+  var st=P.stats(), rv=P.reviewStats(), lv=SD.level();
+  document.getElementById("rings").innerHTML=
+    ring(st.pct, st.pct+"%", st.completed+"/"+st.total+" topics")+
+    ring(Math.min(100,rv.scheduled?Math.round((rv.scheduled-rv.due)/rv.scheduled*100):0), rv.due, rv.due+" reviews due")+
+    ring(Math.min(100,SD.streak()*10), "🔥"+SD.streak(), "day streak")+
+    ring(Math.round(lv.into/lv.need*100), lv.level, lv.title+" · Lv"+lv.level);
+}
+function renderLevel(){
+  var lv=SD.level();
+  document.getElementById("level-card").innerHTML=
+    '<div class="sd-xp"><div class="lvl">'+lv.level+'</div>'+
+    '<div class="xp-mid"><div class="xp-title">'+lv.title+' · Level '+lv.level+'</div>'+
+    '<div class="sd-sub">'+lv.xp+' XP total · '+lv.into+' / '+lv.need+' to next level</div>'+
+    '<div class="sd-xpbar"><span style="width:'+Math.round(lv.into/lv.need*100)+'%"></span></div></div>'+
+    '<a class="btn" href="review.html">🔁 Review ('+P.reviewStats().due+')</a></div>';
+}
+function renderHeat(){
+  var days=105, today=SD.date.todayIso(), act=SD.activitySet(), cells="";
+  for(var i=days-1;i>=0;i--){ var d=SD.date.addDays(today,-i);
+    cells+='<div class="cell '+(act[d]?"on":"")+(d===today?" today":"")+'" title="'+d+'"></div>'; }
+  document.getElementById("heat").innerHTML=cells;
+}
+function renderMilestones(){
+  var st=P.stats(), rv=P.reviewStats(), day=SD.currentDay();
+  var ms=[
+    ["Reached Day "+day+" of 30", day>=1],
+    ["Completed 10 topics", st.completed>=10],
+    ["Completed 23 chapters", st.completed>=23],
+    ["Finished all 46 chapters", st.completed>=46],
+    ["7-day streak", SD.longestStreak()>=7],
+    ["Mastered 5 topics (SR box 5)", rv.mastered>=5]
+  ];
+  document.getElementById("milestones").innerHTML=ms.map(function(m){
+    return '<div style="display:flex;gap:10px;align-items:center;padding:6px 0;font-size:14px">'+
+      '<span>'+(m[1]?"✅":"⬜")+'</span><span style="'+(m[1]?"":"color:var(--text-faint)")+'">'+m[0]+'</span></div>';
+  }).join("");
+}
+
+/* ---------- Timeline ---------- */
+function renderTimeline(){
+  var plan=SD.buildPlan(), cur=SD.currentDay(), html="";
+  plan.forEach(function(pd){
+    var allDone=pd.topics.every(function(t){return P.isComplete(t.slug);});
+    var cls=(pd.day===cur?"is-today ":"")+(pd.day<cur?"is-past ":"")+(allDone?"done-day ":"")+(expandAll?"open":(pd.day===cur?"open":""));
+    html+='<div class="sd-day '+cls+'" data-day="'+pd.day+'">'+
+      '<div class="sd-day-head"><div class="dn">'+pd.day+'</div>'+
+      '<div class="dh"><div class="dt">'+pd.topics.map(function(t){return t.name;}).join(" + ")+'</div>'+
+      '<div class="dm">Phase '+pd.phase.n+' · '+pd.theme+' · ~'+pd.readingMin+' min'+(pd.revisions.length?' · '+pd.revisions.length+' revisions':'')+'</div></div>'+
+      (allDone?'<span class="badge lvl-Beginner">done</span>':'')+'<span class="caret">▾</span></div>'+
+      '<div class="sd-day-body">'+
+        '<div class="sd-plan-block"><h4>Study</h4>'+pd.topics.map(function(t){return topicRow(t);}).join("")+'</div>'+
+        (pd.revisions.length?'<div class="sd-plan-block"><h4>Revise</h4>'+pd.revisions.map(function(t){return topicRow(t,{badge:"revise"});}).join("")+'</div>':'')+
+        '<div class="sd-muted" style="margin-top:6px">🎯 '+pd.challenge+'</div>'+
+      '</div></div>';
+  });
+  document.getElementById("timeline").innerHTML=html;
+  document.querySelectorAll(".sd-day-head").forEach(function(h){ h.onclick=function(e){ if(e.target.classList.contains("chk"))return; h.parentElement.classList.toggle("open"); }; });
+}
+
+/* delegate checkbox clicks (hero + timeline) */
+document.addEventListener("click", function(e){
+  var chk=e.target.closest(".chk"); if(!chk)return;
+  e.preventDefault(); e.stopPropagation();
+  P.toggleComplete(chk.dataset.slug); SD.touchToday();
+});
+
+document.getElementById("expand-all").onclick=function(){ expandAll=true; document.querySelectorAll(".sd-day").forEach(function(d){ d.classList.add("open"); }); };
+document.getElementById("collapse-all").onclick=function(){ expandAll=false; document.querySelectorAll(".sd-day").forEach(function(d){ d.classList.remove("open"); }); };
+
+function renderAll(){ renderHero(); renderRings(); renderLevel(); renderHeat(); renderMilestones(); renderTimeline(); }
+renderAll();
+P.onChange(function(){ renderRings(); renderLevel(); renderMilestones();
+  // keep checkboxes/timeline in sync without collapsing open days
+  document.querySelectorAll(".chk").forEach(function(c){ var d=P.isComplete(c.dataset.slug); c.classList.toggle("done",d); c.textContent=d?"✓":""; });
+});
+</script>
+</body>
+</html>
