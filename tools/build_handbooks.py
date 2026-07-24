@@ -10,9 +10,10 @@ import hb_lib
 
 import sql_hb, go_hb, django_hb, docker_hb, k8s_hb, numpy_pandas_hb, system_design_hb
 import ai_engineering_hb, cassandra_hb, rest_api_hb
+import grpc_golang_hb
 SPECS = [django_hb.SPEC, go_hb.SPEC, system_design_hb.SPEC, docker_hb.SPEC,
          k8s_hb.SPEC, numpy_pandas_hb.SPEC, sql_hb.SPEC, ai_engineering_hb.SPEC,
-         cassandra_hb.SPEC, rest_api_hb.SPEC]
+         cassandra_hb.SPEC, rest_api_hb.SPEC, grpc_golang_hb.SPEC]
 
 cards = []
 # DSA handbook is self-contained at the root with its own engine — link to dsa.html

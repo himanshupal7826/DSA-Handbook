@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Review — gRPC with Go Handbook</title>
+<meta name="description" content="Spaced-repetition review dashboard for the gRPC with Go Handbook. Topics resurface on a 1/3/7/14/30/90-day schedule so they stick — fully offline.">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/sd.css">
+<link rel="icon" type="image/png" href="../assets/images/03_favicon.png">
+<script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+</head>
+<body>
+<header class="topbar" id="topbar"></header>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+<nav class="sidebar" id="sidebar"></nav>
+<main class="main sd-wrap">
+  <div class="sd-subnav">
+    <a href="journey.html">🗓️ 30-Day Journey</a>
+    <a href="interview.html">🎤 Interview Mode</a>
+    <a href="review.html" class="active">🔁 Review</a>
+    <a href="index.html">📚 All Topics</a>
+  </div>
+
+  <h1 style="margin:0 0 4px">🔁 Spaced-Repetition Review</h1>
+  <p class="sd-muted">Every topic you complete is enrolled automatically and resurfaces on a <b>1 → 3 → 7 → 14 → 30 → 90 day</b> schedule. Recall it correctly to advance it; miss it and it comes back tomorrow.</p>
+
+  <div class="sd-grid cols-3" id="rv-stats" style="margin-top:16px"></div>
+
+  <h2 class="section-title"><span class="bar"></span>Due today</h2>
+  <div id="due-wrap"></div>
+
+  <h2 class="section-title"><span class="bar"></span>Retention by box</h2>
+  <div class="sd-card" id="box-dist"></div>
+
+  <h2 class="section-title"><span class="bar"></span>Upcoming</h2>
+  <div id="upcoming"></div>
+</main>
+</div>
+<div class="sd-toast" id="toast"></div>
+
+<script src="../assets/js/theme.js"></script>
+<script src="data.js"></script>
+<script src="../assets/js/hb-progress.js"></script>
+<script src="../assets/js/hb-search.js"></script>
+<script src="../assets/js/markdown.js"></script>
+<script src="content.js" onerror="window.HANDBOOK_CONTENT=window.HANDBOOK_CONTENT||{}"></script>
+<script>window.HB_JOURNEY={"practicePattern": "^(11|14|23|24|27|29|30)-", "practiceVerb": "Build", "practiceNamePrefix": "^(Design|Build):\\s*", "conceptChallenge": "Explain how you'd apply {name} in a real Go gRPC service, and name one concrete trade-off.", "practiceTabLabel": "🏗️ Build & Design Rounds", "practiceIntro": "Pick a service to build end to end. Write the .proto and the Go handlers yourself first — open the full chapter only after you've attempted it.", "practiceStartLabel": "Start round →", "practiceBackLabel": "← All rounds", "practiceDrillTag": "45-min round", "practiceDrillIntro": "Talk through each step aloud. Tick items as you cover them, then compare with the full chapter.", "practiceSteps": [["Clarify consumers & traffic", "Who calls this service — internal mesh, mobile clients, partners? QPS, payload sizes, latency SLO, streaming needs."], ["Choose the RPC patterns", "Which calls are unary, which stream, and in which direction. Justify every stream — they cost you a pinned connection."], ["Design the .proto contract", "Messages, field numbers, enums with a zero value, well-known types, and the service block with all method kinds."], ["Plan schema evolution", "Reserved numbers, optional vs default, additive-only rules, and how buf breaking runs in CI."], ["Server handlers & concurrency", "Context propagation, per-RPC goroutines, backpressure on streams, and where state lives."], ["Error model", "Map domain failures to codes.Code, attach ErrorInfo/BadRequest details, and decide what is retryable."], ["Interceptors & cross-cutting concerns", "Auth, logging, metrics, tracing, panic recovery, rate limiting — server and client chains."], ["Security", "TLS or mTLS, per-RPC credentials, token validation, and authorization at the method level."], ["Deadlines, retries & load balancing", "Client deadlines, service config with retry policy and hedging, round_robin vs a lookaside LB."], ["Observability & rollout", "Health checking, reflection, OTel spans, Prometheus metrics, and what breaks at 10x traffic."]], "phases": [{"until": 3, "label": "Conceptual Foundation"}, {"until": 6, "label": "Toolchain Setup"}, {"until": 11, "label": "Protobuf Schema Design"}, {"until": 16, "label": "Server Implementation"}, {"until": 20, "label": "Client Implementation"}, {"until": 23, "label": "Errors & Interceptors"}, {"until": 26, "label": "Security & Operability"}, {"until": 28, "label": "Testing"}, {"until": 30, "label": "Production & Interview"}]};</script>
+<script src="../assets/js/sd-hub.js"></script>
+<script src="../assets/js/hb-engine.js"></script>
+<script>
+DSAApp.initChrome(null);
+var P=window.DSAProgress, T=document.getElementById("toast"), D=P.date;
+function toast(m){ T.textContent=m; T.classList.add("show"); setTimeout(function(){T.classList.remove("show");},1600); }
+function pad(n){ return String(n).padStart(2,"0"); }
+function dueLabel(due){ var d=D.daysBetween(due, D.todayIso()); return d===0?"due today":d===1?"1 day overdue":d>1?(d+" days overdue"):("in "+(-d)+" day"+(-d===1?"":"s")); }
+
+function renderStats(){
+  var rv=P.reviewStats();
+  document.getElementById("rv-stats").innerHTML=
+    '<div class="sd-stat"><div class="n">'+rv.due+'</div><div class="l">Due now</div></div>'+
+    '<div class="sd-stat"><div class="n">'+rv.scheduled+'</div><div class="l">In rotation</div></div>'+
+    '<div class="sd-stat"><div class="n">'+rv.mastered+'</div><div class="l">Mastered (box 5)</div></div>';
+}
+function card(slug, r){
+  var t=SD.bySlug(slug); if(!t) return "";
+  return '<div class="rv-card" data-slug="'+slug+'">'+
+    '<div class="box" title="Leitner box">'+r.box+'</div>'+
+    '<div class="info"><div class="nm"><a href="topic.html?p='+slug+'">'+pad(t.id)+'. '+t.name+'</a></div>'+
+      '<div class="sd-sub">'+t.category+' · '+t.level+' · <span class="'+(D.daysBetween(r.due,D.todayIso())>=0?"rv-due":"")+'">'+dueLabel(r.due)+'</span> · last '+r.last+'</div></div>'+
+    '<span class="badge box-'+r.box+'">box '+r.box+'/5</span>'+
+    '<div class="rv-actions"><button class="btn done" data-act="ok">✅ Remembered</button><button class="btn" data-act="no">🔁 Again</button></div></div>';
+}
+function renderDue(){
+  var due=P.dueReviews(), w=document.getElementById("due-wrap");
+  if(!due.length){
+    var anyComplete=P.stats().completed>0;
+    w.innerHTML='<div class="sd-card rv-empty"><div class="big">'+(anyComplete?"🎉":"📚")+'</div>'+
+      (anyComplete?'<p><b>All caught up!</b> Nothing due for review right now. New reviews unlock as your intervals come around.</p>'
+        :'<p><b>Nothing enrolled yet.</b> Complete a topic to start building your spaced-repetition queue.</p>')+
+      '<div class="sd-btn-row" style="justify-content:center"><a class="btn primary" href="'+(anyComplete?"journey.html":"index.html")+'">'+(anyComplete?"Back to journey":"Browse topics")+'</a></div></div>';
+    return;
+  }
+  w.innerHTML='<div class="sd-muted" style="margin-bottom:10px">'+due.length+' topic'+(due.length>1?"s":"")+' to review — most overdue first.</div>'+
+    '<div class="rv-list">'+due.map(function(d){return card(d.slug,d.review);}).join("")+'</div>';
+  w.querySelectorAll(".rv-card").forEach(function(el){
+    el.querySelectorAll("[data-act]").forEach(function(b){
+      b.onclick=function(){
+        var ok=b.dataset.act==="ok"; var r=P.markReviewed(el.dataset.slug, ok); SD.touchToday();
+        toast(ok?("Advanced to box "+r.box+" · next in "+P.INTERVALS[r.box]+"d"):"Back to box 0 · see it tomorrow");
+        renderAll();
+      };
+    });
+  });
+}
+function renderBoxDist(){
+  var s=null; try{ s=JSON.parse(localStorage.getItem("zariya-progress-"+(HANDBOOK.id))); }catch(e){}
+  var reviews=(s&&s.reviews)||{}, completed=(s&&s.completed)||{}, counts=[0,0,0,0,0,0];
+  Object.keys(reviews).forEach(function(slug){ if(completed[slug]) counts[reviews[slug].box]++; });
+  var total=counts.reduce(function(a,b){return a+b;},0)||1;
+  document.getElementById("box-dist").innerHTML=counts.map(function(c,i){
+    return '<div style="display:flex;align-items:center;gap:10px;margin:6px 0">'+
+      '<span class="badge box-'+i+'" style="min-width:70px;text-align:center">box '+i+'</span>'+
+      '<div style="flex:1;height:14px;background:var(--border);border-radius:999px;overflow:hidden"><span style="display:block;height:100%;width:'+Math.round(c/total*100)+'%;background:var(--accent)"></span></div>'+
+      '<span class="sd-sub" style="min-width:70px;text-align:right">'+c+' topic'+(c===1?"":"s")+'</span></div>';
+  }).join("")+'<p class="sd-sub" style="margin:10px 0 0">Interval per box: '+P.INTERVALS.map(function(d,i){return "box "+i+"→"+d+"d";}).join(" · ")+'. Reach box 5 to consider a topic mastered.</p>';
+}
+function renderUpcoming(){
+  var s=null; try{ s=JSON.parse(localStorage.getItem("zariya-progress-"+(HANDBOOK.id))); }catch(e){}
+  var reviews=(s&&s.reviews)||{}, completed=(s&&s.completed)||{}, t=D.todayIso(), up=[];
+  Object.keys(reviews).forEach(function(slug){ if(completed[slug]&&D.daysBetween(reviews[slug].due,t)<0) up.push({slug:slug,r:reviews[slug]}); });
+  up.sort(function(a,b){return D.parseIso(a.r.due)-D.parseIso(b.r.due);});
+  var w=document.getElementById("upcoming");
+  if(!up.length){ w.innerHTML='<p class="sd-muted">No future reviews scheduled yet.</p>'; return; }
+  w.innerHTML='<div class="rv-list">'+up.slice(0,8).map(function(u){var t2=SD.bySlug(u.slug); return t2?
+    '<div class="rv-card"><div class="box">'+u.r.box+'</div><div class="info"><div class="nm"><a href="topic.html?p='+u.slug+'">'+t2.name+'</a></div>'+
+    '<div class="sd-sub">'+t2.category+' · '+dueLabel(u.r.due)+' ('+u.r.due+')</div></div><span class="badge box-'+u.r.box+'">box '+u.r.box+'</span></div>':"";}).join("")+'</div>';
+}
+function renderAll(){ renderStats(); renderDue(); renderBoxDist(); renderUpcoming(); }
+renderAll();
+P.onChange(renderAll);
+</script>
+</body>
+</html>
