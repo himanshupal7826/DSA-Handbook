@@ -18,6 +18,7 @@ This folder is the **zariya.in** portal: a set of comprehensive, interview-focus
 | 💠 Apache Cassandra | 46 | `cassandra/` |
 | 🔌 REST API | 46 | `rest-api/` |
 | 🔗 gRPC with Go | 30 | `grpc-golang/` |
+| ⚡ Caching with Redis | 30 | `redis-caching/` |
 
 Each new handbook has its own `index.html` (home), `topic.html` (renderer), `data.js` (manifest), `content.js` (offline content), and `markdown/`. They share the engine in `assets/js/hb-*.js` + `markdown.js`/`theme.js` and `assets/css/style.css`. Regenerate them with `python3 tools/build_handbooks.py` (handbook specs live in `tools/src/*_hb.py`).
 
