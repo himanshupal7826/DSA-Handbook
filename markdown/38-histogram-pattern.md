@@ -41,32 +41,128 @@ histogram, largest rectangle, monotonic stack, area, maximal.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"For each bar, how far can a rectangle of that height stretch before it hits something shorter?"*
+
 ### Intuition
-For each element scan outward to find the next/previous greater or smaller — O(n^2).
+Fix each bar as the limiting height, then walk outward in both directions while the bars stay at least that tall.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each index `i`:
+2. &nbsp;&nbsp;Walk left from `i` while `heights[left] >= heights[i]`.
+3. &nbsp;&nbsp;Walk right from `i` while `heights[right] >= heights[i]`.
+4. &nbsp;&nbsp;`area = heights[i] × (right − left − 1)`.
+5. Keep the maximum.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n²)** — each bar may scan the whole array.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Histogram Pattern pattern is built to use.
+- On a sorted-ascending histogram like `[1,2,3,…,n]`, every bar walks all the way left. That is the full quadratic cost.
+- And it is redundant: while walking left from bar `i`, we re-derive facts we already established when we processed bar `i−1`. Nothing is remembered between iterations.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Histogram Pattern invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Every rectangle is capped by its shortest bar — so for each bar, find the first shorter bar to its left and to its right. A stack finds all of them in one pass.**
+
+The bar at `i` can extend until it meets something **strictly shorter**. Those two positions are its boundaries:
+
+```text
+width = rightSmaller - leftSmaller - 1
+area  = heights[i] * width
+```
+
+The only hard part is computing `leftSmaller` and `rightSmaller` for every `i` cheaply. That is exactly what a **monotonic stack** does.
+
+### The thought process
+
+```text
+We need    : for each bar, the nearest strictly-shorter bar on each side.
+Obvious way: scan outward from every bar.
+Too slow   : O(n^2), and it re-derives the same facts repeatedly.
+Notice     : while scanning left to right, when a SHORT bar arrives,
+             it is the right boundary for every taller bar behind it —
+             and those taller bars can never be a boundary for anything
+             further right, because this shorter bar blocks them.
+Therefore  : keep a stack of indices with increasing heights.
+             A new shorter bar pops them, and each pop settles one
+             bar's rectangle completely.
+Now        : each index is pushed once and popped once → O(n).
+```
+
+### Why a stack, and why it stays increasing
+
+Think about what the stack means at any moment:
+
+> The stack holds the bars that are **still waiting** for their right boundary — bars nothing shorter has appeared after yet.
+
+That set is automatically increasing in height. If a taller bar sat above a shorter one, the shorter one would have popped it on arrival. So:
+
+- **The bar below you on the stack is your nearest shorter bar on the left.** Everything between you and it was taller and already popped.
+- **The bar that pops you is your nearest shorter bar on the right.**
+
+Both boundaries come for free from the stack's structure. That is the whole trick.
+
+### Steps
+
+```text
+Step 1 → Empty stack of indices; best = 0.
+Step 2 → For i = 0 .. n  (n is a sentinel bar of height 0):
+Step 3 →     While the stack is non-empty and heights[stack.top] >= current:
+Step 4 →         top    = pop
+Step 5 →         height = heights[top]
+Step 6 →         width  = stack empty ? i : i - stack.top - 1
+Step 7 →         best   = max(best, height * width)
+Step 8 →     Push i.
+Step 9 → Return best.
+```
+
+### Why the width formula looks the way it does
+
+After popping `top`, the new stack top is `top`'s nearest shorter bar on the left, and `i` is its nearest shorter bar on the right. The rectangle spans everything strictly between them:
+
+```text
+       leftSmaller        top        rightSmaller
+            ↓              ↓              ↓
+   ...  [   2   ][  5  ][  6  ][   2   ] ...
+            1      2      3       4          ← indices
+
+   width = 4 - 1 - 1 = 2      (indices 2 and 3)
+```
+
+If the stack empties, no shorter bar exists to the left, so the rectangle reaches index 0 and the width is simply `i`.
+
+### Why the sentinel bar of height 0
+
+When the loop ends, bars may still be on the stack — those that never met anything shorter. Running one extra iteration at `i = n` with height `0` forces every one of them to pop and be measured. Without it you would need a duplicate drain loop after the main loop; the sentinel folds that into the same code path.
+
+### Why `>=` rather than `>` in the pop test
+
+With equal heights, popping on `>=` settles the earlier bar with a *too-small* width. That looks like a bug but isn't: the later equal bar is still on the stack and will eventually be measured with the **full** width, which covers the same rectangle. The maximum is unaffected, and `>=` keeps the stack strictly increasing, which keeps the "bar below me is my left boundary" invariant exact.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "largest rectangle", "maximal rectangle in a matrix"
+  "for each element, the nearest smaller/greater one"
+  a histogram, skyline of bars, or a binary matrix of 0/1
+        ↓
+Think about...
+  "What are this element's boundaries, and can a stack
+   hand me both of them as it pops?"
+        ↓
+Use...
+  monotonic INCREASING stack → nearest smaller elements
+  monotonic DECREASING stack → nearest greater elements
+  matrix version → run the histogram routine once per row
+```
 
 ### Visual explanation
 
@@ -92,74 +188,160 @@ A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relat
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Histogram Pattern : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+heights = [2, 1, 5, 6, 2, 3]
+
+  6 |          █
+  5 |       ▓▓▓█            ▓ = the winning rectangle
+  4 |       ▓▓▓█               height 5, width 2 → area 10
+  3 |       ▓▓▓█        █
+  2 | █     ▓▓▓█  █     █
+  1 | █  █  ▓▓▓█  █     █
+    +──────────────────────
+      0  1  2  3  4  5
+
+bar 2 (height 5): blocked left by bar 1 (height 1)
+                  blocked right by bar 4 (height 2)
+    ⇒ width = 4 - 1 - 1 = 2,  area = 5 × 2 = 10
 ```
 
 ### Interview explanation
-"This is a Histogram Pattern problem. I'll a stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element. That brings the complexity down to O(n) time and O(n) space — here's the template."
+"Every rectangle is limited by its shortest bar, so for each bar I need the first strictly-shorter bar on each side. I get both with a monotonic increasing stack of indices. When a shorter bar arrives it pops everything taller — and for each popped bar, the popper is its right boundary and whatever is left underneath on the stack is its left boundary, so `width = i − stack.top − 1`. I append a sentinel bar of height 0 so everything still on the stack gets drained and measured. Each index is pushed and popped exactly once, so it's O(n) time and O(n) space."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Stacks** family template. Adapt the comparison/condition to the specific problem.
+> Increasing stack of indices. A shorter arrival pops and settles; a sentinel drains the rest.
 
 ```go
-// Next greater element to the right using a monotonic decreasing stack.
-func nextGreater(nums []int) []int {
-    res := make([]int, len(nums))
-    for i := range res { res[i] = -1 }
-    stack := []int{} // indices, values decreasing from bottom to top
-    for i, v := range nums {
-        for len(stack) > 0 && nums[stack[len(stack)-1]] < v {
+// LargestRectangleArea computes the biggest rectangle in a histogram.
+func LargestRectangleArea(heights []int) int {
+    stack := []int{} // indices, heights strictly increasing bottom → top
+    best := 0
+
+    // i == len(heights) acts as a sentinel bar of height 0 that drains the stack.
+    for i := 0; i <= len(heights); i++ {
+        current := 0
+        if i < len(heights) {
+            current = heights[i]
+        }
+
+        for len(stack) > 0 && heights[stack[len(stack)-1]] >= current {
             top := stack[len(stack)-1]
             stack = stack[:len(stack)-1]
-            res[top] = v
+
+            height := heights[top]
+            // After popping, the new top is top's nearest shorter bar on the
+            // left; i is its nearest shorter bar on the right.
+            width := i
+            if len(stack) > 0 {
+                width = i - stack[len(stack)-1] - 1
+            }
+            if area := height * width; area > best {
+                best = area
+            }
         }
         stack = append(stack, i)
     }
-    return res
+    return best
+}
+
+// NearestSmallerLeft returns, for each i, the index of the nearest strictly
+// smaller element to the left, or -1. This is the stack's other product.
+func NearestSmallerLeft(nums []int) []int {
+    result := make([]int, len(nums))
+    stack := []int{}
+
+    for i, v := range nums {
+        for len(stack) > 0 && nums[stack[len(stack)-1]] >= v {
+            stack = stack[:len(stack)-1]
+        }
+        if len(stack) == 0 {
+            result[i] = -1
+        } else {
+            result[i] = stack[len(stack)-1]
+        }
+        stack = append(stack, i)
+    }
+    return result
 }
 ```
 
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
+def largest_rectangle_area(heights):
+    """Biggest rectangle in a histogram, via a monotonic increasing stack."""
+    stack = []                       # indices, heights increasing
+    best = 0
+
+    for i in range(len(heights) + 1):
+        current = heights[i] if i < len(heights) else 0    # sentinel drains it
+
+        while stack and heights[stack[-1]] >= current:
+            height = heights[stack.pop()]
+            # new stack top = nearest shorter bar on the left; i = on the right
+            width = i if not stack else i - stack[-1] - 1
+            best = max(best, height * width)
+
         stack.append(i)
-    return res
+    return best
+
+def nearest_smaller_left(nums):
+    """Index of the nearest strictly smaller element to the left, or -1."""
+    result, stack = [], []
+    for i, v in enumerate(nums):
+        while stack and nums[stack[-1]] >= v:
+            stack.pop()
+        result.append(stack[-1] if stack else -1)
+        stack.append(i)
+    return result
 ```
 
 ```java
-int[] nextGreater(int[] nums) {
-    int[] res = new int[nums.length];
-    Arrays.fill(res, -1);
-    Deque<Integer> stack = new ArrayDeque<>();
-    for (int i = 0; i < nums.length; i++) {
-        while (!stack.isEmpty() && nums[stack.peek()] < nums[i])
-            res[stack.pop()] = nums[i];
-        stack.push(i);
+import java.util.*;
+
+public class HistogramPattern {
+    public static int largestRectangleArea(int[] heights) {
+        Deque<Integer> stack = new ArrayDeque<>();   // indices, increasing heights
+        int best = 0;
+
+        for (int i = 0; i <= heights.length; i++) {
+            int current = (i < heights.length) ? heights[i] : 0;   // sentinel
+
+            while (!stack.isEmpty() && heights[stack.peek()] >= current) {
+                int height = heights[stack.pop()];
+                int width = stack.isEmpty() ? i : i - stack.peek() - 1;
+                best = Math.max(best, height * width);
+            }
+            stack.push(i);
+        }
+        return best;
     }
-    return res;
 }
 ```
 
 ```cpp
-vector<int> nextGreater(vector<int>& nums) {
-    vector<int> res(nums.size(), -1);
-    stack<int> st;                  // indices
-    for (int i = 0; i < (int)nums.size(); ++i) {
-        while (!st.empty() && nums[st.top()] < nums[i]) {
-            res[st.top()] = nums[i]; st.pop();
+#include <algorithm>
+#include <vector>
+using namespace std;
+
+int largestRectangleArea(const vector<int>& heights) {
+    vector<int> stack;                       // indices, increasing heights
+    int best = 0;
+    int n = (int)heights.size();
+
+    for (int i = 0; i <= n; ++i) {
+        int current = (i < n) ? heights[i] : 0;              // sentinel
+
+        while (!stack.empty() && heights[stack.back()] >= current) {
+            int height = heights[stack.back()];
+            stack.pop_back();
+            int width = stack.empty() ? i : i - stack.back() - 1;
+            best = max(best, height * width);
         }
-        st.push(i);
+        stack.push_back(i);
     }
-    return res;
+    return best;
 }
 ```
 
@@ -244,141 +426,362 @@ vector<int> nextGreater(vector<int>& nums) {
 
 ## 9. Solved Example 1
 
-### Problem — Largest Rectangle (LeetCode 84)
-A representative **Histogram Pattern** problem. The signal: monotonic stack finds the largest rectangle under a histogram.
+### Problem — Largest Rectangle in Histogram (LeetCode 84)
+Find the area of the largest rectangle that fits inside the histogram.
 
 ### Thought Process
-1. Keep a stack of bar indices whose heights are strictly increasing.
-2. When the current bar is shorter than the stack top, pop it: the popped bar is the limiting height of a rectangle whose left edge is the new stack top and right edge is the current index.
-3. Append a sentinel height of 0 so every bar gets popped and measured at the end.
+1. Any rectangle is capped by its shortest bar, so ask per bar: how wide can a rectangle of *this* height be?
+2. It stretches until it meets a strictly shorter bar on each side.
+3. A monotonic **increasing** stack of indices delivers both boundaries: whatever pops you is your right boundary, whatever sits below you is your left one.
+4. `width = i − stack.top − 1` after the pop; if the stack empties, the bar reaches index 0 so `width = i`.
+5. A sentinel bar of height `0` at index `n` drains everything still waiting.
 
 ### Dry Run
-`heights = [2,1,5,6,2]` (append 0 → `[2,1,5,6,2,0]`).
-- i=0 push 2. i=1 h=1<2: pop 2 → area 2*1=2; push 1.
-- i=2 push 5. i=3 push 6. i=4 h=2: pop 6 → 6*1=6; pop 5 → 5*2=10 (best); push 2.
-- i=5 h=0: pop 2 → 2*3=6; pop 1 → 1*5=5. Answer = **10**.
+
+Input: `heights = [2, 1, 5, 6, 2, 3]`, plus a sentinel `0` at index 6
+
+| i | height | stack before | pops (height × width = area) | stack after | best |
+|---|--------|--------------|------------------------------|-------------|------|
+| 0 | 2 | `[]`      | — | `[0]`     | 0 |
+| 1 | 1 | `[0]`     | pop 0: `2 × 1 = 2` (stack empty → width = `i` = 1) | `[1]` | 2 |
+| 2 | 5 | `[1]`     | — (`1 < 5`) | `[1,2]`   | 2 |
+| 3 | 6 | `[1,2]`   | — (`5 < 6`) | `[1,2,3]` | 2 |
+| 4 | 2 | `[1,2,3]` | pop 3: `6 × (4−2−1) = 6 × 1 = 6`<br>pop 2: `5 × (4−1−1) = 5 × 2 = **10**` | `[1,4]` | **10** |
+| 5 | 3 | `[1,4]`   | — (`2 < 3`) | `[1,4,5]` | 10 |
+| 6 | 0 (sentinel) | `[1,4,5]` | pop 5: `3 × (6−4−1) = 3 × 1 = 3`<br>pop 4: `2 × (6−1−1) = 2 × 4 = 8`<br>pop 1: `1 × 6 = 6` (stack empty → width = `i` = 6) | `[6]` | 10 |
+
+Output: **10** — height 5 spanning indices 2 and 3.
+
+Look at `i = 4`: bar 6 pops first with width 1 (it is hemmed in by bars 5 and 2), then bar 5 pops with width 2 — because bar 6 was taller, it doesn't block bar 5, so bar 5 stretches across both indices 2 and 3. That is the stack handing back the left boundary automatically.
 
 ### Visualization
-```
-input  ──▶ [ apply Histogram Pattern step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+index :  0  1  2  3  4  5
+height:  2  1  5  6  2  3
+
+  6 |          █
+  5 |       ▓▓▓█
+  4 |       ▓▓▓█
+  3 |       ▓▓▓█        █
+  2 | █     ▓▓▓█  █     █
+  1 | █  █  ▓▓▓█  █     █
+    +──────────────────────
+
+bar 2 (height 5): left boundary bar 1 (height 1), right boundary bar 4 (height 2)
+    width = 4 - 1 - 1 = 2   →   area 10  ★
 ```
 
 ### Code
+
+```go
+func largestRectangleArea(heights []int) int {
+    stack := []int{} // indices; heights increase from bottom to top
+    best := 0
+
+    // i == len(heights) is a sentinel bar of height 0 that drains the stack.
+    for i := 0; i <= len(heights); i++ {
+        current := 0
+        if i < len(heights) {
+            current = heights[i]
+        }
+
+        for len(stack) > 0 && heights[stack[len(stack)-1]] >= current {
+            top := stack[len(stack)-1]
+            stack = stack[:len(stack)-1]
+
+            height := heights[top]
+            // The new stack top is top's nearest shorter bar on the left;
+            // i is its nearest shorter bar on the right.
+            width := i
+            if len(stack) > 0 {
+                width = i - stack[len(stack)-1] - 1
+            }
+            if area := height * width; area > best {
+                best = area
+            }
+        }
+        stack = append(stack, i)
+    }
+    return best
+}
+```
+
 ```python
 def largestRectangleArea(heights):
-    stack = []                      # indices, heights increasing
+    stack = []                        # indices; heights increasing
     best = 0
-    for i, h in enumerate(heights + [0]):
-        while stack and heights[stack[-1]] >= h:
+
+    for i in range(len(heights) + 1):
+        current = heights[i] if i < len(heights) else 0     # sentinel drains it
+
+        while stack and heights[stack[-1]] >= current:
             height = heights[stack.pop()]
-            left = stack[-1] if stack else -1
-            best = max(best, height * (i - left - 1))
+            # new stack top = nearest shorter on the left; i = nearest on the right
+            width = i if not stack else i - stack[-1] - 1
+            best = max(best, height * width)
+
         stack.append(i)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index is pushed and popped exactly once.
+Time **O(n)** — each index is pushed once and popped once. Space O(n).
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Maximal Rectangle (LeetCode 85)
-A representative **Histogram Pattern** problem. The signal: monotonic stack finds the largest rectangle under a histogram.
+Given a binary matrix of `'0'` and `'1'` characters, find the largest rectangle containing only `'1'`s.
 
 ### Thought Process
-1. Scan the matrix row by row, maintaining a `heights` array of consecutive 1s ending at the current row for each column (reset to 0 on a '0').
-2. After building each row's histogram, run the LeetCode 84 largest-rectangle routine on it.
-3. The overall answer is the maximum rectangle area found across all rows.
+1. This looks two-dimensional, but there is a reduction that makes it one-dimensional.
+2. **Treat each row as the ground line of a histogram.** For row `i`, the bar at column `j` is the number of consecutive `'1'`s ending at `(i, j)` going upward.
+3. Any all-ones rectangle whose bottom edge lies on row `i` is exactly a rectangle in that histogram.
+4. So: build the histogram incrementally per row, run the O(n) routine from Example 1, and keep the best across all rows.
+5. Updating the heights is O(1) per cell: `'1'` → `height + 1`, `'0'` → reset to `0`.
 
 ### Dry Run
-`matrix = [["1","0","1"],["1","1","1"]]`.
-- Row 0 heights `[1,0,1]` → best rectangle area 1.
-- Row 1 heights `[2,1,2]` → columns all ≥1, width 3 height 1 → area 3 (beats 2).
-- Answer = **3**.
+
+Input:
+
+```text
+1 0 1 0 0
+1 0 1 1 1
+1 1 1 1 1
+1 0 0 1 0
+```
+
+| row | heights after this row | largest rectangle in that histogram |
+|-----|------------------------|-------------------------------------|
+| 0 | `[1, 0, 1, 0, 0]` | 1 |
+| 1 | `[2, 0, 2, 1, 1]` | 3 — height 1 across columns 2–4 |
+| 2 | `[3, 1, 3, 2, 2]` | **6** — height 2 across columns 2–4 |
+| 3 | `[4, 0, 0, 3, 0]` | 4 — the single column of height 4 |
+
+Output: **6**
+
+Row 2 is the winner. Its histogram `[3,1,3,2,2]` has a height-2 rectangle spanning columns 2, 3, 4 — which back in the matrix is the 2×3 block of ones on rows 1 and 2. ✓
+
+Notice the reset at row 3, column 2: the matrix has a `'0'` there, so the height drops from `3` to `0` rather than decreasing by one. A zero breaks the column completely.
 
 ### Visualization
-```
-input  ──▶ [ apply Histogram Pattern step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+matrix            heights (row 2)      histogram
+1 0 1 0 0
+1 0 1 1 1          3 1 3 2 2            3 |█   █
+1 1 1 1 1 ←row 2                        2 |█   █▓▓█▓▓█    ▓ = area 6
+1 0 0 1 0                               1 |█ █ █▓▓█▓▓█
+                                          +───────────
+                                           0 1 2 3 4
 ```
 
 ### Code
+
+```go
+func maximalRectangle(matrix [][]byte) int {
+    if len(matrix) == 0 || len(matrix[0]) == 0 {
+        return 0
+    }
+
+    heights := make([]int, len(matrix[0]))
+    best := 0
+
+    for _, row := range matrix {
+        // Each row becomes the ground line of a histogram.
+        for j, cell := range row {
+            if cell == '1' {
+                heights[j]++ // the column of ones grows
+            } else {
+                heights[j] = 0 // a zero breaks the column entirely
+            }
+        }
+        if area := maxRectInHistogram(heights); area > best {
+            best = area
+        }
+    }
+    return best
+}
+
+// maxRectInHistogram is Example 1's routine, unchanged.
+func maxRectInHistogram(heights []int) int {
+    stack := []int{}
+    best := 0
+
+    for i := 0; i <= len(heights); i++ {
+        current := 0
+        if i < len(heights) {
+            current = heights[i]
+        }
+        for len(stack) > 0 && heights[stack[len(stack)-1]] >= current {
+            height := heights[stack[len(stack)-1]]
+            stack = stack[:len(stack)-1]
+            width := i
+            if len(stack) > 0 {
+                width = i - stack[len(stack)-1] - 1
+            }
+            if area := height * width; area > best {
+                best = area
+            }
+        }
+        stack = append(stack, i)
+    }
+    return best
+}
+```
+
 ```python
 def maximalRectangle(matrix):
-    if not matrix:
+    if not matrix or not matrix[0]:
         return 0
-    n = len(matrix[0])
-    heights = [0] * n
+
+    heights = [0] * len(matrix[0])
     best = 0
+
     for row in matrix:
-        for j in range(n):
-            heights[j] = heights[j] + 1 if row[j] == '1' else 0
-        stack = []
-        for i, h in enumerate(heights + [0]):
-            while stack and heights[stack[-1]] >= h:
-                height = heights[stack.pop()]
-                left = stack[-1] if stack else -1
-                best = max(best, height * (i - left - 1))
-            stack.append(i)
+        for j, cell in enumerate(row):
+            heights[j] = heights[j] + 1 if cell == "1" else 0   # 0 breaks the column
+        best = max(best, largestRectangleArea(heights))          # reuse Example 1
     return best
 ```
 
 ### Complexity
-Time O(rows × cols), Space O(cols) for the heights array and stack.
+Time **O(rows × cols)** — one O(cols) histogram pass per row. Space O(cols).
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Submatrices (LeetCode 1504)
-A representative **Histogram Pattern** problem. The signal: monotonic stack finds the largest rectangle under a histogram.
+### Problem — Count Submatrices With All Ones (LeetCode 1504)
+Count how many submatrices consist entirely of `1`s.
 
 ### Thought Process
-1. For each row, keep a `heights[j]` counting consecutive 1s ending at this row in column j (reset to 0 on a 0).
-2. Sweep left-to-right with a monotonic increasing stack; for each column j compute `cur`, the number of all-ones submatrices whose bottom-right corner is (row, j), by extending the previous shorter bar's running sum.
-3. Add every `cur` into a global total across all rows.
+1. Same histogram reduction, but now we **count** rectangles instead of maximising one.
+2. Build the same per-column heights. Then count submatrices whose **bottom-right corner** is `(i, j)` — every submatrix has exactly one, so no double counting.
+3. Fix `(i, j)` and walk left with `k = j, j−1, …`, tracking `minHeight = min(minHeight, heights[k])`.
+4. For each `k`, the widths `k..j` support exactly `minHeight` rectangles (one for each possible height from 1 up to `minHeight`). Add it.
+5. `minHeight` only ever decreases as we walk left, which is what keeps the count correct.
 
 ### Dry Run
-`mat = [[1,1],[1,1]]`.
-- Row 0 heights `[1,1]`: j=0 cur=1 (total 1); j=1 pops equal bar, cur=1*2=2 (total 3).
-- Row 1 heights `[2,2]`: j=0 cur=2 (total 5); j=1 pops, cur=2*2=4 (total 9).
-- Answer = **9**.
+
+Input:
+
+```text
+1 0 1
+1 1 0
+1 1 0
+```
+
+**Heights per row:**
+
+| row | heights |
+|-----|---------|
+| 0 | `[1, 0, 1]` |
+| 1 | `[2, 1, 0]` |
+| 2 | `[3, 2, 0]` |
+
+**Counting, row by row** (for each `j`, walk `k` left tracking `minHeight`):
+
+| row | j | walk `k` (minHeight → contribution) | row subtotal |
+|-----|---|--------------------------------------|--------------|
+| 0 | 0 | k=0: min 1 → +1 | |
+| 0 | 1 | k=1: min 0 → +0 | |
+| 0 | 2 | k=2: min 1 → +1; k=1: min 0 → +0; k=0: min 0 → +0 | **2** |
+| 1 | 0 | k=0: min 2 → +2 | |
+| 1 | 1 | k=1: min 1 → +1; k=0: min 1 → +1 | |
+| 1 | 2 | heights[2] = 0 → all zero | **4** |
+| 2 | 0 | k=0: min 3 → +3 | |
+| 2 | 1 | k=1: min 2 → +2; k=0: min 2 → +2 | |
+| 2 | 2 | heights[2] = 0 → all zero | **7** |
+
+Total: `2 + 4 + 7` = **13**
+
+Output: **13** ✓
+
+Take row 2, `j = 1`: `heights = [3, 2, 0]`. At `k = 1` the min is 2, giving the 1×1 and 2×1 submatrices ending at that cell. At `k = 0` the min is still `min(2, 3) = 2`, giving the 1×2 and 2×2 ones. The taller column 0 is clamped by column 1 — which is exactly the "shortest bar caps the rectangle" rule again.
 
 ### Visualization
-```
-input  ──▶ [ apply Histogram Pattern step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+row 2 heights:  3  2  0
+                █  █
+                █  █
+                █
+
+bottom-right at (2,1), walking left:
+
+  k=1 : minHeight 2  →  2 rectangles   (1×1, 2×1)
+  k=0 : minHeight 2  →  2 rectangles   (1×2, 2×2)
+        (column 0 is height 3 but clamped by column 1)
+
+  contribution from j=1: 4
 ```
 
 ### Code
+
+```go
+func numSubmat(mat [][]int) int {
+    if len(mat) == 0 || len(mat[0]) == 0 {
+        return 0
+    }
+    cols := len(mat[0])
+    heights := make([]int, cols)
+    total := 0
+
+    for _, row := range mat {
+        for j := 0; j < cols; j++ {
+            if row[j] == 1 {
+                heights[j]++
+            } else {
+                heights[j] = 0
+            }
+        }
+
+        // Count submatrices whose bottom-right corner is (thisRow, j).
+        for j := 0; j < cols; j++ {
+            minHeight := heights[j]
+            for k := j; k >= 0 && minHeight > 0; k-- {
+                if heights[k] < minHeight {
+                    minHeight = heights[k] // the shortest column caps the block
+                }
+                total += minHeight // one rectangle per height 1..minHeight
+            }
+        }
+    }
+    return total
+}
+```
+
 ```python
 def numSubmat(mat):
-    n = len(mat[0])
-    heights = [0] * n
+    if not mat or not mat[0]:
+        return 0
+    cols = len(mat[0])
+    heights = [0] * cols
     total = 0
+
     for row in mat:
-        for j in range(n):
+        for j in range(cols):
             heights[j] = heights[j] + 1 if row[j] == 1 else 0
-        stack = []                  # (index, height, running submatrix count)
-        for j in range(n):
-            h = heights[j]
-            while stack and stack[-1][1] >= h:
-                stack.pop()
-            if stack:
-                prev_idx, _, prev_sum = stack[-1]
-                cur = prev_sum + h * (j - prev_idx)
-            else:
-                cur = h * (j + 1)
-            stack.append((j, h, cur))
-            total += cur
+
+        for j in range(cols):                  # bottom-right corner at (row, j)
+            min_height = heights[j]
+            for k in range(j, -1, -1):
+                if min_height == 0:
+                    break
+                min_height = min(min_height, heights[k])   # shortest column caps it
+                total += min_height            # one per height 1..min_height
     return total
 ```
 
 ### Complexity
-Time O(rows × cols), Space O(cols) for the heights array and stack.
+Time **O(rows × cols²)** — the inner leftward walk is what costs the extra factor. Space O(cols).
 
+> There is an O(rows × cols) version using a monotonic stack that maintains the running count instead of re-walking left. It is faster but considerably harder to justify under interview pressure; this version is the one to write first and optimise only if asked.
+
+---
 
 ## 12. LeetCode Practice Set
 
