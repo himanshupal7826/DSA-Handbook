@@ -41,32 +41,132 @@ upper bound, first >, bisect right, count, insert.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"In a sorted array, where does `target` **end**?"* — the first index whose value is strictly `> target`.
+
 ### Intuition
-Linear scan checks each candidate — O(n).
+Scan from the left until you pass every copy of the target.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For `i` from `0` to `n−1`:
+2. &nbsp;&nbsp;If `nums[i] > target`, return `i`.
+3. If the loop finishes, nothing exceeded the target — return `n`.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n)** per query.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Upper Bound pattern is built to use.
+- Correct but blind to the sortedness.
+- It is especially wasteful in the problems this pattern actually appears in — "how many values are ≤ X", "the latest entry at or before time T" — which are asked thousands of times over the same fixed data. O(q·n) becomes O(q·log n) for free.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Upper Bound invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Same boundary search as lower bound — just move the boundary one notch to the right by using `<=` instead of `<`.**
+
+Look at the array through the predicate `nums[i] > target`. Sortedness makes it false on a prefix and true afterwards:
+
+```text
+nums   :  1   2   2   2   3        target = 2
+>  2?  :  F   F   F   F   T
+                          ↑
+                    upper bound = 4
+
+>= 2?  :  F   T   T   T   T
+              ↑
+        lower bound = 1
+```
+
+Lower bound is where the target's block **starts**; upper bound is where it **ends** (one past the last copy).
+
+### The thought process
+
+```text
+We need    : the first index with nums[i] > target.
+Obvious way: scan from the left.
+Too slow   : O(n), ignores sortedness.
+Notice     : "nums[i] > target" is FALSE for a prefix, TRUE after.
+             Same monotone shape as lower bound.
+Therefore  : the same binary search, with the comparison relaxed
+             from < to <= so that EQUAL values get skipped past.
+Now        : O(log n).
+```
+
+### The one-character difference
+
+```text
+lower bound:  if nums[mid] <  target  → lo = mid + 1
+upper bound:  if nums[mid] <= target  → lo = mid + 1
+                             ↑
+                     that = is the whole difference
+```
+
+Read the branch as *"is `mid` disqualified?"*:
+
+- Lower bound wants the first `>= target`, so only values **strictly less** are disqualified.
+- Upper bound wants the first `> target`, so values **less than or equal** are disqualified — equals get skipped rather than kept.
+
+### Why both exist: the two facts you actually use
+
+```text
+count of target in nums   =  upperBound(target) - lowerBound(target)
+
+last index <= target      =  upperBound(target) - 1
+                             (or "none" when upperBound(target) == 0)
+```
+
+The second one is the workhorse for "the most recent record at or before time T" — snapshots, version stores, time-series lookups. Take the upper bound and step back one.
+
+That `− 1` needs a guard: if `upperBound` returns `0`, nothing in the array is `<= target`, and index `−1` doesn't exist.
+
+### Steps
+
+```text
+Step 1 → lo = 0, hi = n            ← half-open, so "past the end" is expressible
+Step 2 → While lo < hi:
+Step 3 →     mid = lo + (hi - lo) / 2
+Step 4 →     if nums[mid] <= target → mid is disqualified → lo = mid + 1
+Step 5 →     else                   → mid still qualifies  → hi = mid
+Step 6 → Return lo.
+```
+
+### A useful identity (integers only)
+
+For integer data:
+
+```text
+upperBound(nums, t)  ==  lowerBound(nums, t + 1)
+```
+
+"First value `> t`" and "first value `>= t+1`" are the same thing when values are integers. Go's standard library only ships a lower bound (`sort.SearchInts`), so this identity is how you get an upper bound from it:
+
+```go
+upper := sort.SearchInts(nums, target+1)
+```
+
+It does **not** hold for floats or strings — there is no "next" float — so write the explicit `<=` version there.
+
+### How should I recognize this?
+
+```text
+If you see...
+  sorted data plus "last / rightmost / at or before"
+  "how many are <= X", "count occurrences of X"
+  "the most recent value at time T", versioned or timestamped lookups
+        ↓
+Think about...
+  "Do I want where the target's block STARTS (lower)
+   or where it ENDS (upper)?"
+        ↓
+Use...
+  upper: nums[mid] <= target → lo = mid+1, else hi = mid
+  then subtract 1 if you want the last qualifying index
+```
 
 ### Visual explanation
 
@@ -90,70 +190,147 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Upper Bound       : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [1, 2, 2, 2, 3]   target = 2
+
+lo=0 hi=5  mid=2  nums[2]=2 <= 2  → disqualified → lo=3
+lo=3 hi=5  mid=4  nums[4]=3 >  2  → qualifies    → hi=4
+lo=3 hi=4  mid=3  nums[3]=2 <= 2  → disqualified → lo=4
+lo=4 hi=4  → range empty → answer 4
+
+        1    2    2    2    3
+   lower↑                   ↑upper
+        1                   4
+   count of 2 = 4 - 1 = 3   ✓
 ```
 
 ### Interview explanation
-"This is a Upper Bound problem. I'll if the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration. That brings the complexity down to O(log n) time and O(1) space — here's the template."
+"Upper bound is the same boundary search as lower bound with one character changed: the disqualifying test becomes `nums[mid] <= target` instead of `<`, so equal elements get skipped past rather than kept. That gives me the first index strictly greater than the target — one past the last copy. I keep the half-open `[0, n)` range so 'everything is ≤ target' returns `n` naturally. The two bounds together give me the occurrence count as a subtraction, and `upperBound − 1` gives the last element at or before a value, which is the usual shape for timestamped lookups. O(log n) time, O(1) space."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Binary Search** family template. Adapt the comparison/condition to the specific problem.
+> Identical to lower bound except for `<=`. Subtract 1 to get the last qualifying index.
 
 ```go
-// Lower bound: first index with a[i] >= target. Half-open invariant [lo, hi).
-func lowerBound(a []int, target int) int {
-    lo, hi := 0, len(a)
+// UpperBound returns the first index i with nums[i] > target,
+// or len(nums) if every element is <= target. nums must be sorted ascending.
+func UpperBound(nums []int, target int) int {
+    lo, hi := 0, len(nums) // half-open [lo, hi)
     for lo < hi {
-        mid := lo + (hi-lo)/2     // avoids overflow
-        if a[mid] < target {
+        mid := lo + (hi-lo)/2
+        if nums[mid] <= target {
+            lo = mid + 1 // <= : equal values are skipped past
+        } else {
+            hi = mid // mid still qualifies
+        }
+    }
+    return lo
+}
+
+// LastAtMost returns the largest index i with nums[i] <= target, or -1.
+func LastAtMost(nums []int, target int) int {
+    return UpperBound(nums, target) - 1 // -1 when nothing qualifies
+}
+
+// CountAtMost returns how many elements are <= target.
+func CountAtMost(nums []int, target int) int {
+    return UpperBound(nums, target)
+}
+
+// CountEqual counts copies of target using both bounds.
+func CountEqual(nums []int, target int) int {
+    lo, hi := 0, len(nums)
+    for lo < hi { // lower bound
+        mid := lo + (hi-lo)/2
+        if nums[mid] < target {
             lo = mid + 1
         } else {
             hi = mid
         }
     }
-    return lo
+    return UpperBound(nums, target) - lo
 }
 ```
 
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def upper_bound(nums, target):
+    """First index i with nums[i] > target, or len(nums)."""
+    lo, hi = 0, len(nums)              # half-open [lo, hi)
     while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        mid = lo + (hi - lo) // 2
+        if nums[mid] <= target:
+            lo = mid + 1               # <= : equal values are skipped past
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            hi = mid                   # mid still qualifies
+    return lo
+
+def last_at_most(nums, target):
+    """Largest index i with nums[i] <= target, or -1."""
+    return upper_bound(nums, target) - 1
+
+def count_at_most(nums, target):
+    return upper_bound(nums, target)
+
+def count_equal(nums, target):
+    from bisect import bisect_left
+    return upper_bound(nums, target) - bisect_left(nums, target)
+
+# The standard library ships it as bisect.bisect_right.
 ```
 
 ```java
-int lowerBound(int[] a, int target) {
-    int lo = 0, hi = a.length;
-    while (lo < hi) {
-        int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+public class UpperBoundPattern {
+    // First index i with nums[i] > target, or nums.length.
+    public static int upperBound(int[] nums, int target) {
+        int lo = 0, hi = nums.length;               // half-open [lo, hi)
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;
+            if (nums[mid] <= target) lo = mid + 1;  // <= skips equal values
+            else hi = mid;
+        }
+        return lo;
     }
-    return lo;
+
+    // Largest index i with nums[i] <= target, or -1.
+    public static int lastAtMost(int[] nums, int target) {
+        return upperBound(nums, target) - 1;
+    }
+
+    public static int countEqual(int[] nums, int target) {
+        int lo = 0, hi = nums.length;
+        while (lo < hi) {                           // lower bound
+            int mid = lo + (hi - lo) / 2;
+            if (nums[mid] < target) lo = mid + 1;
+            else hi = mid;
+        }
+        return upperBound(nums, target) - lo;
+    }
 }
 ```
 
 ```cpp
-int lowerBound(vector<int>& a, int target) {
-    int lo = 0, hi = (int)a.size();
+#include <vector>
+using namespace std;
+
+// First index i with nums[i] > target, or nums.size().
+int upperBound(const vector<int>& nums, int target) {
+    int lo = 0, hi = (int)nums.size();              // half-open [lo, hi)
     while (lo < hi) {
         int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
+        if (nums[mid] <= target) lo = mid + 1;      // <= skips equal values
         else hi = mid;
     }
     return lo;
 }
+
+// Largest index i with nums[i] <= target, or -1.
+int lastAtMost(const vector<int>& nums, int target) {
+    return upperBound(nums, target) - 1;
+}
+
+// The STL ships this as std::upper_bound.
 ```
 
 ---
@@ -237,131 +414,354 @@ int lowerBound(vector<int>& a, int target) {
 
 ## 9. Solved Example 1
 
-### Problem — Search Insert (LeetCode 35)
-Given a sorted array of **distinct** integers and a target, return the index if the target is found, else the index where it would be inserted to keep the array sorted.
+### Problem — Search Insert Position (LeetCode 35)
+Given a sorted array of **distinct** integers and a `target`, return the index of the target if present, else the index where it should be inserted.
 
 ### Thought Process
-1. The insert position is exactly the leftmost index `i` with `nums[i] >= target` — this is a lower-bound query on the sorted array.
-2. Because the values are distinct, if the target is present the lower bound lands on it; if absent, it lands on the first larger element, i.e. the correct insertion slot.
-3. Run the half-open `[lo, hi)` binary search: move `lo` past every element strictly less than target, and the surviving `lo` is the answer.
+1. Read the requirement carefully: when the target is present we must return **its own** index. That is where the target's block *starts* — a **lower** bound.
+2. So this problem is deliberately included here as the contrast case. Upper bound would return the index *after* the target, which is off by one when the target exists.
+3. With **distinct** values the two bounds differ by exactly 1 on a hit and agree on a miss — which is why it is easy to reach for the wrong one and still pass some tests.
+4. Use `nums[mid] < target → lo = mid + 1`. The `<` (not `<=`) is what keeps an equal element as a candidate.
 
 ### Dry Run
-`nums = [1, 3, 5, 6], target = 4`
-- `lo=0, hi=4 → mid=2, nums[2]=5 >= 4 → hi=2`
-- `lo=0, hi=2 → mid=1, nums[1]=3 < 4 → lo=2`
-- `lo == hi == 2` → return `2` (4 inserts between 3 and 5). Correct.
+
+Input: `nums = [1, 3, 5, 6]`, `target = 5` (chosen because the target is **present** — that is where the two bounds diverge)
+
+| lo | hi | mid | nums[mid] | `nums[mid] < 5`? | action |
+|----|----|-----|-----------|------------------|--------|
+| 0 | 4 | 2 | 5 | no  | `mid` qualifies → `hi = 2` |
+| 0 | 2 | 1 | 3 | yes | `mid` is out → `lo = 2` |
+| 2 | 2 | — | — | — | `lo == hi` → return **2** |
+
+Output: **2** — the index of `5` itself. ✓
+
+**The contrast, on the same input:**
+
+| query | lower bound | upper bound | which does LeetCode 35 want? |
+|---|---|---|---|
+| `target = 5` (present) | **2** ✓ | 3 ✗ | lower |
+| `target = 4` (absent)  | 2 ✓ | 2 ✓ | either works |
+
+So: **"insert before existing equals" → lower bound. "Insert after existing equals" → upper bound.**
 
 ### Visualization
-```
-input  ──▶ [ apply Upper Bound step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums  :   1    3    5    6        target = 5
+index :   0    1    2    3   (4)
+
+>= 5? :   F    F    T    T        lower bound = 2   ← what this problem wants
+>  5? :   F    F    F    T        upper bound = 3
+                    ↑    ↑
+              the target  one past it
 ```
 
 ### Code
+
+```go
+func searchInsert(nums []int, target int) int {
+    // Lower bound: strictly-less is the only disqualifier, so an equal
+    // element stays a candidate and we land on the target itself.
+    lo, hi := 0, len(nums)
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] < target {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    return lo
+}
+
+// upperBoundInts is the sibling: the first index with nums[i] > target.
+// Swapping it into searchInsert would return 3 instead of 2 for target 5.
+func upperBoundInts(nums []int, target int) int {
+    lo, hi := 0, len(nums)
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] <= target { // <= : skip past equal values
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    return lo
+}
+```
+
 ```python
 def searchInsert(nums, target):
-    lo, hi = 0, len(nums)             # half-open [lo, hi)
+    # Lower bound: only strictly-smaller elements are disqualified, so an
+    # equal element stays a candidate and we land on the target itself.
+    lo, hi = 0, len(nums)
     while lo < hi:
-        mid = (lo + hi) // 2
-        if nums[mid] < target:        # strictly less → discard left half
+        mid = lo + (hi - lo) // 2
+        if nums[mid] < target:
             lo = mid + 1
         else:
             hi = mid
-    return lo                         # first index with nums[i] >= target
+    return lo
+
+def upper_bound_ints(nums, target):
+    """The sibling: first index with nums[i] > target."""
+    lo, hi = 0, len(nums)
+    while lo < hi:
+        mid = lo + (hi - lo) // 2
+        if nums[mid] <= target:        # <= : skip past equal values
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
 ```
 
 ### Complexity
-Time O(log n), Space O(1) — one binary search over the sorted array.
+Time O(log n), Space O(1).
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Range Frequency (LeetCode 2080)
-Build a structure over a fixed array that answers many `query(left, right, value)` calls: how many times does `value` occur in the subarray `arr[left..right]`?
+### Problem — Range Frequency Queries (LeetCode 2080)
+Build a structure over a fixed array answering many `query(left, right, value)` calls: how many times does `value` appear in `arr[left..right]`?
 
 ### Thought Process
-1. For each distinct value, store the **sorted list of indices** where it appears (indices are naturally increasing as we scan left to right).
-2. A count within `[left, right]` is a count of indices in that band — the classic `upper_bound - lower_bound` trick on the value's index list.
-3. `bisect_right(idxs, right)` gives how many indices are `<= right`; `bisect_left(idxs, left)` gives how many are `< left`. Their difference is the occurrences inside `[left, right]`.
+1. Scanning the range per query is O(n) each — too slow for many queries.
+2. Invert the data: for each distinct value, store **the sorted list of indices where it appears**. Scanning left to right builds these already sorted, for free.
+3. Now the question becomes: how many entries of that index list fall in `[left, right]`?
+4. That is a classic two-bound subtraction:
+   - `upperBound(indices, right)` = how many indices are `<= right`
+   - `lowerBound(indices, left)`  = how many indices are `< left`
+   - the difference is how many lie inside `[left, right]`
+5. Each query is O(log k) where `k` is how often that value occurs.
+
+Note the pairing: **upper** bound on the right edge (inclusive, so we skip *past* equals) and **lower** bound on the left edge (so we stop *before* equals). Using the same bound on both sides is the classic off-by-one here.
 
 ### Dry Run
-`arr = [12, 33, 4, 56, 22, 2, 34, 33, 22, 12, 34, 56]`; indices of `33` are `[1, 7]`.
-- `query(4, 8, 33)`: `bisect_right([1,7], 8) = 2`, `bisect_left([1,7], 4) = 1`
-- count = `2 - 1 = 1` (only index 7 lies in [4,8]). Correct.
+
+Input: `arr = [12, 33, 4, 56, 22, 2, 34, 33, 22, 12, 34, 56]`
+
+**Build the index map** (only the entry we need is shown):
+
+```text
+33 → [1, 7]        (arr[1] = 33 and arr[7] = 33)
+```
+
+**`query(4, 8, 33)`:**
+
+| step | computation | result | meaning |
+|------|-------------|--------|---------|
+| upper bound of `right = 8` in `[1,7]` | first index `> 8` | **2** | 2 occurrences at position `<= 8` |
+| lower bound of `left = 4` in `[1,7]`  | first index `>= 4` | **1** | 1 occurrence at position `< 4` |
+| subtract | `2 − 1` | **1** | occurrences inside `[4, 8]` |
+
+Output: **1** — only `arr[7]` qualifies; `arr[1]` is left of the range. ✓
+
+**`query(0, 11, 33)`** → `2 − 0 = ` **2** (both occurrences). ✓
 
 ### Visualization
-```
-input  ──▶ [ apply Upper Bound step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+positions of 33 :   1              7
+arr indices     :   0  1 ... 4 ... 7  8 ... 11
+query range     :         └──────────┘
+                          4          8
+
+  indices <= 8  : {1, 7}   → upper bound = 2
+  indices <  4  : {1}      → lower bound = 1
+  inside [4,8]  : 2 - 1 = 1
 ```
 
 ### Code
+
+```go
+type RangeFreqQuery struct {
+    positions map[int][]int // value -> sorted list of indices where it occurs
+}
+
+func Constructor(arr []int) RangeFreqQuery {
+    positions := make(map[int][]int)
+    for i, v := range arr {
+        // Scanning left to right keeps each list sorted automatically.
+        positions[v] = append(positions[v], i)
+    }
+    return RangeFreqQuery{positions: positions}
+}
+
+func (q *RangeFreqQuery) Query(left int, right int, value int) int {
+    idx, ok := q.positions[value]
+    if !ok {
+        return 0
+    }
+    // upper on the right edge (inclusive), lower on the left edge.
+    return upperBoundIdx(idx, right) - lowerBoundIdx(idx, left)
+}
+
+// upperBoundIdx: first position with nums[i] > target.
+func upperBoundIdx(nums []int, target int) int {
+    lo, hi := 0, len(nums)
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] <= target {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    return lo
+}
+
+// lowerBoundIdx: first position with nums[i] >= target.
+func lowerBoundIdx(nums []int, target int) int {
+    lo, hi := 0, len(nums)
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] < target {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    return lo
+}
+```
+
 ```python
 from bisect import bisect_left, bisect_right
 from collections import defaultdict
 
 class RangeFreqQuery:
     def __init__(self, arr):
-        self.pos = defaultdict(list)
-        for i, v in enumerate(arr):     # indices per value, already sorted
-            self.pos[v].append(i)
+        self.positions = defaultdict(list)     # value -> sorted indices
+        for i, v in enumerate(arr):
+            self.positions[v].append(i)        # left-to-right keeps it sorted
 
     def query(self, left, right, value):
-        idxs = self.pos.get(value)
-        if not idxs:
+        idx = self.positions.get(value)
+        if not idx:
             return 0
-        # upper_bound(right) - lower_bound(left) = count in [left, right]
-        return bisect_right(idxs, right) - bisect_left(idxs, left)
+        # upper on the inclusive right edge, lower on the left edge
+        return bisect_right(idx, right) - bisect_left(idx, left)
 ```
 
 ### Complexity
-Build O(n); each query O(log k) where k is that value's frequency. Space O(n).
+Build O(n) time and space. Each query **O(log k)** where `k` is the number of occurrences of that value.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Time Map (LeetCode 981)
-Design a key-value store where `set(key, value, timestamp)` records a value at a time, and `get(key, timestamp)` returns the value stored at the greatest `timestamp_prev <= timestamp` (or `""` if none).
+### Problem — Time Based Key-Value Store (LeetCode 981)
+Implement `set(key, value, timestamp)` and `get(key, timestamp)`, where `get` returns the value stored at the **largest timestamp ≤ the requested one**, or `""` if none exists.
 
 ### Thought Process
-1. `set` is always called with strictly increasing timestamps per key, so each key's list of `(timestamp, value)` pairs is kept sorted by timestamp automatically.
-2. `get` needs the last entry whose timestamp is `<= t` — take the **upper bound** (`bisect_right`) of `t` in the timestamp list, which is the first index strictly greater than `t`.
-3. Step back one index: `i - 1` is the largest timestamp `<= t`. If `i == 0`, nothing qualifies, so return `""`.
+1. "Largest entry at or before T" is exactly `upperBound(T) − 1`.
+2. `set` is guaranteed to be called with strictly increasing timestamps per key, so appending keeps each key's list sorted — no sorting needed.
+3. `get` runs an upper bound over that key's timestamps, then steps back one index.
+4. Guard the step-back: if the upper bound is `0`, every stored timestamp is greater than `T`, so nothing qualifies and we return `""`.
+5. Binary searching **timestamps only** (not the pairs) keeps the comparison trivial.
 
 ### Dry Run
-`set(foo,bar,1)`, `set(foo,baz,4)` → `foo` timestamps `[1, 4]`.
-- `get(foo, 3)`: `bisect_right([1,4], 3) = 1` → index `1-1 = 0` → value at ts 1 = `"bar"`. Correct.
-- `get(foo, 4)`: `bisect_right([1,4], 4) = 2` → index `1` → `"baz"`. Correct.
+
+Operations: `set("foo","bar",1)`, `set("foo","baz",4)` → `foo`'s timestamps are `[1, 4]`
+
+| call | upper bound of T in `[1,4]` | step back `−1` | result |
+|------|------------------------------|----------------|--------|
+| `get("foo", 1)` | first `> 1` → **1** | index 0 → ts 1 | **`"bar"`** |
+| `get("foo", 3)` | first `> 3` → **1** | index 0 → ts 1 | **`"bar"`** |
+| `get("foo", 4)` | first `> 4` → **2** | index 1 → ts 4 | **`"baz"`** |
+| `get("foo", 5)` | first `> 5` → **2** | index 1 → ts 4 | **`"baz"`** |
+| `get("foo", 0)` | first `> 0` → **0** | `0 − 1 = −1` | **`""`** (guard fires) |
+
+Output for the sequence above: `"bar"`, `"bar"`, `"baz"`, `"baz"`, `""` ✓
+
+`get("foo", 3)` is the interesting one: no entry has timestamp 3, and the answer is the most recent earlier entry — which is precisely what stepping back from the upper bound gives.
 
 ### Visualization
-```
-input  ──▶ [ apply Upper Bound step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+timestamps for "foo":    1        4
+values             :   "bar"    "baz"
+
+get(3):
+        1        4
+        ●        ●
+             ↑
+          T = 3
+
+  upper bound of 3  →  index 1  (the first timestamp > 3)
+  step back         →  index 0  →  "bar"    ★
 ```
 
 ### Code
+
+```go
+type TimeMap struct {
+    times  map[string][]int    // key -> timestamps, ascending
+    values map[string][]string // key -> values, parallel to times
+}
+
+func NewTimeMap() TimeMap {
+    return TimeMap{
+        times:  make(map[string][]int),
+        values: make(map[string][]string),
+    }
+}
+
+func (m *TimeMap) Set(key string, value string, timestamp int) {
+    // Timestamps arrive in increasing order per key, so appending keeps
+    // the slice sorted with no extra work.
+    m.times[key] = append(m.times[key], timestamp)
+    m.values[key] = append(m.values[key], value)
+}
+
+func (m *TimeMap) Get(key string, timestamp int) string {
+    ts := m.times[key]
+
+    // Upper bound: the first index whose timestamp is > the one requested.
+    lo, hi := 0, len(ts)
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if ts[mid] <= timestamp {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+
+    if lo == 0 {
+        return "" // every stored timestamp is later than the request
+    }
+    return m.values[key][lo-1] // step back one: the latest at or before
+}
+```
+
 ```python
 from bisect import bisect_right
 from collections import defaultdict
 
 class TimeMap:
     def __init__(self):
-        self.store = defaultdict(list)   # key -> [(timestamp, value), ...]
+        self.times = defaultdict(list)     # key -> ascending timestamps
+        self.values = defaultdict(list)    # key -> parallel values
 
     def set(self, key, value, timestamp):
-        self.store[key].append((timestamp, value))   # timestamps increasing
+        # Timestamps arrive increasing per key, so append keeps it sorted.
+        self.times[key].append(timestamp)
+        self.values[key].append(value)
 
     def get(self, key, timestamp):
-        arr = self.store.get(key, [])
-        # upper_bound on timestamp, then step back one
-        i = bisect_right(arr, (timestamp, chr(127)))
-        return arr[i - 1][1] if i else ""
+        ts = self.times.get(key, [])
+        i = bisect_right(ts, timestamp)    # first index with ts > timestamp
+        if i == 0:
+            return ""                      # nothing at or before this time
+        return self.values[key][i - 1]     # step back one
 ```
 
 ### Complexity
-`set` O(1) amortized; `get` O(log n) via binary search. Space O(n) total entries.
+`set` O(1) amortised. `get` **O(log n)** for the key's entry count. Space O(total entries).
 
+---
 
 ## 12. LeetCode Practice Set
 

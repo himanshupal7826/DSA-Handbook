@@ -41,32 +41,126 @@ lower bound, first >=, bisect left, insert position.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"In a sorted array, where does `target` **begin**?"* — the first index whose value is `>= target`.
+
 ### Intuition
-Linear scan checks each candidate — O(n).
+Walk from the left and stop at the first element that is not smaller than the target.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For `i` from `0` to `n−1`:
+2. &nbsp;&nbsp;If `nums[i] >= target`, return `i`.
+3. If the loop finishes, every element was smaller — return `n`.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n)** per query.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Lower Bound pattern is built to use.
+- It is correct, and for one query on a small array it is fine.
+- But it ignores the sortedness completely. Looking at `nums[mid]` tells you about **half the array at once**, and the linear scan throws that away.
+- With `q` queries it becomes O(q·n); binary search makes it O(q·log n).
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Lower Bound invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Binary search not for an exact value, but for the boundary where "too small" turns into "good enough".**
+
+Picture the array through the lens of the test `nums[i] >= target`. Because the array is sorted, the answers to that test form a block of `false` followed by a block of `true`:
+
+```text
+nums   :  1   3   5   6        target = 4
+>= 4?  :  F   F   T   T
+                  ↑
+              lower bound = 2
+```
+
+Lower bound is **the index of the first `T`**. That's all it is. There is no "not found" case — if every answer is `F`, the boundary sits at `n`.
+
+### The thought process
+
+```text
+We need    : the first index with nums[i] >= target.
+Obvious way: scan from the left.
+Too slow   : O(n), and it ignores that the array is sorted.
+Notice     : "nums[i] >= target" is FALSE for a prefix and TRUE forever after.
+             A sorted array makes that test monotone.
+Therefore  : binary search for the F→T boundary.
+Now        : O(log n), and it never needs an equality check.
+```
+
+### Steps
+
+```text
+Step 1 → lo = 0, hi = n            ← note: n, not n-1
+Step 2 → While lo < hi:
+Step 3 →     mid = lo + (hi - lo) / 2
+Step 4 →     if nums[mid] < target → answer is strictly right → lo = mid + 1
+Step 5 →     else                  → mid still qualifies      → hi = mid
+Step 6 → Return lo.
+```
+
+### Why the half-open range `[lo, hi)` is the right shape
+
+Two reasons, and they are the whole reason this template has no off-by-one bugs.
+
+**1. `hi = n` is expressible.** The answer can legitimately be "past the end" (every element is smaller). With an inclusive `[lo, hi]` range and `hi = n-1`, there is no way to *represent* that answer without a special case afterwards.
+
+**2. The invariant is uniform.** Throughout the loop:
+
+```text
+everything left of lo  →  definitely < target
+everything at or right of hi →  definitely >= target
+[lo, hi) is the region still unknown
+```
+
+`lo = mid + 1` and `hi = mid` both preserve that, and both strictly shrink the range, so the loop always terminates. When `lo == hi` the unknown region is empty and `lo` is the boundary.
+
+### Why `hi = mid` and not `hi = mid - 1`
+
+Because when `nums[mid] >= target`, `mid` **is itself a candidate** — it might be the very first such index. Discarding it with `mid - 1` would lose the answer. Meanwhile `lo = mid + 1` *is* safe, because `nums[mid] < target` proves `mid` can never be the answer.
+
+That asymmetry is the heart of the template: **one side excludes `mid`, the other keeps it.**
+
+### Why `lo + (hi - lo) / 2` and not `(lo + hi) / 2`
+
+They agree mathematically, but `lo + hi` can overflow a 32-bit int when both are near the maximum. Go and Python integers make this a non-issue in practice; in Java and C++ it is a real bug that famously sat in the JDK's binary search for years. Write the safe form out of habit.
+
+### Lower bound vs upper bound
+
+They differ by a single comparison:
+
+```text
+lower bound → first index with nums[i] >= target   (uses <  in the test)
+upper bound → first index with nums[i] >  target   (uses <= in the test)
+```
+
+And they combine into the two facts you actually use:
+
+```text
+count of target        = upperBound(target) - lowerBound(target)
+target is present iff  lowerBound(target) < n && nums[lowerBound(target)] == target
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  sorted data plus "first / leftmost / insert position"
+  "how many elements are less than X"
+  "smallest element >= X", "count occurrences of X"
+  a monotone predicate: false…false, true…true
+        ↓
+Think about...
+  "Where does FALSE become TRUE?"
+        ↓
+Use...
+  lo=0, hi=n, half-open; nums[mid] < target → lo=mid+1, else hi=mid
+```
 
 ### Visual explanation
 
@@ -90,27 +184,51 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Lower Bound       : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [1, 3, 5, 6]   target = 4
+
+lo=0 hi=4  mid=2  nums[2]=5 >= 4  → mid qualifies → hi=2
+lo=0 hi=2  mid=1  nums[1]=3 <  4  → mid is out    → lo=2
+lo=2 hi=2  → range empty → answer 2
+
+           1   3   5   6
+          [F] [F] [T] [T]
+                   ↑
+              first TRUE = 2
 ```
 
 ### Interview explanation
-"This is a Lower Bound problem. I'll if the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration. That brings the complexity down to O(log n) time and O(1) space — here's the template."
+"I'll treat this as a boundary search rather than a value search. Because the array is sorted, the predicate `nums[i] >= target` is false on a prefix and true on the rest, so I binary search for the first true. I use a half-open range `[0, n)` — that lets the answer be `n` when every element is smaller, without a special case. When `nums[mid] < target` I know `mid` can't be the answer, so `lo = mid + 1`; otherwise `mid` is still a candidate, so `hi = mid`, never `mid - 1`. O(log n) time, O(1) space, and no equality check anywhere."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Binary Search** family template. Adapt the comparison/condition to the specific problem.
+> `lo = 0`, `hi = n`, `while lo < hi`. One branch excludes `mid`, the other keeps it.
 
 ```go
-// Lower bound: first index with a[i] >= target. Half-open invariant [lo, hi).
-func lowerBound(a []int, target int) int {
-    lo, hi := 0, len(a)
+// LowerBound returns the first index i with nums[i] >= target,
+// or len(nums) if no such index exists. nums must be sorted ascending.
+func LowerBound(nums []int, target int) int {
+    lo, hi := 0, len(nums) // half-open [lo, hi)
     for lo < hi {
-        mid := lo + (hi-lo)/2     // avoids overflow
-        if a[mid] < target {
+        mid := lo + (hi-lo)/2 // written this way to avoid overflow
+        if nums[mid] < target {
+            lo = mid + 1 // mid is too small: it can never be the answer
+        } else {
+            hi = mid // mid still qualifies: keep it in range
+        }
+    }
+    return lo
+}
+
+// UpperBound returns the first index i with nums[i] > target.
+// The only change from LowerBound is <= instead of <.
+func UpperBound(nums []int, target int) int {
+    lo, hi := 0, len(nums)
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] <= target {
             lo = mid + 1
         } else {
             hi = mid
@@ -118,42 +236,120 @@ func lowerBound(a []int, target int) int {
     }
     return lo
 }
+
+// CountOccurrences uses both bounds to count copies of target in O(log n).
+func CountOccurrences(nums []int, target int) int {
+    return UpperBound(nums, target) - LowerBound(nums, target)
+}
+
+// Contains reports whether target is present, via the lower bound.
+func Contains(nums []int, target int) bool {
+    i := LowerBound(nums, target)
+    return i < len(nums) && nums[i] == target
+}
 ```
 
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def lower_bound(nums, target):
+    """First index i with nums[i] >= target, or len(nums)."""
+    lo, hi = 0, len(nums)              # half-open [lo, hi)
     while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] < target:
+        mid = lo + (hi - lo) // 2
+        if nums[mid] < target:
+            lo = mid + 1               # mid too small: never the answer
+        else:
+            hi = mid                   # mid still qualifies: keep it
+    return lo
+
+def upper_bound(nums, target):
+    """First index i with nums[i] > target. Only <= differs from lower_bound."""
+    lo, hi = 0, len(nums)
+    while lo < hi:
+        mid = lo + (hi - lo) // 2
+        if nums[mid] <= target:
             lo = mid + 1
         else:
             hi = mid
-    return lo                     # first index with a[i] >= target
+    return lo
+
+def count_occurrences(nums, target):
+    return upper_bound(nums, target) - lower_bound(nums, target)
+
+def contains(nums, target):
+    i = lower_bound(nums, target)
+    return i < len(nums) and nums[i] == target
+
+# The standard library ships both:
+#   from bisect import bisect_left  as lower_bound
+#   from bisect import bisect_right as upper_bound
 ```
 
 ```java
-int lowerBound(int[] a, int target) {
-    int lo = 0, hi = a.length;
-    while (lo < hi) {
-        int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+public class LowerBoundPattern {
+    // First index i with nums[i] >= target, or nums.length.
+    public static int lowerBound(int[] nums, int target) {
+        int lo = 0, hi = nums.length;              // half-open [lo, hi)
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;          // overflow-safe
+            if (nums[mid] < target) lo = mid + 1;  // mid can't be the answer
+            else hi = mid;                         // mid still qualifies
+        }
+        return lo;
     }
-    return lo;
+
+    // First index i with nums[i] > target. Only <= differs.
+    public static int upperBound(int[] nums, int target) {
+        int lo = 0, hi = nums.length;
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;
+            if (nums[mid] <= target) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
+    }
+
+    public static int countOccurrences(int[] nums, int target) {
+        return upperBound(nums, target) - lowerBound(nums, target);
+    }
+
+    public static boolean contains(int[] nums, int target) {
+        int i = lowerBound(nums, target);
+        return i < nums.length && nums[i] == target;
+    }
 }
 ```
 
 ```cpp
-int lowerBound(vector<int>& a, int target) {
-    int lo = 0, hi = (int)a.size();
+#include <vector>
+using namespace std;
+
+// First index i with nums[i] >= target, or nums.size().
+int lowerBound(const vector<int>& nums, int target) {
+    int lo = 0, hi = (int)nums.size();             // half-open [lo, hi)
+    while (lo < hi) {
+        int mid = lo + (hi - lo) / 2;              // overflow-safe
+        if (nums[mid] < target) lo = mid + 1;      // mid can't be the answer
+        else hi = mid;                             // mid still qualifies
+    }
+    return lo;
+}
+
+// First index i with nums[i] > target. Only <= differs.
+int upperBound(const vector<int>& nums, int target) {
+    int lo = 0, hi = (int)nums.size();
     while (lo < hi) {
         int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
+        if (nums[mid] <= target) lo = mid + 1;
         else hi = mid;
     }
     return lo;
 }
+
+int countOccurrences(const vector<int>& nums, int target) {
+    return upperBound(nums, target) - lowerBound(nums, target);
+}
+
+// The STL ships both: std::lower_bound / std::upper_bound.
 ```
 
 ---
@@ -237,113 +433,272 @@ int lowerBound(vector<int>& a, int target) {
 
 ## 9. Solved Example 1
 
-### Problem — Search Insert (LeetCode 35)
-Given a sorted array and a target, return the index where target is found, or the leftmost index where it should be inserted to keep the array sorted.
+### Problem — Search Insert Position (LeetCode 35)
+Given a sorted array of distinct integers and a `target`, return the index of the target if present, otherwise the index where it should be inserted.
 
 ### Thought Process
-1. The insert position is exactly the first index `i` with `nums[i] >= target` — a textbook lower bound.
-2. Run a half-open binary search on `[0, n)`: when `nums[mid] < target` the answer lies strictly right, else `mid` is still a candidate.
-3. When the loop collapses, `lo` is the leftmost qualifying index (or `n` if target exceeds every element).
+1. Both cases the problem describes are the *same* index: the first position whose value is `>= target`.
+   - Target present → that position is the target itself.
+   - Target absent → that position is the first larger element, which is exactly where it belongs.
+2. So this is a plain lower bound. No equality check is needed anywhere.
+3. Half-open `[0, n)` handles "target is bigger than everything" by returning `n`, with no special case.
 
 ### Dry Run
-`nums=[1,3,5,6]`, `target=4`.
-- `lo=0,hi=4 → mid=2, nums[2]=5 >= 4 → hi=2`
-- `lo=0,hi=2 → mid=1, nums[1]=3 < 4 → lo=2`
-- `lo=2,hi=2` stop → return `2` (insert between 3 and 5). Correct.
+
+Input: `nums = [1, 3, 5, 6]`, `target = 4`
+
+| lo | hi | mid | nums[mid] | `nums[mid] < 4`? | action |
+|----|----|-----|-----------|------------------|--------|
+| 0 | 4 | 2 | 5 | no  | `mid` qualifies → `hi = 2` |
+| 0 | 2 | 1 | 3 | yes | `mid` is out → `lo = 2` |
+| 2 | 2 | — | — | — | `lo == hi` → return **2** |
+
+Output: **2** — inserting `4` at index 2 gives `[1, 3, 4, 5, 6]`, still sorted. ✓
+
+**Edge cases from the same code:**
+
+| input | result | why |
+|---|---|---|
+| `target = 5` | 2 | present at index 2; lower bound lands on it |
+| `target = 0` | 0 | smaller than everything → insert at the front |
+| `target = 7` | 4 | larger than everything → `hi = n = 4` is returned |
 
 ### Visualization
-```
-[1, 3, 5, 6]  target 4
-       ^ first index with value >= 4  ──▶ insert at 2
+
+```text
+nums  :   1    3    5    6          target = 4
+>= 4? :   F    F    T    T
+index :   0    1    2    3    (4)
+                    ↑
+              first TRUE → insert at 2
 ```
 
 ### Code
+
+```go
+func searchInsert(nums []int, target int) int {
+    lo, hi := 0, len(nums) // half-open: hi = n lets "past the end" be an answer
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] < target {
+            lo = mid + 1 // mid is too small, discard it
+        } else {
+            hi = mid // mid still qualifies, keep it in range
+        }
+    }
+    return lo
+}
+```
+
 ```python
 def searchInsert(nums, target):
-    lo, hi = 0, len(nums)            # half-open [lo, hi)
+    lo, hi = 0, len(nums)          # half-open [lo, hi)
     while lo < hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2
         if nums[mid] < target:
-            lo = mid + 1
+            lo = mid + 1           # mid too small, discard
         else:
-            hi = mid
-    return lo                        # leftmost index with nums[i] >= target
+            hi = mid               # mid still qualifies
+    return lo
 ```
 
 ### Complexity
-Time O(log n), Space O(1) — a single binary search over the array.
+Time O(log n) — the range halves each iteration. Space O(1).
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — LIS (LeetCode 300)
-Return the length of the longest strictly increasing subsequence of `nums`.
+### Problem — Longest Increasing Subsequence (LeetCode 300)
+Return the length of the longest **strictly increasing** subsequence.
 
 ### Thought Process
-1. Maintain a `tails` array where `tails[k]` is the smallest possible tail of any increasing subsequence of length `k+1` (patience sorting).
-2. For each value `x`, use `bisect_left` (a lower bound) to find the first tail `>= x`; that is the pile `x` belongs on.
-3. If the position is past the end, `x` extends the longest run (append); otherwise it replaces that tail, keeping piles as small as possible. The answer is `len(tails)`.
+1. The O(n²) DP is the natural first answer. The O(n log n) version uses a lower bound in a clever way.
+2. Keep an array `tails`, where `tails[k]` = **the smallest possible tail value** of any increasing subsequence of length `k+1`.
+3. `tails` is always sorted — a longer subsequence must end at a larger value — so we can binary search it.
+4. For each `x`, find the first tail `>= x` (a lower bound):
+   - **Past the end** → `x` is bigger than every tail, so it extends the longest run. Append it.
+   - **Inside** → replace that tail with `x`. Same length, but a smaller tail, which can only make future extensions easier.
+5. The answer is `len(tails)`.
+
+> **Important:** `tails` is *not* itself a valid subsequence. Only its **length** is the answer. Saying otherwise is a common interview slip.
+
+Why *lower* bound and not upper? Lower bound finds the first tail `>= x`, so an equal tail gets **replaced**. That is what enforces *strictly* increasing. Using upper bound instead would allow equal values through and solve the non-decreasing variant.
 
 ### Dry Run
-`nums=[10,9,2,5,3,7]`.
-- 10 → tails=[10]; 9 replaces → [9]; 2 replaces → [2]
-- 5 appends → [2,5]; 3 replaces the 5 → [2,3]; 7 appends → [2,3,7]
-- `len(tails)=3` (e.g. 2,3,7). Correct.
+
+Input: `nums = [10, 9, 2, 5, 3, 7]`
+
+| x | lower bound in `tails` | past the end? | action | `tails` after |
+|---|------------------------|---------------|--------|---------------|
+| 10 | 0 in `[]`        | yes | append   | `[10]`     |
+| 9  | 0 in `[10]`      | no  | replace index 0 | `[9]`  |
+| 2  | 0 in `[9]`       | no  | replace index 0 | `[2]`  |
+| 5  | 1 in `[2]`       | yes | append   | `[2, 5]`   |
+| 3  | 1 in `[2,5]`     | no  | replace index 1 | `[2, 3]` |
+| 7  | 2 in `[2,3]`     | yes | append   | `[2, 3, 7]` |
+
+Output: **`len(tails) = 3`**
+
+Check by hand: `2 → 3 → 7` is increasing and has length 3. No length-4 increasing subsequence exists in `[10,9,2,5,3,7]`. ✓
+
+Watch the `3` step: it replaced the `5`. Both `[2,5]` and `[2,3]` represent length-2 subsequences, but ending at `3` leaves more room for what comes next — and indeed `7` then extended it.
 
 ### Visualization
-```
-value ──▶ bisect_left(tails, value)  (first tail >= value)
-tails ──▶ [2, 3, 7]   length = LIS length
+
+```text
+nums:  10   9   2   5   3   7
+
+tails evolves, always sorted:
+
+  [10]
+  [9]              9 replaces 10   (same length, smaller tail)
+  [2]              2 replaces 9
+  [2, 5]           5 is bigger than every tail → append, length 2
+  [2, 3]           3 replaces 5    (same length, smaller tail)
+  [2, 3, 7]        7 appends       → length 3   ★
 ```
 
 ### Code
+
+```go
+func lengthOfLIS(nums []int) int {
+    // tails[k] = smallest tail among increasing subsequences of length k+1.
+    tails := []int{}
+
+    for _, x := range nums {
+        // Lower bound: first tail >= x. Using >= (not >) enforces STRICT increase.
+        i := lowerBoundInts(tails, x)
+        if i == len(tails) {
+            tails = append(tails, x) // x extends the longest run
+        } else {
+            tails[i] = x // same length, but a smaller tail is strictly better
+        }
+    }
+    return len(tails)
+}
+
+func lowerBoundInts(nums []int, target int) int {
+    lo, hi := 0, len(nums)
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] < target {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    return lo
+}
+```
+
 ```python
 from bisect import bisect_left
 
 def lengthOfLIS(nums):
-    tails = []                       # tails[k] = smallest tail of an LIS of length k+1
+    tails = []                      # tails[k] = smallest tail of an LIS of length k+1
     for x in nums:
-        i = bisect_left(tails, x)    # lower bound: first tail >= x
+        i = bisect_left(tails, x)   # lower bound: >= enforces STRICT increase
         if i == len(tails):
-            tails.append(x)          # x extends the longest run
+            tails.append(x)         # x extends the longest run
         else:
-            tails[i] = x             # keep piles minimal
+            tails[i] = x            # same length, smaller tail is better
     return len(tails)
 ```
 
 ### Complexity
-Time O(n log n) — one lower-bound search per element; Space O(n) for `tails`.
+Time **O(n log n)** — one binary search per element. Space O(n) for `tails`.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Russian Dolls (LeetCode 354)
-Each envelope has a width and height; one fits inside another only if both dimensions are strictly larger. Return the maximum number of envelopes you can nest.
+### Problem — Russian Doll Envelopes (LeetCode 354)
+Envelope `(w, h)` fits inside `(W, H)` only if `w < W` **and** `h < H`. Return the largest number that can be nested.
 
 ### Thought Process
-1. Sort by width ascending, and on equal widths by height **descending** — the descending tie-break stops two same-width envelopes from ever counting as an increasing pair.
-2. With widths handled by the sort, the answer reduces to the strictly increasing LIS on the heights sequence.
-3. Compute that LIS in O(n log n) with `bisect_left` (lower bound) on a `tails` array, exactly as in problem 300.
+1. This is LIS in two dimensions. Sorting by width reduces it to one dimension — then we just need an LIS on the heights.
+2. But there is a trap. If two envelopes share a width, sorting by height *ascending* would let the LIS chain them together — and they can't nest, because nesting needs `w < W` **strictly**.
+3. **Fix: sort by width ascending, and by height *descending* when widths tie.** Now equal-width envelopes appear in decreasing height order, so a strictly increasing run can never pick two of them.
+4. Then run the O(n log n) LIS from the previous example on the heights.
 
 ### Dry Run
-`[[5,4],[6,4],[6,7],[2,3]]` → sort → `[[2,3],[5,4],[6,7],[6,4]]`.
-- heights = `[3, 4, 7, 4]`
-- LIS via bisect_left: 3→[3]; 4→[3,4]; 7→[3,4,7]; 4 replaces 7→[3,4,4]
-- `len(tails)=3` → answer `3`. Correct.
+
+Input: `envelopes = [[5,4], [6,4], [6,7], [2,3]]`
+
+**Step 1 — sort** (width ascending, height descending on ties):
+
+```text
+[2,3]  [5,4]  [6,7]  [6,4]
+                └──────┘
+        width 6 appears twice → heights ordered 7 then 4 (descending)
+```
+
+**Step 2 — LIS on the heights `[3, 4, 7, 4]`:**
+
+| h | lower bound in `tails` | action | `tails` after |
+|---|------------------------|--------|---------------|
+| 3 | 0 in `[]`      | append  | `[3]`       |
+| 4 | 1 in `[3]`     | append  | `[3, 4]`    |
+| 7 | 2 in `[3,4]`   | append  | `[3, 4, 7]` |
+| 4 | 1 in `[3,4,7]` | replace index 1 | `[3, 4, 7]` |
+
+Output: **3** — the chain `[2,3] → [5,4] → [6,7]`. ✓
+
+**See the descending-height trick work:** the two width-6 envelopes give heights `7` then `4`. Since `4 < 7`, the later one cannot extend a run containing the earlier one. Had we sorted heights ascending (`4` then `7`), the LIS would have chained `4 → 7` and returned **4**, claiming `[6,4]` nests inside `[6,7]` — which is wrong, since their widths are equal.
 
 ### Visualization
-```
-sort (w asc, h desc on ties) ──▶ heights [3, 4, 7, 4]
-LIS on heights via bisect_left ──▶ length 3
+
+```text
+sorted:   [2,3]   [5,4]   [6,7]   [6,4]
+heights:    3       4       7       4
+            └───────┴───────┘
+            strictly increasing 3 → 4 → 7   → answer 3
+
+same width, heights descending (7 then 4)
+   ⇒ the strict LIS can never take both   ✓
 ```
 
 ### Code
+
+```go
+func maxEnvelopes(envelopes [][]int) int {
+    // Width ascending; on ties, height DESCENDING so equal widths can never
+    // both appear in a strictly increasing run of heights.
+    sort.Slice(envelopes, func(i, j int) bool {
+        if envelopes[i][0] == envelopes[j][0] {
+            return envelopes[i][1] > envelopes[j][1]
+        }
+        return envelopes[i][0] < envelopes[j][0]
+    })
+
+    // Now it is just an LIS over the heights.
+    tails := []int{}
+    for _, e := range envelopes {
+        h := e[1]
+        // sort.SearchInts is the standard library's lower bound:
+        // the first index i with tails[i] >= h.
+        i := sort.SearchInts(tails, h)
+        if i == len(tails) {
+            tails = append(tails, h)
+        } else {
+            tails[i] = h
+        }
+    }
+    return len(tails)
+}
+```
+
 ```python
 from bisect import bisect_left
 
 def maxEnvelopes(envelopes):
-    envelopes.sort(key=lambda e: (e[0], -e[1]))   # width asc, height desc on ties
-    tails = []                                    # LIS on heights
+    # Width ascending; on ties, height DESCENDING.
+    envelopes.sort(key=lambda e: (e[0], -e[1]))
+
+    tails = []                          # LIS over the heights
     for _, h in envelopes:
-        i = bisect_left(tails, h)                 # lower bound: first tail >= h
+        i = bisect_left(tails, h)
         if i == len(tails):
             tails.append(h)
         else:
@@ -352,8 +707,9 @@ def maxEnvelopes(envelopes):
 ```
 
 ### Complexity
-Time O(n log n) — sort plus one lower-bound search per envelope; Space O(n) for `tails`.
+Time **O(n log n)** — the sort and the LIS are both O(n log n). Space O(n).
 
+---
 
 ## 12. LeetCode Practice Set
 
