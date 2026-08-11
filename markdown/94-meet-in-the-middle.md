@@ -41,32 +41,131 @@ meet in the middle, split, 2^(n/2), subset sum, combine halves.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Which subset gets closest to a target?"* — when `n` is around 40: too big for `2ⁿ`, too big for a DP over sums.
+
 ### Intuition
-Direct per-query computation or full recomputation — too slow for large/online workloads.
+Enumerate every subset and score it.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each of the `2ⁿ` subsets:
+2. &nbsp;&nbsp;Compute its sum.
+3. &nbsp;&nbsp;Compare against the target and keep the best.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(2ⁿ)**.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Meet in the Middle pattern is built to use.
+- At `n = 40` that is 1.1 × 10¹² subsets — roughly an hour of pure arithmetic, and far beyond any time limit.
+- Subset-sum DP does not rescue you either: with values up to 10⁹ the sum axis is astronomically wide, so `O(n · sum)` is worse than the exponential.
+
+```text
+n = 20   2^20 = 1e6        fine
+n = 40   2^40 = 1e12       hopeless
+n = 40   2^20 twice = 2e6  ← the whole idea
+```
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Meet in the Middle invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Split the items into two halves, enumerate each half completely, then *match* the halves against each other instead of enumerating their combination.**
+
+```text
+2^n           →       2^(n/2)  +  2^(n/2)   generated
+                              then matched with sorting or hashing
+              →       O(2^(n/2) · n)
+```
+
+Halving the exponent turns `10¹²` into `10⁶`. That is the entire pattern, and it is why it is called *meet in the middle*.
+
+### The thought process
+
+```text
+We need    : the best subset of ~40 items.
+Obvious way: enumerate all 2^n subsets.
+Hopeless   : 2^40.
+Notice     : every subset is (a subset of the first half) plus
+             (a subset of the second half), independently.
+Therefore  : enumerate the two halves SEPARATELY — 2^20 each — and
+             then find the best pairing between them.
+Now        : generation is cheap; the matching step is the work.
+```
+
+### The matching step is where the technique lives
+
+Generating both halves is easy. The skill is combining them **without** trying all `2^(n/2) × 2^(n/2)` pairs — which would put you right back at `2ⁿ`.
+
+| What you need | Matching technique | Cost |
+|---|---|---|
+| an **exact** target | hash set of one half, look up `target − x` | O(1) per item |
+| the **closest** value | sort one half, binary search each item of the other | O(log) per item |
+| closest, both sorted | **two pointers** walking inward | O(1) per item |
+| best under a constraint | sort, then a running prefix maximum | O(1) per item |
+
+The exact-match case is Two Sum on the two halves. The closest-value case is the one that appears most often, and sorting plus binary search is the reliable default.
+
+### Steps
+
+```text
+Step 1 → Split the items into halves A and B (sizes as equal as possible).
+Step 2 → Enumerate every subset sum of A  → list `sumsA`  (2^|A| entries)
+Step 3 → Enumerate every subset sum of B  → list `sumsB`
+Step 4 → Sort `sumsA`.
+Step 5 → For each s in sumsB:
+Step 6 →     binary search sumsA for the value closest to (target - s)
+Step 7 →     check both the found element and its neighbour
+Step 8 → Return the best pairing seen.
+```
+
+**Step 7 matters.** A lower-bound search returns the first element `>= x`; the closest value may be that one *or* the one just before it. Checking only one side is the standard bug here.
+
+### Enumerating one half's subset sums
+
+Iterate the masks of that half; each mask is a subset:
+
+```text
+for mask := 0; mask < (1 << len(half)); mask++ {
+    sum := 0
+    for i := range half {
+        if mask & (1 << i) != 0 { sum += half[i] }
+    }
+}
+```
+
+That is `O(2^k · k)`. It can be reduced to `O(2^k)` by building each sum from a smaller mask (`sum[mask] = sum[mask &^ lowbit] + half[index(lowbit)]`), but the simple version is usually fast enough and much easier to get right.
+
+### When you also need the subset *size*
+
+Some problems constrain how many items may be chosen — "split into two arrays of equal length", "a non-empty proper subset". Then a bare sum is not enough: group each half's sums **by subset size**, and only combine sizes that add up to something legal.
+
+```text
+sumsA[k] = all sums achievable using exactly k items from A
+```
+
+That turns one sorted list into `|A| + 1` sorted lists, and the matching runs per compatible size pair.
+
+### How should I recognize this?
+
+```text
+If you see...
+  n around 30-40 — too big for 2^n, too small for anything polynomial
+  "closest subset sum", "split into two groups", "choose any subset such that..."
+  values too large for a sum-indexed DP
+        ↓
+Think about...
+  "Can I split the items in half, solve each half exhaustively,
+   and then MATCH the two halves cheaply?"
+        ↓
+Use...
+  enumerate 2^(n/2) per half
+  exact target → hash set;  closest → sort + binary search
+  size constraints → group each half's sums by subset size
+```
 
 ### Visual explanation
 
@@ -95,66 +194,254 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Meet in the Middle: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [5, -7, 3, 5], goal = 6
+
+split:   A = [5, -7]        B = [3, 5]
+
+subset sums of A:  {0, 5, -7, -2}       (2^2 = 4)
+subset sums of B:  {0, 3, 5, 8}         (2^2 = 4)
+
+sort sumsA:  [-7, -2, 0, 5]
+
+for each b in sumsB, look for the a closest to (goal - b):
+
+   b = 0   want  6   →  closest a =  5   →  |5 + 0 - 6| = 1
+   b = 3   want  3   →  closest a =  5   →  |5 + 3 - 6| = 2
+   b = 5   want  1   →  closest a =  0   →  |0 + 5 - 6| = 1
+   b = 8   want -2   →  closest a = -2   →  |-2 + 8 - 6| = 0   ★
+
+answer: 0
 ```
 
 ### Interview explanation
-"This is a Meet in the Middle problem. I'll match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP. That brings the complexity down to Varies (often O(log n) per op) time and O(n) to O(n log n) space — here's the template."
+"`n` is around 40, which is the signature of meet in the middle: too large for `2ⁿ` but exactly right for two independent halves of `2ⁿᐟ²`. Every subset is a subset of the first half combined with a subset of the second, and those choices are independent — so I enumerate all `2²⁰` subset sums of each half separately, which is about a million each. The skill is in the matching: I must not try all pairs, or I'm back at `2ⁿ`. For a closest-sum target I sort one half's sums and binary search each element of the other for `target − s`, checking both the element found and its predecessor since the closest value can be on either side. That's `O(2ⁿᐟ² · n)` overall. If the problem also constrains the subset size, I group each half's sums by how many items they use and only combine compatible size pairs."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Advanced** family template. Adapt the comparison/condition to the specific problem.
+> Enumerate each half; match with sorting, hashing, or two pointers.
 
 ```go
-// Fenwick (Binary Indexed) Tree: prefix sums with point updates, O(log n).
-type Fenwick struct{ tree []int }
-func NewFenwick(n int) *Fenwick { return &Fenwick{make([]int, n+1)} }
-func (f *Fenwick) Update(i, delta int) {
-    for ; i < len(f.tree); i += i & (-i) { f.tree[i] += delta }
+// SubsetSums returns every subset sum of `items`, one per mask.
+func SubsetSums(items []int) []int {
+    total := 1 << len(items)
+    sums := make([]int, 0, total)
+
+    for mask := 0; mask < total; mask++ {
+        sum := 0
+        for i := range items {
+            if mask&(1<<i) != 0 {
+                sum += items[i]
+            }
+        }
+        sums = append(sums, sum)
+    }
+    return sums
 }
-func (f *Fenwick) Query(i int) int { // prefix sum [1..i]
-    s := 0
-    for ; i > 0; i -= i & (-i) { s += f.tree[i] }
-    return s
+
+// SubsetSumsBySize groups each subset sum by how many items it uses,
+// which is what size-constrained problems need.
+func SubsetSumsBySize(items []int) [][]int {
+    bySize := make([][]int, len(items)+1)
+
+    for mask := 0; mask < (1 << len(items)); mask++ {
+        sum, size := 0, 0
+        for i := range items {
+            if mask&(1<<i) != 0 {
+                sum += items[i]
+                size++
+            }
+        }
+        bySize[size] = append(bySize[size], sum)
+    }
+    return bySize
+}
+
+// ClosestSubsetSum returns the smallest possible |subsetSum - goal|.
+func ClosestSubsetSum(nums []int, goal int) int {
+    middle := len(nums) / 2
+    sumsA := SubsetSums(nums[:middle])
+    sumsB := SubsetSums(nums[middle:])
+
+    sort.Ints(sumsA) // so we can binary search it
+
+    best := math.MaxInt32
+    for _, b := range sumsB {
+        want := goal - b
+
+        // First index whose value is >= want.
+        i := sort.SearchInts(sumsA, want)
+
+        // The closest value may be at i OR at i-1 — check BOTH sides,
+        // which is the step people usually forget.
+        for _, candidate := range []int{i - 1, i} {
+            if candidate < 0 || candidate >= len(sumsA) {
+                continue
+            }
+            difference := sumsA[candidate] + b - goal
+            if difference < 0 {
+                difference = -difference
+            }
+            if difference < best {
+                best = difference
+            }
+        }
+    }
+    return best
+}
+
+// ExactSubsetSum is the hash-set variant: does any subset hit the target?
+func ExactSubsetSum(nums []int, target int) bool {
+    middle := len(nums) / 2
+
+    seen := make(map[int]struct{})
+    for _, a := range SubsetSums(nums[:middle]) {
+        seen[a] = struct{}{}
+    }
+
+    for _, b := range SubsetSums(nums[middle:]) {
+        if _, ok := seen[target-b]; ok {
+            return true
+        }
+    }
+    return false
 }
 ```
 
 ```python
-class Fenwick:
-    def __init__(self, n):
-        self.tree = [0] * (n + 1)
-    def update(self, i, delta):          # 1-indexed
-        while i < len(self.tree):
-            self.tree[i] += delta
-            i += i & (-i)
-    def query(self, i):                  # prefix sum [1..i]
-        s = 0
-        while i > 0:
-            s += self.tree[i]
-            i -= i & (-i)
-        return s
+from bisect import bisect_left
+
+def subset_sums(items):
+    """Every subset sum, one per mask."""
+    sums = []
+    for mask in range(1 << len(items)):
+        total = sum(items[i] for i in range(len(items)) if mask & (1 << i))
+        sums.append(total)
+    return sums
+
+def subset_sums_by_size(items):
+    """Group each subset sum by how many items it uses."""
+    by_size = [[] for _ in range(len(items) + 1)]
+    for mask in range(1 << len(items)):
+        chosen = [items[i] for i in range(len(items)) if mask & (1 << i)]
+        by_size[len(chosen)].append(sum(chosen))
+    return by_size
+
+def closest_subset_sum(nums, goal):
+    """Smallest possible |subsetSum - goal|."""
+    middle = len(nums) // 2
+    sums_a = sorted(subset_sums(nums[:middle]))     # sorted for binary search
+    sums_b = subset_sums(nums[middle:])
+
+    best = float("inf")
+    for b in sums_b:
+        want = goal - b
+        i = bisect_left(sums_a, want)
+
+        # The closest value may be at i OR i-1 — check BOTH sides.
+        for candidate in (i - 1, i):
+            if 0 <= candidate < len(sums_a):
+                best = min(best, abs(sums_a[candidate] + b - goal))
+    return best
+
+def exact_subset_sum(nums, target):
+    """Hash-set variant: does any subset hit the target exactly?"""
+    middle = len(nums) // 2
+    seen = set(subset_sums(nums[:middle]))
+    return any(target - b in seen for b in subset_sums(nums[middle:]))
 ```
 
 ```java
-class Fenwick {
-    long[] tree;
-    Fenwick(int n) { tree = new long[n + 1]; }
-    void update(int i, long d) { for (; i < tree.length; i += i & (-i)) tree[i] += d; }
-    long query(int i) { long s = 0; for (; i > 0; i -= i & (-i)) s += tree[i]; return s; }
+import java.util.*;
+
+public class MeetInTheMiddle {
+    public static List<Integer> subsetSums(int[] items) {
+        List<Integer> sums = new ArrayList<>(1 << items.length);
+        for (int mask = 0; mask < (1 << items.length); mask++) {
+            int sum = 0;
+            for (int i = 0; i < items.length; i++)
+                if ((mask & (1 << i)) != 0) sum += items[i];
+            sums.add(sum);
+        }
+        return sums;
+    }
+
+    public static int closestSubsetSum(int[] nums, int goal) {
+        int middle = nums.length / 2;
+        int[] left = Arrays.copyOfRange(nums, 0, middle);
+        int[] right = Arrays.copyOfRange(nums, middle, nums.length);
+
+        List<Integer> sumsA = subsetSums(left);
+        Collections.sort(sumsA);                    // for binary search
+        List<Integer> sumsB = subsetSums(right);
+
+        int best = Integer.MAX_VALUE;
+        for (int b : sumsB) {
+            int want = goal - b;
+            int i = lowerBound(sumsA, want);
+
+            // Check BOTH sides — the closest may be at i or i-1.
+            for (int candidate : new int[]{i - 1, i}) {
+                if (candidate < 0 || candidate >= sumsA.size()) continue;
+                best = Math.min(best, Math.abs(sumsA.get(candidate) + b - goal));
+            }
+        }
+        return best;
+    }
+
+    private static int lowerBound(List<Integer> sorted, int target) {
+        int lo = 0, hi = sorted.size();
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;
+            if (sorted.get(mid) < target) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
+    }
 }
 ```
 
 ```cpp
-struct Fenwick {
-    vector<long long> tree;
-    Fenwick(int n) : tree(n + 1, 0) {}
-    void update(int i, long long d) { for (; i < (int)tree.size(); i += i & (-i)) tree[i] += d; }
-    long long query(int i) { long long s = 0; for (; i > 0; i -= i & (-i)) s += tree[i]; return s; }
-};
+#include <algorithm>
+#include <climits>
+#include <cstdlib>
+#include <vector>
+using namespace std;
+
+vector<int> subsetSums(const vector<int>& items) {
+    vector<int> sums;
+    sums.reserve(1 << items.size());
+    for (int mask = 0; mask < (1 << (int)items.size()); ++mask) {
+        int sum = 0;
+        for (int i = 0; i < (int)items.size(); ++i)
+            if (mask & (1 << i)) sum += items[i];
+        sums.push_back(sum);
+    }
+    return sums;
+}
+
+int closestSubsetSum(const vector<int>& nums, int goal) {
+    int middle = (int)nums.size() / 2;
+    vector<int> sumsA = subsetSums({nums.begin(), nums.begin() + middle});
+    vector<int> sumsB = subsetSums({nums.begin() + middle, nums.end()});
+
+    sort(sumsA.begin(), sumsA.end());               // for binary search
+
+    int best = INT_MAX;
+    for (int b : sumsB) {
+        int want = goal - b;
+        auto it = lower_bound(sumsA.begin(), sumsA.end(), want);
+
+        // Check BOTH sides — the closest may be at it or it-1.
+        for (auto candidate : {it == sumsA.begin() ? it : prev(it), it}) {
+            if (candidate == sumsA.end()) continue;
+            best = min(best, abs(*candidate + b - goal));
+        }
+    }
+    return best;
+}
 ```
 
 ---
@@ -238,124 +525,487 @@ struct Fenwick {
 
 ## 9. Solved Example 1
 
-### Problem — Closest Subseq Sum (LeetCode 1755)
-A representative **Meet in the Middle** problem. The signal: split the input in half, enumerate each, then combine — 2^(n/2).
+### Problem — Closest Subsequence Sum (LeetCode 1755)
+Given `nums` (length up to 40) and a `goal`, choose any subsequence and minimise `|sum − goal|`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (meet in the middle, split, 2^(n/2), subset sum, combine halves).
-2. Reach for the Meet in the Middle template below and map the problem's entities onto it.
-3. Match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP.
+1. `n ≤ 40` is the signature: `2⁴⁰` is hopeless, `2²⁰` twice is a million each.
+2. Split into halves. Every subsequence is a subset of the left half plus a subset of the right half, chosen independently.
+3. Enumerate all subset sums of each half.
+4. Sort the left half's sums, then for each right-half sum `b` binary search for the value closest to `goal − b`.
+5. Check **both** the found index and the one before it — the closest value can lie on either side of a lower-bound result.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `nums = [5, -7, 3, 5]`, `goal = 6`
+
+**Split:** `A = [5, -7]`, `B = [3, 5]`
+
+**All subset sums:**
+
+| half | masks | sums |
+|------|-------|------|
+| A | `{}`, `{5}`, `{−7}`, `{5,−7}` | `0, 5, −7, −2` |
+| B | `{}`, `{3}`, `{5}`, `{3,5}` | `0, 3, 5, 8` |
+
+**Sort A:** `[−7, −2, 0, 5]`
+
+**Match each `b` against `goal − b = 6 − b`:**
+
+| `b` | want `6 − b` | lower bound in A | candidates checked | best `\|a + b − 6\|` |
+|-----|---------------|-------------------|--------------------|----------------------|
+| 0 | 6 | index 4 (past end) | `a = 5` | `\|5 + 0 − 6\| = 1` |
+| 3 | 3 | index 3 (`5`) | `a = 0`, `a = 5` | `\|0+3−6\| = 3`, `\|5+3−6\| = 2` → **2** |
+| 5 | 1 | index 3 (`5`) | `a = 0`, `a = 5` | `\|0+5−6\| = 1`, `\|5+5−6\| = 4` → **1** |
+| 8 | −2 | index 1 (`−2`) | `a = −7`, `a = −2` | `\|−7+8−6\| = 5`, `\|−2+8−6\| = **0**` ★ |
+
+Output: **0** ✓ — the subsequence `{5, −7, 3, 5}` sums to exactly 6.
+
+**Why both sides must be checked.** At `b = 3` the lower bound landed on `5`, giving distance 2. But the *predecessor* `0` gives 3 — worse here. At `b = 5` the roles reverse: the predecessor `0` gives 1 while the found `5` gives 4. Neither side is reliably better, so both must be tried.
 
 ### Visualization
-```
-input  ──▶ [ apply Meet in the Middle step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums = [5, -7, 3, 5],  goal = 6
+
+  A = [5, -7]        sums  {0, 5, -7, -2}   sorted  [-7, -2, 0, 5]
+  B = [3,  5]        sums  {0, 3, 5, 8}
+
+  b = 8  →  want 6 - 8 = -2
+            binary search finds -2 exactly
+            |-2 + 8 - 6| = 0        ★
+
+  2^40 subsets became 2^2 + 2^2 generated, then matched
 ```
 
 ### Code
+
+```go
+func minAbsDifference(nums []int, goal int) int {
+    middle := len(nums) / 2
+
+    sumsA := allSubsetSums(nums[:middle])
+    sumsB := allSubsetSums(nums[middle:])
+
+    sort.Ints(sumsA) // so each b can be matched by binary search
+
+    best := math.MaxInt32
+    for _, b := range sumsB {
+        want := goal - b
+
+        // First index in sumsA whose value is >= want.
+        i := sort.SearchInts(sumsA, want)
+
+        // The closest value may be at i OR at i-1. Checking only one
+        // side is the classic bug here.
+        for _, candidate := range []int{i - 1, i} {
+            if candidate < 0 || candidate >= len(sumsA) {
+                continue
+            }
+            difference := sumsA[candidate] + b - goal
+            if difference < 0 {
+                difference = -difference
+            }
+            if difference < best {
+                best = difference
+            }
+        }
+    }
+    return best
+}
+
+// allSubsetSums returns one sum per subset mask of `items`.
+func allSubsetSums(items []int) []int {
+    sums := make([]int, 0, 1<<len(items))
+    for mask := 0; mask < (1 << len(items)); mask++ {
+        sum := 0
+        for i := range items {
+            if mask&(1<<i) != 0 {
+                sum += items[i]
+            }
+        }
+        sums = append(sums, sum)
+    }
+    return sums
+}
+```
+
 ```python
-class Fenwick:
-    def __init__(self, n):
-        self.tree = [0] * (n + 1)
-    def update(self, i, delta):          # 1-indexed
-        while i < len(self.tree):
-            self.tree[i] += delta
-            i += i & (-i)
-    def query(self, i):                  # prefix sum [1..i]
-        s = 0
-        while i > 0:
-            s += self.tree[i]
-            i -= i & (-i)
-        return s
+from bisect import bisect_left
+
+def minAbsDifference(nums, goal):
+    def all_subset_sums(items):
+        sums = []
+        for mask in range(1 << len(items)):
+            sums.append(sum(items[i] for i in range(len(items)) if mask & (1 << i)))
+        return sums
+
+    middle = len(nums) // 2
+    sums_a = sorted(all_subset_sums(nums[:middle]))     # sorted for searching
+    sums_b = all_subset_sums(nums[middle:])
+
+    best = float("inf")
+    for b in sums_b:
+        want = goal - b
+        i = bisect_left(sums_a, want)
+
+        # The closest value may be at i OR i-1 — check BOTH.
+        for candidate in (i - 1, i):
+            if 0 <= candidate < len(sums_a):
+                best = min(best, abs(sums_a[candidate] + b - goal))
+    return best
 ```
 
 ### Complexity
-Time Varies (often O(log n) per op), Space O(n) to O(n log n). Build cost amortized over many fast queries/updates.
+Time **O(2ⁿᐟ² · n)** — generating each half, sorting one, and one binary search per element of the other. Space O(2ⁿᐟ²).
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Split Array Avg (LeetCode 805)
-A representative **Meet in the Middle** problem. The signal: split the input in half, enumerate each, then combine — 2^(n/2).
+### Problem — Split Array With Same Average (LeetCode 805)
+Can `nums` be split into two non-empty parts whose **averages** are equal?
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (meet in the middle, split, 2^(n/2), subset sum, combine halves).
-2. Reach for the Meet in the Middle template below and map the problem's entities onto it.
-3. Match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP.
+1. Averages are awkward to compare directly. Normalise them away.
+2. If part `A` has `k` elements and sum `sA`, and the whole array has `n` elements and sum `S`, equal averages means `sA/k = S/n`, i.e. `n·sA = k·S`.
+3. Rewrite each element as `b[i] = n · nums[i] − S`. Then `Σ b over A = n·sA − k·S`, which is **zero** exactly when the averages match.
+4. So the question becomes: **is there a non-empty proper subset of `b` summing to 0?**
+5. Now it is meet in the middle — but sizes matter (the subset must be neither empty nor everything), so each half's sums are grouped by subset size.
+
+**Why the transformation is worth doing.** It converts a two-variable condition (size *and* sum) into a single-value target of zero, which the matching step can hash directly.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `nums = [1, 2, 3, 4, 5, 6, 7, 8]`
+
+`n = 8`, `S = 36`. Transform `b[i] = 8·nums[i] − 36`:
+
+| nums[i] | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---------|---|---|---|---|---|---|---|---|
+| b[i] | −28 | −20 | −12 | −4 | 4 | 12 | 20 | 28 |
+
+**Split:** `A = [−28, −20, −12, −4]`, `B = [4, 12, 20, 28]`
+
+Enumerating both halves, one match stands out:
+
+```text
+from A:  the subset {-28}     sum -28,  size 1
+from B:  the subset { 28}     sum  28,  size 1
+
+combined sum  = 0        ✓
+combined size = 2, which is in [1, 7]   ✓ non-empty and proper
+```
+
+Output: **`true`** ✓
+
+Checking directly: that subset is `nums = {1, 8}`, sum 9, size 2 → average 4.5. The rest is `{2,3,4,5,6,7}`, sum 27, size 6 → average 4.5. Equal ✓ — and the whole array averages `36/8 = 4.5` too, as it must.
+
+**A failing case:** `nums = [3, 1]`. `n = 2`, `S = 4`, so `b = [2, −2]`. The only non-empty proper subsets are `{2}` and `{−2}`, neither summing to 0 → **`false`** ✓
+
+**Why the size check is needed.** The empty subset sums to 0, and so does the *entire* array — `Σ b = n·S − n·S = 0` always. Both are degenerate, so the combined size must be strictly between 0 and `n`.
 
 ### Visualization
-```
-input  ──▶ [ apply Meet in the Middle step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums = [1, 2, 3, 4, 5, 6, 7, 8]     n = 8, S = 36
+
+  transform:  b[i] = 8*nums[i] - 36
+              [-28, -20, -12, -4, 4, 12, 20, 28]
+
+  goal: a NON-EMPTY PROPER subset of b summing to 0
+
+  A = [-28, -20, -12, -4]        B = [4, 12, 20, 28]
+
+  pick {-28} from A  (size 1)  +  pick {28} from B  (size 1)
+       sum -28                        sum  28
+                     total 0,  size 2  ∈ [1, 7]     ✓
+
+  note: the empty subset and the FULL array both sum to 0 —
+        which is exactly why sizes must be tracked
 ```
 
 ### Code
+
+```go
+func splitArraySameAverage(nums []int) bool {
+    n := len(nums)
+    if n < 2 {
+        return false
+    }
+
+    total := 0
+    for _, v := range nums {
+        total += v
+    }
+
+    // b[i] = n*nums[i] - total. A subset of b sums to 0 exactly when
+    // that subset's average equals the whole array's average.
+    transformed := make([]int, n)
+    for i, v := range nums {
+        transformed[i] = n*v - total
+    }
+
+    middle := n / 2
+    left, right := transformed[:middle], transformed[middle:]
+
+    // For each achievable sum, remember WHICH SIZES achieve it, as a
+    // bitmask over sizes 0..len(half). Sizes matter because the empty
+    // subset and the full array both sum to 0.
+    sizesForSum := make(map[int]int)
+    for mask := 0; mask < (1 << len(left)); mask++ {
+        sum, size := 0, 0
+        for i := range left {
+            if mask&(1<<i) != 0 {
+                sum += left[i]
+                size++
+            }
+        }
+        sizesForSum[sum] |= 1 << size
+    }
+
+    for mask := 0; mask < (1 << len(right)); mask++ {
+        sum, size := 0, 0
+        for i := range right {
+            if mask&(1<<i) != 0 {
+                sum += right[i]
+                size++
+            }
+        }
+
+        leftSizes, ok := sizesForSum[-sum]
+        if !ok {
+            continue
+        }
+
+        // Any left-half size that makes the combined size a proper,
+        // non-empty subset works.
+        for leftSize := 0; leftSize <= len(left); leftSize++ {
+            if leftSizes&(1<<leftSize) == 0 {
+                continue
+            }
+            combined := leftSize + size
+            if combined > 0 && combined < n {
+                return true
+            }
+        }
+    }
+
+    return false
+}
+```
+
 ```python
-class Fenwick:
-    def __init__(self, n):
-        self.tree = [0] * (n + 1)
-    def update(self, i, delta):          # 1-indexed
-        while i < len(self.tree):
-            self.tree[i] += delta
-            i += i & (-i)
-    def query(self, i):                  # prefix sum [1..i]
-        s = 0
-        while i > 0:
-            s += self.tree[i]
-            i -= i & (-i)
-        return s
+def splitArraySameAverage(nums):
+    n = len(nums)
+    if n < 2:
+        return False
+    total = sum(nums)
+
+    # b[i] = n*nums[i] - total; a subset sums to 0 iff its average matches.
+    transformed = [n * v - total for v in nums]
+
+    middle = n // 2
+    left, right = transformed[:middle], transformed[middle:]
+
+    # sum -> set of subset SIZES achieving it (sizes matter: the empty
+    # subset and the full array both sum to 0).
+    sizes_for_sum = {}
+    for mask in range(1 << len(left)):
+        chosen = [left[i] for i in range(len(left)) if mask & (1 << i)]
+        sizes_for_sum.setdefault(sum(chosen), set()).add(len(chosen))
+
+    for mask in range(1 << len(right)):
+        chosen = [right[i] for i in range(len(right)) if mask & (1 << i)]
+        need = -sum(chosen)
+        for left_size in sizes_for_sum.get(need, ()):
+            combined = left_size + len(chosen)
+            if 0 < combined < n:            # non-empty and proper
+                return True
+
+    return False
 ```
 
 ### Complexity
-Time Varies (often O(log n) per op), Space O(n) to O(n log n). Build cost amortized over many fast queries/updates.
+Time **O(2ⁿᐟ² · n)**, Space **O(2ⁿᐟ²)**.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Two Subsets (LeetCode 2035)
-A representative **Meet in the Middle** problem. The signal: split the input in half, enumerate each, then combine — 2^(n/2).
+### Problem — Partition Array Into Two Arrays to Minimize Sum Difference (LeetCode 2035)
+Given `2n` integers, split them into two arrays of **exactly `n` elements each**, minimising the absolute difference of their sums.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (meet in the middle, split, 2^(n/2), subset sum, combine halves).
-2. Reach for the Meet in the Middle template below and map the problem's entities onto it.
-3. Match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP.
+1. `2n ≤ 30`, so `n ≤ 15` and each half has 15 elements — `2¹⁵ = 32,768` subsets per half. Meet in the middle fits exactly.
+2. The size constraint is hard here: taking `k` elements from the left half means taking exactly `n − k` from the right.
+3. So group each half's subset sums **by size**, giving `n + 1` buckets per half.
+4. Let `S` be the total. If one part sums to `p`, the difference is `|S − 2p|` — so we want `p` as close to `S/2` as possible.
+5. For each size `k`, match the left half's size-`k` sums against the right half's size-`(n−k)` sums: sort one bucket and binary search the other.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `nums = [3, 9, 7, 3]` → `2n = 4`, so `n = 2` and each part must have 2 elements.
+
+`S = 22`, so the ideal part sum is `S/2 = 11`.
+
+**Split:** `A = [3, 9]`, `B = [7, 3]`
+
+**Subset sums by size:**
+
+| half | size 0 | size 1 | size 2 |
+|------|--------|--------|--------|
+| A | `[0]` | `[3, 9]` | `[12]` |
+| B | `[0]` | `[7, 3]` | `[10]` |
+
+**Match size `k` from A with size `2 − k` from B:**
+
+| `k` | A sums (size k) | B sums (size 2−k) | combined `p` | `\|S − 2p\| = \|22 − 2p\|` |
+|-----|------------------|--------------------|--------------|-----------------------------|
+| 0 | `0` | `10` | 10 | `\|22 − 20\| = **2**` |
+| 1 | `3` | `7` | 10 | **2** |
+| 1 | `3` | `3` | 6 | `\|22 − 12\| = 10` |
+| 1 | `9` | `7` | 16 | `\|22 − 32\| = 10` |
+| 1 | `9` | `3` | 12 | `\|22 − 24\| = **2**` |
+| 2 | `12` | `0` | 12 | **2** |
+
+Output: **2** ✓
+
+Verify one of them: `k = 1` with A's `3` and B's `7` gives the part `{3, 7}` summing to 10, leaving `{9, 3}` summing to 12 → difference 2. ✓
+
+**Why the size grouping is essential.** The single best sum overall would be `p = 11`, but no 2-element subset sums to 11 here. Ignoring sizes would happily pair A's size-0 subset with B's size-1 subset and report a 1-element part, which the problem forbids.
 
 ### Visualization
-```
-input  ──▶ [ apply Meet in the Middle step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums = [3, 9, 7, 3]     total S = 22,  each part must hold 2 elements
+
+  A = [3, 9]                     B = [7, 3]
+  size 0: {0}                    size 0: {0}
+  size 1: {3, 9}                 size 1: {7, 3}
+  size 2: {12}                   size 2: {10}
+
+  combine size k from A with size (2-k) from B:
+
+     k=0:  0 + 10 = 10   →  |22 - 20| = 2   ★
+     k=1:  3 +  7 = 10   →  |22 - 20| = 2   ★
+     k=1:  9 +  3 = 12   →  |22 - 24| = 2   ★
+     k=2: 12 +  0 = 12   →  |22 - 24| = 2   ★
+
+  minimum difference = 2
 ```
 
 ### Code
+
+```go
+func minimumDifference(nums []int) int {
+    half := len(nums) / 2 // each part must contain exactly `half` elements
+
+    total := 0
+    for _, v := range nums {
+        total += v
+    }
+
+    left := sumsBySize(nums[:half])
+    right := sumsBySize(nums[half:])
+
+    // Sort each right-hand bucket so it can be binary searched.
+    for size := range right {
+        sort.Ints(right[size])
+    }
+
+    best := math.MaxInt32
+
+    for k := 0; k <= half; k++ {
+        need := half - k // taking k from the left means half-k from the right
+        if need < 0 || need > half {
+            continue
+        }
+
+        for _, a := range left[k] {
+            // We want the part sum p = a + b as close as possible to
+            // total/2, so b should be close to total/2 - a.
+            want := total/2 - a
+            bucket := right[need]
+
+            i := sort.SearchInts(bucket, want)
+            for _, candidate := range []int{i - 1, i} {
+                if candidate < 0 || candidate >= len(bucket) {
+                    continue
+                }
+                partSum := a + bucket[candidate]
+
+                // One part sums to partSum, so the difference is |S - 2p|.
+                difference := total - 2*partSum
+                if difference < 0 {
+                    difference = -difference
+                }
+                if difference < best {
+                    best = difference
+                }
+            }
+        }
+    }
+
+    return best
+}
+
+// sumsBySize[k] lists every subset sum using exactly k of the items.
+func sumsBySize(items []int) [][]int {
+    bySize := make([][]int, len(items)+1)
+
+    for mask := 0; mask < (1 << len(items)); mask++ {
+        sum, size := 0, 0
+        for i := range items {
+            if mask&(1<<i) != 0 {
+                sum += items[i]
+                size++
+            }
+        }
+        bySize[size] = append(bySize[size], sum)
+    }
+    return bySize
+}
+```
+
 ```python
-class Fenwick:
-    def __init__(self, n):
-        self.tree = [0] * (n + 1)
-    def update(self, i, delta):          # 1-indexed
-        while i < len(self.tree):
-            self.tree[i] += delta
-            i += i & (-i)
-    def query(self, i):                  # prefix sum [1..i]
-        s = 0
-        while i > 0:
-            s += self.tree[i]
-            i -= i & (-i)
-        return s
+from bisect import bisect_left
+
+def minimumDifference(nums):
+    half = len(nums) // 2               # each part holds exactly `half` items
+    total = sum(nums)
+
+    def sums_by_size(items):
+        by_size = [[] for _ in range(len(items) + 1)]
+        for mask in range(1 << len(items)):
+            chosen = [items[i] for i in range(len(items)) if mask & (1 << i)]
+            by_size[len(chosen)].append(sum(chosen))
+        return by_size
+
+    left = sums_by_size(nums[:half])
+    right = [sorted(bucket) for bucket in sums_by_size(nums[half:])]
+
+    best = float("inf")
+    for k in range(half + 1):
+        need = half - k                 # k from the left ⇒ half-k from the right
+        bucket = right[need]
+        for a in left[k]:
+            want = total // 2 - a       # aim the part sum at total/2
+            i = bisect_left(bucket, want)
+            for candidate in (i - 1, i):
+                if 0 <= candidate < len(bucket):
+                    part = a + bucket[candidate]
+                    best = min(best, abs(total - 2 * part))
+
+    return best
 ```
 
 ### Complexity
-Time Varies (often O(log n) per op), Space O(n) to O(n log n). Build cost amortized over many fast queries/updates.
+Time **O(2ⁿ · n)** where `n` is the half-length — generating both halves, sorting the buckets, and one binary search per left-hand sum. Space O(2ⁿ).
 
+> All three examples split, enumerate, and match — the differences are only in the matching. Example 1 wants the closest value (sort + binary search), Example 2 wants an exact zero (hash), and Example 3 adds a size constraint (bucket by size first). Recognising *which* matching your problem needs is the whole skill once the split is obvious.
+
+---
 
 ## 12. LeetCode Practice Set
 

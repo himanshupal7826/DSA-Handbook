@@ -41,32 +41,145 @@ sparse table, range minimum, rmq, static, idempotent, binary lifting.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"What is the minimum (or maximum, or gcd) over this range?"* — asked many times, on an array that never changes.
+
 ### Intuition
-Direct per-query computation or full recomputation — too slow for large/online workloads.
+Scan the range and take the extreme.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Read the query `(l, r)`.
+2. Walk from `l` to `r`, tracking the minimum.
+3. Return it.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n) per query**, so **O(q · n)** overall.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Sparse Table pattern is built to use.
+- With `q = 10⁵` queries on `n = 10⁵` elements that is 10¹⁰ operations.
+- And the array is **static** — nothing ever changes — so every query re-derives facts that were already true the first time. Overlapping ranges recompute the same minima again and again.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Sparse Table invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Precompute the answer for every range whose length is a power of two — then any range is covered by just *two* of them, even if they overlap.**
+
+That overlap is the whole trick, and it is what makes queries **O(1)** rather than O(log n).
+
+### The thought process
+
+```text
+We need    : range minima, many queries, array never changes.
+Obvious way: scan each range.
+Too slow   : O(q x n), and it recomputes the same facts.
+Notice     : min is IDEMPOTENT — min(x, x) = x — so counting an
+             element twice does no harm.
+Therefore  : precompute minima for all power-of-two lengths, then
+             cover any range with two possibly-OVERLAPPING blocks.
+Now        : O(n log n) to build, O(1) per query.
+```
+
+### The table
+
+```text
+table[k][i] = the minimum over the range [i, i + 2^k - 1]
+              (a block of length 2^k starting at i)
+```
+
+Each level is built from the one below by splitting the block in half:
+
+```text
+table[0][i] = nums[i]                                   blocks of length 1
+table[k][i] = min( table[k-1][i],                       first half
+                   table[k-1][i + 2^(k-1)] )            second half
+```
+
+There are `log n` levels of `n` entries, so building is O(n log n) time and space.
+
+### The query, and why overlap is allowed
+
+Take the largest power of two that fits inside the range:
+
+```text
+length = r - l + 1
+k      = floor(log2(length))
+
+answer = min( table[k][l],                 the block starting at l
+              table[k][r - 2^k + 1] )      the block ENDING at r
+```
+
+Those two blocks together cover `[l, r]` completely, and they **overlap in the middle** whenever the length is not an exact power of two.
+
+```text
+range [2, 8], length 7, k = 2 (blocks of length 4)
+
+index :  2  3  4  5  6  7  8
+block1: [2  3  4  5]
+block2:       [5  6  7  8]
+                ↑↑
+            overlap — harmless, because min(x, x) = x
+```
+
+**This is the entire reason a sparse table is O(1) instead of O(log n).** A segment tree must partition the range into disjoint pieces, so it needs `log n` of them. A sparse table may double-count, so two always suffice.
+
+### Which operations qualify
+
+Overlap is only safe for **idempotent** operations — ones where combining a value with itself changes nothing:
+
+| Operation | `f(x, x) == x`? | Sparse table? |
+|---|---|---|
+| min, max | yes | **yes, O(1)** |
+| gcd, bitwise AND, bitwise OR | yes | **yes, O(1)** |
+| **sum**, product, XOR | **no** | no — double-counting corrupts it |
+
+For a sum you would count the overlap twice. Use a prefix-sum array (O(1), static) or a Fenwick tree (O(log n), updatable) instead.
+
+### The other hard requirement: the array must be static
+
+There is no update operation. Changing one element can invalidate up to `log n` entries per level, so a rebuild costs O(n log n). If the data changes, use a segment tree.
+
+```text
+static + idempotent      →  sparse table:   build O(n log n), query O(1)
+static + any operation   →  prefix sums (if invertible)
+updates + any operation  →  segment tree:   build O(n),  query/update O(log n)
+updates + invertible     →  Fenwick tree:   smaller and simpler
+```
+
+### Steps
+
+```text
+Step 1 → table[0][i] = nums[i] for every i
+Step 2 → For k = 1 while 2^k <= n:
+Step 3 →     For each i with i + 2^k - 1 < n:
+Step 4 →         table[k][i] = min(table[k-1][i], table[k-1][i + 2^(k-1)])
+Step 5 → To query (l, r):
+Step 6 →     k = floor(log2(r - l + 1))
+Step 7 →     return min(table[k][l], table[k][r - 2^k + 1])
+```
+
+Precompute the logarithms in an array (`log[1] = 0`, `log[i] = log[i/2] + 1`) so the query needs no floating-point call.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "range minimum / maximum / gcd", many queries
+  the array is FIXED — no updates anywhere in the problem
+  a nested loop over all subarrays needing an extreme of each
+        ↓
+Think about...
+  "Is the operation idempotent? Then two overlapping blocks suffice."
+        ↓
+Use...
+  sparse table   → static + idempotent, O(1) queries
+  segment tree   → updates needed, or a non-idempotent operation
+  monotonic deque→ a single SLIDING window rather than arbitrary ranges
+```
 
 ### Visual explanation
 
@@ -106,65 +219,186 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Sparse Table      : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [5, 2, 8, 1, 9, 3]
+
+table[0]:  5   2   8   1   9   3          blocks of length 1
+table[1]:  2   2   1   1   3              blocks of length 2
+table[2]:  1   1   1                      blocks of length 4
+
+query(1, 4)   length 4, k = 2
+    = min( table[2][1], table[2][4 - 4 + 1] )
+    = min( table[2][1], table[2][1] )
+    = 1                                    ✓ min of {2, 8, 1, 9}
+
+query(0, 4)   length 5, k = 2
+    = min( table[2][0], table[2][1] )
+    = min( 1, 1 ) = 1
+      blocks [0..3] and [1..4] OVERLAP at 1,2,3 — harmless for min
 ```
 
 ### Interview explanation
-"This is a Sparse Table problem. I'll match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP. That brings the complexity down to Varies (often O(log n) per op) time and O(n) to O(n log n) space — here's the template."
+"The array is static and I have many range-minimum queries, so I'll build a sparse table. `table[k][i]` holds the minimum over the block of length `2^k` starting at `i`, and each level is built from the one below by combining two half-blocks — O(n log n) to build. A query takes the largest power of two that fits in the range and combines the block starting at `l` with the block *ending* at `r`. Those two cover the range and generally overlap, which is fine because `min` is idempotent: counting an element twice doesn't change the answer. That's what makes queries O(1) rather than O(log n) — a segment tree has to partition the range into disjoint pieces and needs `log n` of them. The two requirements are that the operation is idempotent, so sums are out, and that the array never changes, since there's no update operation."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Advanced** family template. Adapt the comparison/condition to the specific problem.
+> Build by doubling; query with two overlapping blocks. Idempotent operations only.
 
 ```go
-// Fenwick (Binary Indexed) Tree: prefix sums with point updates, O(log n).
-type Fenwick struct{ tree []int }
-func NewFenwick(n int) *Fenwick { return &Fenwick{make([]int, n+1)} }
-func (f *Fenwick) Update(i, delta int) {
-    for ; i < len(f.tree); i += i & (-i) { f.tree[i] += delta }
+// SparseTable answers range-minimum queries in O(1) on a STATIC array.
+// It relies on min being idempotent, which is what allows the two query
+// blocks to overlap.
+type SparseTable struct {
+    table [][]int // table[k][i] = min over [i, i + 2^k - 1]
+    logOf []int   // logOf[n] = floor(log2(n)), precomputed
 }
-func (f *Fenwick) Query(i int) int { // prefix sum [1..i]
-    s := 0
-    for ; i > 0; i -= i & (-i) { s += f.tree[i] }
-    return s
+
+func NewSparseTable(nums []int) *SparseTable {
+    n := len(nums)
+    if n == 0 {
+        return &SparseTable{}
+    }
+
+    // logOf[1] = 0, and each doubling adds one.
+    logOf := make([]int, n+1)
+    for i := 2; i <= n; i++ {
+        logOf[i] = logOf[i/2] + 1
+    }
+
+    levels := logOf[n] + 1
+    table := make([][]int, levels)
+    table[0] = append([]int(nil), nums...) // blocks of length 1
+
+    for k := 1; k < levels; k++ {
+        width := 1 << k
+        half := width >> 1
+        count := n - width + 1
+        table[k] = make([]int, count)
+
+        for i := 0; i < count; i++ {
+            // Combine the two halves of this block.
+            left, right := table[k-1][i], table[k-1][i+half]
+            if left < right {
+                table[k][i] = left
+            } else {
+                table[k][i] = right
+            }
+        }
+    }
+
+    return &SparseTable{table: table, logOf: logOf}
+}
+
+// Min returns the minimum over the inclusive range [l, r] in O(1).
+func (s *SparseTable) Min(l, r int) int {
+    k := s.logOf[r-l+1] // the largest power of two that fits
+
+    // The block starting at l and the block ENDING at r. They overlap
+    // unless the length is an exact power of two — harmless for min.
+    left := s.table[k][l]
+    right := s.table[k][r-(1<<k)+1]
+
+    if left < right {
+        return left
+    }
+    return right
 }
 ```
 
 ```python
-class Fenwick:
-    def __init__(self, n):
-        self.tree = [0] * (n + 1)
-    def update(self, i, delta):          # 1-indexed
-        while i < len(self.tree):
-            self.tree[i] += delta
-            i += i & (-i)
-    def query(self, i):                  # prefix sum [1..i]
-        s = 0
-        while i > 0:
-            s += self.tree[i]
-            i -= i & (-i)
-        return s
+class SparseTable:
+    """Range minimum in O(1) on a STATIC array. Requires an IDEMPOTENT
+    operation, because the two query blocks may overlap."""
+
+    def __init__(self, nums):
+        n = len(nums)
+        self.log_of = [0] * (n + 1)
+        for i in range(2, n + 1):
+            self.log_of[i] = self.log_of[i // 2] + 1
+
+        levels = self.log_of[n] + 1 if n else 1
+        self.table = [list(nums)]                   # blocks of length 1
+
+        for k in range(1, levels):
+            width, half = 1 << k, 1 << (k - 1)
+            row = [
+                min(self.table[k - 1][i], self.table[k - 1][i + half])
+                for i in range(n - width + 1)
+            ]
+            self.table.append(row)
+
+    def minimum(self, l, r):
+        """Minimum over the inclusive range [l, r], in O(1)."""
+        k = self.log_of[r - l + 1]          # largest power of two that fits
+        # Block starting at l, and block ENDING at r. Overlap is harmless.
+        return min(self.table[k][l], self.table[k][r - (1 << k) + 1])
 ```
 
 ```java
-class Fenwick {
-    long[] tree;
-    Fenwick(int n) { tree = new long[n + 1]; }
-    void update(int i, long d) { for (; i < tree.length; i += i & (-i)) tree[i] += d; }
-    long query(int i) { long s = 0; for (; i > 0; i -= i & (-i)) s += tree[i]; return s; }
+public class SparseTable {
+    private final int[][] table;    // table[k][i] = min over [i, i + 2^k - 1]
+    private final int[] logOf;
+
+    public SparseTable(int[] nums) {
+        int n = nums.length;
+        logOf = new int[n + 1];
+        for (int i = 2; i <= n; i++) logOf[i] = logOf[i / 2] + 1;
+
+        int levels = logOf[n] + 1;
+        table = new int[levels][];
+        table[0] = nums.clone();                    // blocks of length 1
+
+        for (int k = 1; k < levels; k++) {
+            int width = 1 << k, half = width >> 1, count = n - width + 1;
+            table[k] = new int[count];
+            for (int i = 0; i < count; i++)
+                table[k][i] = Math.min(table[k - 1][i], table[k - 1][i + half]);
+        }
+    }
+
+    // O(1): two blocks that cover [l, r] and may overlap.
+    public int min(int l, int r) {
+        int k = logOf[r - l + 1];
+        return Math.min(table[k][l], table[k][r - (1 << k) + 1]);
+    }
 }
 ```
 
 ```cpp
-struct Fenwick {
-    vector<long long> tree;
-    Fenwick(int n) : tree(n + 1, 0) {}
-    void update(int i, long long d) { for (; i < (int)tree.size(); i += i & (-i)) tree[i] += d; }
-    long long query(int i) { long long s = 0; for (; i > 0; i -= i & (-i)) s += tree[i]; return s; }
+#include <algorithm>
+#include <vector>
+using namespace std;
+
+// Range minimum in O(1) on a STATIC array; needs an idempotent operation.
+class SparseTable {
+    vector<vector<int>> table;      // table[k][i] = min over [i, i + 2^k - 1]
+    vector<int> logOf;
+
+public:
+    explicit SparseTable(const vector<int>& nums) {
+        int n = (int)nums.size();
+        logOf.assign(n + 1, 0);
+        for (int i = 2; i <= n; ++i) logOf[i] = logOf[i / 2] + 1;
+
+        int levels = n ? logOf[n] + 1 : 1;
+        table.assign(levels, {});
+        table[0] = nums;                            // blocks of length 1
+
+        for (int k = 1; k < levels; ++k) {
+            int width = 1 << k, half = width >> 1;
+            table[k].resize(n - width + 1);
+            for (int i = 0; i + width <= n; ++i)
+                table[k][i] = min(table[k - 1][i], table[k - 1][i + half]);
+        }
+    }
+
+    // Two blocks covering [l, r]; overlap is harmless for min.
+    int minimum(int l, int r) const {
+        int k = logOf[r - l + 1];
+        return min(table[k][l], table[k][r - (1 << k) + 1]);
+    }
 };
 ```
 
@@ -249,124 +483,443 @@ struct Fenwick {
 
 ## 9. Solved Example 1
 
-### Problem — Sliding Window Max (LeetCode 239)
-A representative **Sparse Table** problem. The signal: o(1) idempotent range queries (min/max/gcd) after o(n log n) build.
+### Problem — Sliding Window Maximum (LeetCode 239)
+Return the maximum of every window of size `k`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sparse table, range minimum, rmq, static, idempotent, binary lifting).
-2. Reach for the Sparse Table template below and map the problem's entities onto it.
-3. Match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP.
+1. Every window is a range query on a **static** array, so a sparse table answers each in O(1).
+2. Build a max table: `table[j][i]` is the maximum over `[i, i + 2^j − 1]`.
+3. Since all windows share the same length `k`, the level `j = floor(log2(k))` is fixed — computed once, reused for every window.
+4. Each window `[i, i+k−1]` is covered by the block starting at `i` and the block ending at `i+k−1`, which overlap unless `k` is a power of two. Harmless, because `max` is idempotent.
+5. Build O(n log n), then O(1) per window.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `nums = [1, 3, -1, -3, 5, 3, 6, 7]`, `k = 3`
+
+**The table** (only the levels we need):
+
+```text
+index  :   0   1   2   3   4   5   6   7
+level 0:   1   3  -1  -3   5   3   6   7        blocks of length 1
+level 1:   3   3  -1   5   5   6   7            blocks of length 2
+```
+
+For `k = 3`, `j = floor(log2 3) = 1`, so blocks of length 2.
+
+**Queries** — each window `[i, i+2]` becomes `max(level1[i], level1[i+1])`:
+
+| window | range | `level1[i]` | `level1[i+2−2+1] = level1[i+1]` | max | overlap |
+|--------|-------|-------------|----------------------------------|-----|---------|
+| `[1,3,-1]` | `[0,2]` | `3` (covers 0–1) | `3` (covers 1–2) | **3** | index 1 counted twice |
+| `[3,-1,-3]` | `[1,3]` | `3` (1–2) | `-1` (2–3) | **3** | index 2 twice |
+| `[-1,-3,5]` | `[2,4]` | `-1` (2–3) | `5` (3–4) | **5** | index 3 twice |
+| `[-3,5,3]` | `[3,5]` | `5` (3–4) | `5` (4–5) | **5** | index 4 twice |
+| `[5,3,6]` | `[4,6]` | `5` (4–5) | `6` (5–6) | **6** | index 5 twice |
+| `[3,6,7]` | `[5,7]` | `6` (5–6) | `7` (6–7) | **7** | index 6 twice |
+
+Output: **`[3, 3, 5, 5, 6, 7]`** ✓
+
+Every single query double-counted one element, and every answer is still correct — that is idempotence doing its job.
 
 ### Visualization
-```
-input  ──▶ [ apply Sparse Table step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums  :   1   3  -1  -3   5   3   6   7
+level1:  [3] [3] [-1] [5] [5] [6] [7]      blocks of length 2
+
+window [2, 4]  (length 3, so j = 1)
+
+   block starting at 2 : [-1, -3]  → -1
+   block ending   at 4 : [-3,  5]  →  5
+                  ↑↑
+              index 3 is in BOTH — harmless for max
+
+   answer = max(-1, 5) = 5   ✓
 ```
 
 ### Code
+
+```go
+func maxSlidingWindow(nums []int, k int) []int {
+    n := len(nums)
+    if n == 0 || k <= 0 {
+        return nil
+    }
+
+    // logOf[i] = floor(log2(i)), so the query needs no floating point.
+    logOf := make([]int, n+1)
+    for i := 2; i <= n; i++ {
+        logOf[i] = logOf[i/2] + 1
+    }
+
+    // table[j][i] = maximum over [i, i + 2^j - 1].
+    levels := logOf[n] + 1
+    table := make([][]int, levels)
+    table[0] = append([]int(nil), nums...)
+
+    for j := 1; j < levels; j++ {
+        width := 1 << j
+        half := width >> 1
+        table[j] = make([]int, n-width+1)
+        for i := 0; i+width <= n; i++ {
+            left, right := table[j-1][i], table[j-1][i+half]
+            if left > right {
+                table[j][i] = left
+            } else {
+                table[j][i] = right
+            }
+        }
+    }
+
+    // Every window has the same length, so the level is fixed.
+    j := logOf[k]
+    result := make([]int, 0, n-k+1)
+
+    for i := 0; i+k <= n; i++ {
+        // The block starting at i and the block ENDING at i+k-1.
+        // They overlap unless k is a power of two — fine, max is idempotent.
+        left := table[j][i]
+        right := table[j][i+k-(1<<j)]
+        if left > right {
+            result = append(result, left)
+        } else {
+            result = append(result, right)
+        }
+    }
+    return result
+}
+```
+
 ```python
-class Fenwick:
-    def __init__(self, n):
-        self.tree = [0] * (n + 1)
-    def update(self, i, delta):          # 1-indexed
-        while i < len(self.tree):
-            self.tree[i] += delta
-            i += i & (-i)
-    def query(self, i):                  # prefix sum [1..i]
-        s = 0
-        while i > 0:
-            s += self.tree[i]
-            i -= i & (-i)
-        return s
+def maxSlidingWindow(nums, k):
+    n = len(nums)
+    if n == 0 or k <= 0:
+        return []
+
+    log_of = [0] * (n + 1)
+    for i in range(2, n + 1):
+        log_of[i] = log_of[i // 2] + 1
+
+    # table[j][i] = maximum over [i, i + 2^j - 1]
+    table = [list(nums)]
+    for j in range(1, log_of[n] + 1):
+        width, half = 1 << j, 1 << (j - 1)
+        table.append([
+            max(table[j - 1][i], table[j - 1][i + half])
+            for i in range(n - width + 1)
+        ])
+
+    j = log_of[k]                       # every window has the same length
+    return [
+        max(table[j][i], table[j][i + k - (1 << j)])    # overlap is harmless
+        for i in range(n - k + 1)
+    ]
 ```
 
 ### Complexity
-Time Varies (often O(log n) per op), Space O(n) to O(n log n). Build cost amortized over many fast queries/updates.
+Build **O(n log n)** time and space; each of the `n − k + 1` queries is **O(1)**.
+
+> A monotonic deque solves this specific problem in **O(n)** time and O(k) space, which is strictly better *here* — see the Sliding Window Maximum chapter. The sparse table earns its place when the ranges are **arbitrary** rather than a fixed-width window sliding forward, which is exactly Examples 2 and 3.
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Closest Threshold (LeetCode 1521)
-A representative **Sparse Table** problem. The signal: o(1) idempotent range queries (min/max/gcd) after o(n log n) build.
+### Problem — Find a Value of a Mysterious Function Closest to Target (LeetCode 1521)
+The function is the **bitwise AND** of a subarray. Over all subarrays, minimise `|AND(l, r) − target|`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sparse table, range minimum, rmq, static, idempotent, binary lifting).
-2. Reach for the Sparse Table template below and map the problem's entities onto it.
-3. Match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP.
+1. Bitwise AND is idempotent (`x & x == x`), so a sparse table answers `AND(l, r)` in O(1).
+2. That alone gives an O(n²) sweep over all subarrays, which is fine for moderate `n`.
+3. The sharper observation: for a fixed left endpoint, extending right can only ever **clear** bits, never set them. So `AND(l, r)` is non-increasing in `r`, and it can change at most **30 times** (once per bit).
+4. So the set of distinct AND values ending at each position has at most ~30 members — keep them in a small set and roll it forward.
+5. That gives O(n · 30). The sparse table version is shown here because it demonstrates the pattern directly.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `arr = [9, 12, 3, 7, 15]`, `target = 5`
+
+**Distinct AND values by starting point:**
+
+| start `l` | AND as `r` extends | values produced |
+|-----------|---------------------|-----------------|
+| 0 | `9`, `9&12=8`, `8&3=0`, `0&7=0`, `0&15=0` | `9, 8, 0` |
+| 1 | `12`, `12&3=0`, `0`, `0` | `12, 0` |
+| 2 | `3`, `3&7=3`, `3&15=3` | `3` |
+| 3 | `7`, `7&15=7` | `7` |
+| 4 | `15` | `15` |
+
+**Distances from `target = 5`:**
+
+| value | 9 | 8 | 0 | 12 | 3 | 7 | 15 |
+|-------|---|---|---|----|---|---|----|
+| `\|v − 5\|` | 4 | 3 | 5 | 7 | **2** | **2** | 10 |
+
+Minimum: **2** ✓ — achieved by the subarray `[3]` (value 3) and by `[7]` or `[3,7]` (value 7).
+
+**Watch the monotone collapse.** Starting at `l = 0`, the AND went `9 → 8 → 0` and then stayed at `0` forever. Bits only ever turn off, so each starting point produces at most about 30 distinct values no matter how long the array is — which is what makes the linear-ish variant possible.
 
 ### Visualization
-```
-input  ──▶ [ apply Sparse Table step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+arr = [9, 12, 3, 7, 15]     target = 5
+
+l = 0:   9  →  8  →  0  →  0  →  0
+              bits only ever CLEAR, never set
+              so at most ~30 distinct values per start
+
+all distinct ANDs: {9, 8, 0, 12, 3, 7, 15}
+
+           |3 - 5| = 2      ★
+           |7 - 5| = 2      ★
 ```
 
 ### Code
+
+```go
+func closestToTarget(arr []int, target int) int {
+    n := len(arr)
+
+    logOf := make([]int, n+1)
+    for i := 2; i <= n; i++ {
+        logOf[i] = logOf[i/2] + 1
+    }
+
+    // table[j][i] = bitwise AND over [i, i + 2^j - 1].
+    // AND is idempotent, so overlapping query blocks are safe.
+    levels := logOf[n] + 1
+    table := make([][]int, levels)
+    table[0] = append([]int(nil), arr...)
+
+    for j := 1; j < levels; j++ {
+        width := 1 << j
+        half := width >> 1
+        table[j] = make([]int, n-width+1)
+        for i := 0; i+width <= n; i++ {
+            table[j][i] = table[j-1][i] & table[j-1][i+half]
+        }
+    }
+
+    rangeAnd := func(l, r int) int {
+        j := logOf[r-l+1]
+        return table[j][l] & table[j][r-(1<<j)+1]
+    }
+
+    best := math.MaxInt32
+    for l := 0; l < n; l++ {
+        for r := l; r < n; r++ {
+            value := rangeAnd(l, r)
+
+            difference := value - target
+            if difference < 0 {
+                difference = -difference
+            }
+            if difference < best {
+                best = difference
+            }
+
+            // AND only clears bits, so once it reaches 0 it stays 0 and
+            // no further r can improve this starting point.
+            if value == 0 {
+                break
+            }
+        }
+    }
+    return best
+}
+```
+
 ```python
-class Fenwick:
-    def __init__(self, n):
-        self.tree = [0] * (n + 1)
-    def update(self, i, delta):          # 1-indexed
-        while i < len(self.tree):
-            self.tree[i] += delta
-            i += i & (-i)
-    def query(self, i):                  # prefix sum [1..i]
-        s = 0
-        while i > 0:
-            s += self.tree[i]
-            i -= i & (-i)
-        return s
+def closestToTarget(arr, target):
+    """The linear-ish variant: for each position keep the small set of
+    distinct ANDs of subarrays ending there. Bits only clear, so the set
+    never exceeds about 30 members."""
+    best = float("inf")
+    ending_here = set()                 # distinct AND values ending at i
+
+    for value in arr:
+        # Extend every previous subarray by one, plus the singleton.
+        ending_here = {value} | {previous & value for previous in ending_here}
+        for candidate in ending_here:
+            best = min(best, abs(candidate - target))
+
+    return best
 ```
 
 ### Complexity
-Time Varies (often O(log n) per op), Space O(n) to O(n log n). Build cost amortized over many fast queries/updates.
+Sparse-table version: build **O(n log n)**, then O(n²) queries at O(1) each. The rolling-set version is **O(n · 30)** time and O(30) space, and is the one to reach for when `n` is large.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Subarray Ranges (LeetCode 2104)
-A representative **Sparse Table** problem. The signal: o(1) idempotent range queries (min/max/gcd) after o(n log n) build.
+### Problem — Sum of Subarray Ranges (LeetCode 2104)
+The *range* of a subarray is its maximum minus its minimum. Return the sum of the ranges of **all** subarrays.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (sparse table, range minimum, rmq, static, idempotent, binary lifting).
-2. Reach for the Sparse Table template below and map the problem's entities onto it.
-3. Match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP.
+1. There are `n(n+1)/2` subarrays, and each needs both a maximum and a minimum.
+2. Two sparse tables — one for max, one for min — answer each in O(1), so the whole sum is O(n²) instead of O(n³).
+3. Both operations are idempotent, so overlapping blocks are safe for both tables.
+4. Enumerate every `(l, r)` and add `max(l,r) − min(l,r)`.
+5. The array is static, which is exactly the sparse table's requirement.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `nums = [1, 2, 3]`
+
+**The two tables:**
+
+```text
+max level 0:  1   2   3          min level 0:  1   2   3
+max level 1:  2   3              min level 1:  1   2
+```
+
+**All six subarrays:**
+
+| `l` | `r` | subarray | max | min | range | running sum |
+|-----|-----|----------|-----|-----|-------|-------------|
+| 0 | 0 | `[1]` | 1 | 1 | 0 | 0 |
+| 0 | 1 | `[1,2]` | 2 | 1 | **1** | 1 |
+| 0 | 2 | `[1,2,3]` | 3 | 1 | **2** | 3 |
+| 1 | 1 | `[2]` | 2 | 2 | 0 | 3 |
+| 1 | 2 | `[2,3]` | 3 | 2 | **1** | **4** |
+| 2 | 2 | `[3]` | 3 | 3 | 0 | 4 |
+
+Output: **4** ✓
+
+**Check the overlap on `[0, 2]`** (length 3, so `j = 1`, blocks of length 2):
+
+```text
+max: max( level1[0], level1[2-2+1] ) = max( maxOf[1,2], maxOf[2,3] )
+                                     = max( 2, 3 ) = 3     index 1 counted twice
+min: min( level1[0], level1[1] )     = min( 1, 2 ) = 1
+range = 3 - 1 = 2   ✓
+```
+
+**A second case**, `nums = [1, 3, 3]`: subarrays give ranges `0, 0, 0, 2, 0, 2` → sum **4** ✓ — note `[3,3]` has range 0, and the duplicate values cause no trouble.
 
 ### Visualization
-```
-input  ──▶ [ apply Sparse Table step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums = [1, 2, 3]
+
+  subarray    max  min  range
+  [1]          1    1     0
+  [1,2]        2    1     1
+  [1,2,3]      3    1     2
+  [2]          2    2     0
+  [2,3]        3    2     1
+  [3]          3    3     0
+                       ─────
+                          4
+
+  two sparse tables (one max, one min) make every row O(1)
 ```
 
 ### Code
+
+```go
+func subArrayRanges(nums []int) int64 {
+    n := len(nums)
+    if n < 2 {
+        return 0
+    }
+
+    logOf := make([]int, n+1)
+    for i := 2; i <= n; i++ {
+        logOf[i] = logOf[i/2] + 1
+    }
+    levels := logOf[n] + 1
+
+    // Two tables: one for max, one for min. Both operations are
+    // idempotent, so overlapping query blocks are safe for both.
+    maxTable := make([][]int, levels)
+    minTable := make([][]int, levels)
+    maxTable[0] = append([]int(nil), nums...)
+    minTable[0] = append([]int(nil), nums...)
+
+    for j := 1; j < levels; j++ {
+        width := 1 << j
+        half := width >> 1
+        count := n - width + 1
+        maxTable[j] = make([]int, count)
+        minTable[j] = make([]int, count)
+
+        for i := 0; i < count; i++ {
+            a, b := maxTable[j-1][i], maxTable[j-1][i+half]
+            if a > b {
+                maxTable[j][i] = a
+            } else {
+                maxTable[j][i] = b
+            }
+
+            c, d := minTable[j-1][i], minTable[j-1][i+half]
+            if c < d {
+                minTable[j][i] = c
+            } else {
+                minTable[j][i] = d
+            }
+        }
+    }
+
+    var total int64
+    for l := 0; l < n; l++ {
+        for r := l; r < n; r++ {
+            j := logOf[r-l+1]
+            offset := r - (1 << j) + 1
+
+            high := maxTable[j][l]
+            if maxTable[j][offset] > high {
+                high = maxTable[j][offset]
+            }
+            low := minTable[j][l]
+            if minTable[j][offset] < low {
+                low = minTable[j][offset]
+            }
+
+            total += int64(high - low)
+        }
+    }
+    return total
+}
+```
+
 ```python
-class Fenwick:
-    def __init__(self, n):
-        self.tree = [0] * (n + 1)
-    def update(self, i, delta):          # 1-indexed
-        while i < len(self.tree):
-            self.tree[i] += delta
-            i += i & (-i)
-    def query(self, i):                  # prefix sum [1..i]
-        s = 0
-        while i > 0:
-            s += self.tree[i]
-            i -= i & (-i)
-        return s
+def subArrayRanges(nums):
+    n = len(nums)
+    if n < 2:
+        return 0
+
+    log_of = [0] * (n + 1)
+    for i in range(2, n + 1):
+        log_of[i] = log_of[i // 2] + 1
+
+    # Two tables: max and min. Both idempotent, so overlap is safe.
+    max_table, min_table = [list(nums)], [list(nums)]
+    for j in range(1, log_of[n] + 1):
+        width, half = 1 << j, 1 << (j - 1)
+        max_table.append([max(max_table[j - 1][i], max_table[j - 1][i + half])
+                          for i in range(n - width + 1)])
+        min_table.append([min(min_table[j - 1][i], min_table[j - 1][i + half])
+                          for i in range(n - width + 1)])
+
+    total = 0
+    for l in range(n):
+        for r in range(l, n):
+            j = log_of[r - l + 1]
+            offset = r - (1 << j) + 1
+            total += (max(max_table[j][l], max_table[j][offset])
+                      - min(min_table[j][l], min_table[j][offset]))
+    return total
 ```
 
 ### Complexity
-Time Varies (often O(log n) per op), Space O(n) to O(n log n). Build cost amortized over many fast queries/updates.
+Build **O(n log n)**; the double loop is **O(n²)** with O(1) per subarray. Space O(n log n).
 
+> There is an O(n) solution using monotonic stacks — count how many subarrays each element is the maximum of, and likewise the minimum. It is faster but much less obvious. The sparse table version is the one to write first, and it makes the *structure* of the problem visible.
+
+---
 
 ## 12. LeetCode Practice Set
 
