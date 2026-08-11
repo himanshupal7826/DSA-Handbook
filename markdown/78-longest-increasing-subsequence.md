@@ -152,6 +152,33 @@ Minimum deletions to
 
 The tell is *"pick a subset that stays ordered by two criteria at once"* — sort by one, LIS the other.
 
+### The thought process
+
+```text
+We need    : the longest increasing subsequence.
+Obvious way: enumerate all 2^n subsequences and test each.
+Too slow   : O(n x 2^n), and it re-derives the same facts endlessly.
+Notice     : the best run ENDING at a given index is a fixed number,
+             and there are only n such numbers.
+Therefore  : compute dp[i] = best run ending at i, left to right.
+Now        : O(n^2) — and a patience-sorting refinement gives O(n log n).
+```
+
+### Steps
+
+```text
+Step 1 → dp[i] = 1 for every i (a lone element is a run of length 1).
+Step 2 → For i = 1 .. n-1:
+Step 3 →     For each j < i with nums[j] < nums[i]:
+Step 4 →         dp[i] = max(dp[i], dp[j] + 1)
+Step 5 → Return max(dp) — NOT dp[n-1].
+
+O(n log n) refinement:
+Step 6 → keep `tails`, where tails[k] is the smallest tail of a run of
+          length k+1; binary search each value with a LOWER bound and
+          either append it or replace the tail it lands on.
+```
+
 ### How should I recognize this?
 
 ```text

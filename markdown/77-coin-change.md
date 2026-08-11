@@ -151,6 +151,30 @@ optimal: 3 + 3           = 2 coins
 
 Greedy happens to be correct for real-world currency systems, which are designed to make it so. It is not correct in general, and DP is.
 
+### The thought process
+
+```text
+We need    : the fewest coins (or the number of ways) to reach an amount.
+Obvious way: recurse over every coin at every step.
+Too slow   : exponential, and the same amount is re-solved constantly.
+Notice     : there are only `amount + 1` distinct subproblems in the
+             entire recursion tree.
+Therefore  : compute each one once, in increasing order, and store it.
+Now        : O(amount x coins).
+```
+
+### Steps
+
+```text
+Step 1 → dp[0] = the base value (0 coins, or 1 way).
+Step 2 → Fill i = 1 .. amount in INCREASING order, so every dp[i - coin]
+          is already final.
+Step 3 → minimising: dp[i] = min over coins c <= i of dp[i-c] + 1
+Step 4 → counting  : dp[i] += dp[i-c], with the loop order deciding
+          whether combinations or permutations are counted.
+Step 5 → Read the answer off dp[amount].
+```
+
 ### How should I recognize this?
 
 ```text

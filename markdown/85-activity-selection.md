@@ -71,6 +71,19 @@ One sentence:
 
 The rule is trivial to state. This chapter is about **why it is optimal**, and about recognising the cases where it stops being optimal.
 
+### The thought process
+
+```text
+We need    : the largest set of non-conflicting activities.
+Obvious way: try every subset.
+Hopeless   : O(2^n).
+Notice     : once an activity is chosen, only its FINISH time constrains
+             what can follow. Its start time is history.
+Therefore  : always take the activity that finishes earliest.
+Now        : O(n log n), dominated by the sort — and provably optimal,
+             by the exchange argument below.
+```
+
 ### The two conditions every greedy needs
 
 A greedy algorithm is correct only if both hold. Naming them turns "does greedy work here?" from a guess into a check.

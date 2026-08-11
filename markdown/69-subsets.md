@@ -165,6 +165,19 @@ if i > start && nums[i] == nums[i-1] {
 
 `i > start`, not `i > 0`. The **first** candidate at each level is always allowed; only *repeats within the same loop* are skipped. Using `i > 0` would suppress legitimate uses of a value deeper in the tree.
 
+### Steps
+
+```text
+Step 1 → result = [], path = []
+Step 2 → define backtrack(start):
+Step 3 →     record a COPY of path        ← every node is a valid subset
+Step 4 →     for i = start .. n-1:
+Step 5 →         (duplicates? skip if i > start and nums[i] == nums[i-1])
+Step 6 →         append nums[i] to path            ← choose
+Step 7 →         backtrack(i + 1)                  ← explore
+Step 8 →         remove the last element           ← un-choose
+```
+
 ### How should I recognize this?
 
 ```text

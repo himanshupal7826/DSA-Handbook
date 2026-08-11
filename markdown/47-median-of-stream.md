@@ -156,6 +156,21 @@ Both exploit a constraint that makes the heaps unnecessary:
 | 99% of values in 0–100, rare outliers | counting array for the bulk, plus two small lists for the tails | keeps the common case O(1) |
 | Values arrive sorted | a plain array with an index | the median is a direct lookup |
 
+### Steps
+
+```text
+Step 1 → low = max-heap (small half), high = min-heap (large half)
+Step 2 → Insert:
+Step 3 →     push onto low
+Step 4 →     move low's top to high        ← repairs the ORDER invariant
+Step 5 →     if high is bigger, move its top back   ← repairs SIZE
+Step 6 → Median:
+Step 7 →     odd count  → low's top
+Step 8 →     even count → (low.top + high.top) / 2
+Step 9 → Sliding window: mark expired values in `pending`, track the
+          logical sizes yourself, and prune before reading any top.
+```
+
 ### How should I recognize this?
 
 ```text

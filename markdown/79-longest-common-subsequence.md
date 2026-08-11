@@ -151,6 +151,32 @@ O(m × n) space  →  O(min(m, n)) space
 
 Do this only when asked. The full table is what lets you **reconstruct** the actual subsequence or edit script by walking backwards from the corner, and that is usually the more valuable follow-up.
 
+### The thought process
+
+```text
+We need    : how similar two sequences are.
+Obvious way: enumerate every subsequence of one and test it against the other.
+Too slow   : O(2^m x n), and shared prefixes are recomputed endlessly.
+Notice     : while walking both strings, all that matters is HOW MUCH of
+             each remains — only m x n distinct pairs of positions exist.
+Therefore  : fill a table indexed by those two positions.
+Now        : O(m x n).
+```
+
+### Steps
+
+```text
+Step 1 → Allocate dp with (m+1) x (n+1) cells; the extra row and column
+          stand for the EMPTY prefix.
+Step 2 → Fill the base row and column (zeros for LCS, i and j for edit
+          distance).
+Step 3 → For i = 1 .. m, for j = 1 .. n:
+Step 4 →     if a[i-1] == b[j-1]:  take the DIAGONAL
+Step 5 →     else:                 combine the neighbours (max for LCS,
+                                    1 + min for edit distance)
+Step 6 → Read the answer off dp[m][n].
+```
+
 ### How should I recognize this?
 
 ```text

@@ -158,6 +158,20 @@ remaining <  0  →  overshot; but with sorted input and the break above,
 
 Passing `remaining` down beats recomputing the sum at each node — O(1) instead of O(k) per call.
 
+### Steps
+
+```text
+Step 1 → Sort the candidates (enables both the break and the dedup skip).
+Step 2 → define backtrack(start, remaining):
+Step 3 →     if remaining == 0: record a COPY; return
+Step 4 →     for i = start .. n-1:
+Step 5 →         if candidates[i] > remaining: break     ← sorted, so stop
+Step 6 →         if i > start and candidates[i] == candidates[i-1]: continue
+Step 7 →         append candidates[i]                    ← choose
+Step 8 →         backtrack(i or i+1, remaining - candidates[i])  ← reuse?
+Step 9 →         remove the last element                 ← un-choose
+```
+
 ### How should I recognize this?
 
 ```text

@@ -155,6 +155,19 @@ Two standard fixes:
 - **Lazy deletion** — keep a map of values pending removal; discard them when they surface at a top. Sizes must be tracked separately from `heap.Len()`.
 - **Balanced BST / ordered multiset** — supports arbitrary removal directly (`SortedList` in Python, `multiset` in C++).
 
+### Steps
+
+```text
+Step 1 → Create the two heaps: low (max-heap), high (min-heap).
+Step 2 → To insert a value:
+Step 3 →     push it onto `low`
+Step 4 →     move low's top across to `high`     ← repairs the ORDER invariant
+Step 5 →     if high is now larger, move its top back to low  ← repairs SIZE
+Step 6 → To read the median:
+Step 7 →     len(low) > len(high)  → low's top
+Step 8 →     otherwise             → the average of the two tops
+```
+
 ### How should I recognize this?
 
 ```text

@@ -149,6 +149,20 @@ Recursion *is* a stack; the compiler manages it. Write it recursively first.
 
 Use an explicit stack when the tree could be deep enough to overflow — a degenerate tree of 10⁵ nodes is a linked list, and many languages blow the stack around that depth. The iterative preorder is easy (push right, then left). Iterative inorder and postorder are noticeably fiddlier, which is exactly why the recursive version is the one to reach for by default.
 
+### Steps
+
+```text
+Step 1 → Decide the BASE CASE: what does an empty subtree return?
+Step 2 → Decide the COMBINE step: how do the two child answers make mine?
+Step 3 → Write it:
+Step 4 →     if node is nil: return the base value
+Step 5 →     left  = recurse(node.Left)
+Step 6 →     right = recurse(node.Right)
+Step 7 →     return combine(left, right, node)
+Step 8 → For a traversal, move the "visit" line before / between / after
+          the two recursive calls to get pre / in / post order.
+```
+
 ### How should I recognize this?
 
 ```text
