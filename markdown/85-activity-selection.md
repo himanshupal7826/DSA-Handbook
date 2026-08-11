@@ -41,32 +41,132 @@ activity selection, greedy, earliest finish, intervals, scheduling.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Which activities can I fit in, given they compete for the same resource?"*
+
 ### Intuition
-Try all orderings/choices (often exponential) to find the optimum.
+Try every subset of activities and keep the largest conflict-free one.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Enumerate all `2ⁿ` subsets.
+2. For each, check every pair for overlap.
+3. Keep the largest that passes.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(2ⁿ · n²)**.
+- Space: O(n).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Activity Selection pattern is built to use.
+- Unusable past about 20 activities.
+- More importantly, it treats the problem as *search* when it is really *decision*. There is a rule that picks the right activity every single time — the interesting question is not how to search faster, but **why that rule is provably correct**.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Activity Selection invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Repeatedly take the activity that finishes earliest among those still compatible — finishing early leaves the most room for everything after it.**
+
+The rule is trivial to state. This chapter is about **why it is optimal**, and about recognising the cases where it stops being optimal.
+
+### The two conditions every greedy needs
+
+A greedy algorithm is correct only if both hold. Naming them turns "does greedy work here?" from a guess into a check.
+
+**1. Greedy-choice property** — *some* optimal solution contains the greedy first choice.
+
+**2. Optimal substructure** — after committing to that choice, the remaining problem is the same problem on a smaller input, and solving it optimally gives an overall optimum.
+
+Activity selection has both. Most greedy failures come from the first one failing.
+
+### Proving the greedy choice: the exchange argument
+
+This is a reusable template, not a one-off trick. Learn the shape and you can apply it to any greedy proof.
+
+```text
+1. Let g be the greedy choice (here: the activity finishing earliest).
+2. Let S be ANY optimal solution.
+3. If g is in S, we are done.
+4. Otherwise, let f be the activity in S that finishes earliest.
+5. Show that swapping f for g keeps S valid and the same size.
+6. Conclude S' = S - {f} + {g} is also optimal, so an optimal
+   solution containing the greedy choice exists.
+```
+
+**Step 5 for this problem.** Every other activity in `S` starts at or after `f` ends. Since `g` finishes no later than `f` (it finishes earliest of all), everything in `S` also starts at or after `g` ends. So swapping introduces no conflict, and `|S'| = |S|`.
+
+The sentence that carries the whole argument:
+
+> **Once an activity is chosen, only its finish time constrains the future. Its start time is history.**
+
+Minimising the finish time therefore maximises the room left over.
+
+### Why the tempting alternatives fail
+
+Both wrong answers have small counterexamples worth memorising:
+
+```text
+EARLIEST START:   [0,10]  [1,2]  [3,4]
+                  picking [0,10] first blocks both others → 1
+                  optimum is 2
+
+SHORTEST FIRST:   [0,5]  [4,6]  [5,10]
+                  the shortest is [4,6]; it blocks BOTH others → 1
+                  optimum is 2  ([0,5] and [5,10])
+```
+
+Each fails the greedy-choice property: no optimal solution need contain their first pick.
+
+### Where greedy genuinely breaks: weights
+
+Add a value to each activity and ask for maximum **total value** rather than maximum count. The exchange argument collapses immediately — swapping `f` for `g` preserves the *size* of the solution but not its *value*.
+
+```text
+[0,10] worth 100
+[0,3]  worth 1      earliest-end greedy takes [0,3], [4,6], [7,9]
+[4,6]  worth 1      → total value 3
+[7,9]  worth 1      optimum is [0,10] alone → value 100
+```
+
+**Weighted interval scheduling needs DP**, not greedy: sort by finish time, and for each interval choose between taking it (plus the best solution ending before it starts, found by binary search) and skipping it. That is O(n log n) and is the standard follow-up to this problem.
+
+| Problem | Correct approach |
+|---|---|
+| Maximum **count** of non-overlapping | greedy by earliest finish — O(n log n) |
+| Maximum **total weight** | DP over sorted intervals + binary search — O(n log n) |
+| Minimum resources for **all** activities | different question — min-heap of end times |
+
+### Steps
+
+```text
+Step 1 → Sort activities by FINISH time, ascending.
+Step 2 → count = 0, lastFinish = -infinity
+Step 3 → For each activity in that order:
+Step 4 →     if activity.start >= lastFinish:
+Step 5 →         count++;  lastFinish = activity.finish
+Step 6 → Return count (or n - count if asked for removals).
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "maximum number of activities / meetings / jobs without overlap"
+  "minimum removals to eliminate overlaps"
+  "minimum arrows / taps / points to cover every interval"
+  each item has a start and an end, competing for one resource
+        ↓
+Think about...
+  "Does the greedy-choice property hold — is there an optimal
+   solution containing the earliest-finishing item?"
+  "Are the items WEIGHTED? If so, greedy is wrong — use DP."
+        ↓
+Use...
+  unweighted count → sort by FINISH, sweep, take whatever fits
+  weighted value   → sort by finish, DP with binary search
+```
 
 ### Visual explanation
 
@@ -93,64 +193,253 @@ When a greedy choice provably never hurts, a single sorted pass yields the optim
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Activity Selection: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+activities:  [1,2]  [2,3]  [3,4]  [1,3]
+
+sorted by FINISH:   [1,2]   [2,3]   [1,3]   [3,4]
+                    end 2   end 3   end 3   end 4
+
+take [1,2]              lastFinish = 2
+[2,3]:  2 >= 2  ✓       take, lastFinish = 3
+[1,3]:  1 <  3  ✗       skip — starts before the last one finished
+[3,4]:  3 >= 3  ✓       take, lastFinish = 4
+
+kept 3 of 4
+
+  1──2
+     2──3
+        3──4
+  1─────3       ← conflicts with both of the first two
 ```
 
 ### Interview explanation
-"This is a Activity Selection problem. I'll when a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n). That brings the complexity down to O(n log n) time and O(1) space — here's the template."
+"The rule is to sort by finish time and greedily take every activity that starts at or after the last one I took. What makes it correct is an exchange argument: take any optimal solution and look at the activity in it that finishes earliest. The globally-earliest-finishing activity finishes no later, so swapping it in cannot introduce a conflict — everything else in that solution already starts after an even later time. The solution stays valid and the same size, so an optimal solution containing the greedy choice exists. The intuition behind it is that once an activity is committed, only its finish time constrains what follows; its start is history. Sorting by start or by duration both fail on small counterexamples. And I'd flag the boundary: if the activities carry **weights** and I need maximum total value, greedy breaks — one long high-value interval can beat three short ones — so that variant needs DP over intervals sorted by finish, with binary search for the last compatible one."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Greedy** family template. Adapt the comparison/condition to the specific problem.
+> Sort by finish, sweep once. If the activities are weighted, switch to DP.
 
 ```go
-// Maximum non-overlapping intervals: greedy by earliest finish time.
-func maxNonOverlap(intervals [][]int) int {
-    sort.Slice(intervals, func(i, j int) bool { return intervals[i][1] < intervals[j][1] })
-    count, end := 0, math.MinInt
-    for _, in := range intervals {
-        if in[0] >= end {       // compatible with last chosen
+// MaxActivities returns the largest number of mutually non-overlapping
+// activities. Touching activities are compatible.
+func MaxActivities(intervals [][]int) int {
+    if len(intervals) == 0 {
+        return 0
+    }
+
+    // Earliest FINISH first — the whole correctness argument rests here.
+    sort.Slice(intervals, func(a, b int) bool {
+        return intervals[a][1] < intervals[b][1]
+    })
+
+    count := 0
+    lastFinish := math.MinInt32
+    for _, activity := range intervals {
+        if activity[0] >= lastFinish { // starts after the last one finished
             count++
-            end = in[1]
+            lastFinish = activity[1]
         }
     }
     return count
 }
+
+// SelectedActivities returns the chosen activities, not just how many.
+func SelectedActivities(intervals [][]int) [][]int {
+    if len(intervals) == 0 {
+        return nil
+    }
+    sort.Slice(intervals, func(a, b int) bool {
+        return intervals[a][1] < intervals[b][1]
+    })
+
+    chosen := [][]int{}
+    lastFinish := math.MinInt32
+    for _, activity := range intervals {
+        if activity[0] >= lastFinish {
+            chosen = append(chosen, activity)
+            lastFinish = activity[1]
+        }
+    }
+    return chosen
+}
+
+// MaxWeightedActivities is the DP for the WEIGHTED variant, where greedy
+// is provably wrong. intervals[i] = {start, finish, weight}.
+func MaxWeightedActivities(intervals [][]int) int {
+    n := len(intervals)
+    if n == 0 {
+        return 0
+    }
+
+    sort.Slice(intervals, func(a, b int) bool {
+        return intervals[a][1] < intervals[b][1]
+    })
+
+    finishes := make([]int, n)
+    for i := range intervals {
+        finishes[i] = intervals[i][1]
+    }
+
+    // best[i] = the maximum weight using only the first i intervals.
+    best := make([]int, n+1)
+    for i := 1; i <= n; i++ {
+        start, weight := intervals[i-1][0], intervals[i-1][2]
+
+        // Binary search the last interval that finishes at or before `start`.
+        compatible := sort.SearchInts(finishes[:i-1], start+1)
+
+        take := best[compatible] + weight
+        skip := best[i-1]
+        if take > skip {
+            best[i] = take
+        } else {
+            best[i] = skip
+        }
+    }
+    return best[n]
+}
 ```
 
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
+def max_activities(intervals):
+    """Largest set of mutually non-overlapping activities."""
+    if not intervals:
+        return 0
+    intervals.sort(key=lambda iv: iv[1])        # earliest FINISH first
+
+    count, last_finish = 0, float("-inf")
+    for start, finish in intervals:
+        if start >= last_finish:                # starts after the last finished
             count += 1
-            end = e
+            last_finish = finish
     return count
+
+def selected_activities(intervals):
+    """The chosen activities, not just how many."""
+    if not intervals:
+        return []
+    intervals.sort(key=lambda iv: iv[1])
+
+    chosen, last_finish = [], float("-inf")
+    for activity in intervals:
+        if activity[0] >= last_finish:
+            chosen.append(activity)
+            last_finish = activity[1]
+    return chosen
+
+def max_weighted_activities(intervals):
+    """WEIGHTED variant, where greedy is provably wrong.
+    intervals[i] = (start, finish, weight)."""
+    from bisect import bisect_right
+    if not intervals:
+        return 0
+    intervals.sort(key=lambda iv: iv[1])
+    finishes = [iv[1] for iv in intervals]
+
+    best = [0] * (len(intervals) + 1)
+    for i in range(1, len(intervals) + 1):
+        start, _, weight = intervals[i - 1]
+        # Last interval finishing at or before `start`.
+        compatible = bisect_right(finishes, start, 0, i - 1)
+        best[i] = max(best[i - 1], best[compatible] + weight)
+    return best[len(intervals)]
 ```
 
 ```java
-int maxNonOverlap(int[][] intervals) {
-    Arrays.sort(intervals, (a, b) -> Integer.compare(a[1], b[1]));
-    int count = 0, end = Integer.MIN_VALUE;
-    for (int[] in : intervals)
-        if (in[0] >= end) { count++; end = in[1]; }
-    return count;
+import java.util.*;
+
+public class ActivitySelection {
+    // Unweighted: greedy by earliest finish.
+    public static int maxActivities(int[][] intervals) {
+        if (intervals.length == 0) return 0;
+        Arrays.sort(intervals, (a, b) -> Integer.compare(a[1], b[1]));
+
+        int count = 0;
+        long lastFinish = Long.MIN_VALUE;
+        for (int[] activity : intervals) {
+            if (activity[0] >= lastFinish) {
+                count++;
+                lastFinish = activity[1];
+            }
+        }
+        return count;
+    }
+
+    // Weighted: greedy is WRONG here, so use DP + binary search.
+    public static int maxWeightedActivities(int[][] intervals) {
+        int n = intervals.length;
+        if (n == 0) return 0;
+        Arrays.sort(intervals, (a, b) -> Integer.compare(a[1], b[1]));
+
+        int[] finishes = new int[n];
+        for (int i = 0; i < n; i++) finishes[i] = intervals[i][1];
+
+        int[] best = new int[n + 1];
+        for (int i = 1; i <= n; i++) {
+            int start = intervals[i - 1][0], weight = intervals[i - 1][2];
+            int compatible = upperBound(finishes, i - 1, start);
+            best[i] = Math.max(best[i - 1], best[compatible] + weight);
+        }
+        return best[n];
+    }
+
+    // First index in [0, size) whose finish is > target.
+    private static int upperBound(int[] finishes, int size, int target) {
+        int lo = 0, hi = size;
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;
+            if (finishes[mid] <= target) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
+    }
 }
 ```
 
 ```cpp
-int maxNonOverlap(vector<vector<int>>& intervals) {
+#include <algorithm>
+#include <climits>
+#include <vector>
+using namespace std;
+
+// Unweighted: greedy by earliest finish.
+int maxActivities(vector<vector<int>> intervals) {
+    if (intervals.empty()) return 0;
     sort(intervals.begin(), intervals.end(),
-         [](auto& a, auto& b){ return a[1] < b[1]; });
-    int count = 0, end = INT_MIN;
-    for (auto& in : intervals)
-        if (in[0] >= end) { count++; end = in[1]; }
+         [](const vector<int>& a, const vector<int>& b) { return a[1] < b[1]; });
+
+    int count = 0;
+    long long lastFinish = LLONG_MIN;
+    for (const auto& activity : intervals) {
+        if (activity[0] >= lastFinish) {
+            ++count;
+            lastFinish = activity[1];
+        }
+    }
     return count;
+}
+
+// Weighted: greedy is WRONG, so use DP + binary search.
+int maxWeightedActivities(vector<vector<int>> intervals) {
+    int n = (int)intervals.size();
+    if (n == 0) return 0;
+    sort(intervals.begin(), intervals.end(),
+         [](const vector<int>& a, const vector<int>& b) { return a[1] < b[1]; });
+
+    vector<int> finishes(n);
+    for (int i = 0; i < n; ++i) finishes[i] = intervals[i][1];
+
+    vector<int> best(n + 1, 0);
+    for (int i = 1; i <= n; ++i) {
+        int start = intervals[i - 1][0], weight = intervals[i - 1][2];
+        int compatible = int(upper_bound(finishes.begin(),
+                                         finishes.begin() + (i - 1), start)
+                             - finishes.begin());
+        best[i] = max(best[i - 1], best[compatible] + weight);
+    }
+    return best[n];
 }
 ```
 
@@ -235,115 +524,354 @@ int maxNonOverlap(vector<vector<int>>& intervals) {
 
 ## 9. Solved Example 1
 
-### Problem — Non-overlapping (LeetCode 435)
-Given intervals, return the minimum number to remove so the rest are non-overlapping.
+### Problem — Non-overlapping Intervals (LeetCode 435)
+Return the minimum number of intervals to remove so that the rest do not overlap.
 
 ### Thought Process
-1. Keeping the most intervals is equivalent to removing the fewest — classic activity selection.
-2. Sort by end time and greedily keep an interval whenever its start is at or after the last kept end.
-3. The answer is the total minus the number kept, since every un-kept interval must be erased.
+1. Removing the fewest is keeping the most, so solve the activity-selection problem and subtract: `answer = n − kept`.
+2. Sort by **finish** time, then take greedily.
+3. Touching is allowed here — `[1,2]` and `[2,3]` do not overlap — so the test is `start >= lastFinish`.
+4. The correctness rests on the exchange argument, worked through below.
+5. O(n log n) for the sort, O(n) for the sweep.
 
 ### Dry Run
-intervals = [[1,2],[2,3],[3,4],[1,3]] → sort by end: [1,2],[2,3],[1,3],[3,4]
-keep [1,2] end=2; [2,3] start 2>=2 keep end=3; [1,3] start 1<3 drop; [3,4] start 3>=3 keep.
-kept=3, removed = 4 - 3 = 1.
+
+Input: `intervals = [[1,2], [2,3], [3,4], [1,3]]`
+
+**Sorted by finish:** `[1,2]` (2), `[2,3]` (3), `[1,3]` (3), `[3,4]` (4)
+
+| interval | start | `start >= lastFinish`? | action | lastFinish | kept |
+|----------|-------|------------------------|--------|------------|------|
+| `[1,2]` | 1 | `1 >= −∞` yes | keep | 2 | 1 |
+| `[2,3]` | 2 | `2 >= 2` yes (touching is fine) | keep | 3 | 2 |
+| `[1,3]` | 1 | `1 >= 3` **no** | skip | 3 | 2 |
+| `[3,4]` | 3 | `3 >= 3` yes | keep | 4 | **3** |
+
+Kept 3 of 4 → removals = `4 − 3` = **1**
+
+Output: **1** ✓ — dropping `[1,3]` leaves three pairwise non-overlapping intervals.
+
+**The exchange argument on this input.** Suppose some optimal solution does *not* contain `[1,2]`, the earliest-finishing interval. Let `f` be its earliest-finishing member — say `[2,3]`. Every other interval in that solution starts at or after `3`. Since `[1,2]` finishes at `2 ≤ 3`, swapping it in for `[2,3]` keeps every remaining interval compatible, and the count is unchanged. So an optimal solution containing `[1,2]` exists — which is exactly what licenses the greedy to commit to it.
 
 ### Visualization
-```
-input  ──▶ [ apply Activity Selection step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+  1──2
+     2──3
+        3──4
+  1─────3          ← starts at 1, before lastFinish 3 → skipped
+
+kept: [1,2] [2,3] [3,4]        removed: 1
 ```
 
 ### Code
+
+```go
+func eraseOverlapIntervals(intervals [][]int) int {
+    if len(intervals) == 0 {
+        return 0
+    }
+
+    // Earliest FINISH first: this ordering is what the exchange
+    // argument justifies.
+    sort.Slice(intervals, func(a, b int) bool {
+        return intervals[a][1] < intervals[b][1]
+    })
+
+    kept := 0
+    lastFinish := math.MinInt32
+    for _, interval := range intervals {
+        // >= : touching intervals do not overlap in this problem.
+        if interval[0] >= lastFinish {
+            kept++
+            lastFinish = interval[1]
+        }
+    }
+
+    return len(intervals) - kept
+}
+```
+
 ```python
 def eraseOverlapIntervals(intervals):
-    intervals.sort(key=lambda x: x[1])       # earliest finish first
-    kept, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                          # compatible, keep it
+    if not intervals:
+        return 0
+    intervals.sort(key=lambda iv: iv[1])        # earliest FINISH first
+
+    kept, last_finish = 0, float("-inf")
+    for start, finish in intervals:
+        if start >= last_finish:                # >= : touching is fine
             kept += 1
-            end = e
+            last_finish = finish
     return len(intervals) - kept
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
+Time **O(n log n)** — the sort dominates. Space O(1) beyond the sort.
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Min Arrows (LeetCode 452)
-Given balloons as [start,end] intervals, find the minimum arrows needed to burst them all.
+### Problem — Minimum Number of Arrows to Burst Balloons (LeetCode 452)
+Each balloon spans `[start, end]`. An arrow at `x` bursts every balloon with `start <= x <= end`. Return the minimum number of arrows.
 
 ### Thought Process
-1. An arrow at position x bursts every balloon covering x — picking piercing points is the dual of activity selection.
-2. Sort by end and shoot an arrow at the first balloon's end, bursting all balloons that overlap it.
-3. Only when a later balloon starts after the current arrow do we need a fresh arrow.
+1. This is the same greedy read as a **covering** problem rather than a selection one — the dual formulation.
+2. Each arrow serves one group of mutually overlapping balloons, so the arrow count equals the group count.
+3. Sort by end. Fire the first arrow at the **earliest end** — the furthest right you can shoot while still bursting that balloon, which maximises what else it catches.
+4. Skip every balloon already burst (`start <= arrowPosition`); the first one that isn't needs a new arrow at *its* end.
+5. Here touching **does** count as overlapping — a balloon starting exactly at the arrow is burst — so the comparison is `<=`.
 
 ### Dry Run
-points = [[10,16],[2,8],[1,6],[7,12]] → sort by end: [1,6],[2,8],[7,12],[10,16]
-arrow at 6 bursts [1,6],[2,8]; [7,12] start 7>6 → new arrow at 12 bursts [7,12],[10,16].
-arrows = 2.
+
+Input: `points = [[10,16], [2,8], [1,6], [7,12]]`
+
+**Sorted by end:** `[1,6]` (6), `[2,8]` (8), `[7,12]` (12), `[10,16]` (16)
+
+| balloon | start | `start <= arrowPosition`? | action | arrowPosition | arrows |
+|---------|-------|---------------------------|--------|---------------|--------|
+| `[1,6]` | 1 | — (first) | shoot at its end | **6** | 1 |
+| `[2,8]` | 2 | `2 <= 6` yes | already burst → skip | 6 | 1 |
+| `[7,12]` | 7 | `7 <= 6` **no** | new arrow at its end | **12** | **2** |
+| `[10,16]` | 10 | `10 <= 12` yes | already burst → skip | 12 | 2 |
+
+Output: **2** ✓ — an arrow at `x = 6` bursts `[1,6]` and `[2,8]`; one at `x = 12` bursts `[7,12]` and `[10,16]`.
+
+**Why shoot at the end and not the start?** Shooting `[1,6]` at `x = 1` bursts only that balloon. Shooting at `x = 6` is the rightmost position that still bursts it, so it sweeps up every balloon whose range reaches back that far. This is the same "finishing early leaves the most room" intuition, mirrored: *committing as late as still permitted* catches the most.
 
 ### Visualization
-```
-input  ──▶ [ apply Activity Selection step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+      1────────6
+        2────────8
+              7──────────12
+                 10──────────16
+
+arrow ↑ at 6            ↑ at 12
+      bursts 2          bursts 2
+
+selection view: how many groups?    covering view: how many arrows?
+                    same answer — the two are duals
 ```
 
 ### Code
+
+```go
+func findMinArrowShots(points [][]int) int {
+    if len(points) == 0 {
+        return 0
+    }
+
+    // Earliest end first: shooting at the end catches the most balloons.
+    sort.Slice(points, func(a, b int) bool {
+        return points[a][1] < points[b][1]
+    })
+
+    arrows := 1
+    arrowPosition := points[0][1] // fire at the first balloon's end
+
+    for _, balloon := range points[1:] {
+        // <= : a balloon starting exactly at the arrow is still burst.
+        if balloon[0] > arrowPosition {
+            arrows++
+            arrowPosition = balloon[1] // a new arrow, at this balloon's end
+        }
+    }
+    return arrows
+}
+```
+
 ```python
 def findMinArrowShots(points):
-    points.sort(key=lambda x: x[1])          # earliest end first
-    arrows, arrow = 0, float('-inf')
-    for s, e in points:
-        if s > arrow:                         # current arrow misses it
+    if not points:
+        return 0
+    points.sort(key=lambda p: p[1])             # earliest END first
+
+    arrows = 1
+    arrow_position = points[0][1]               # fire at the first end
+
+    for start, end in points[1:]:
+        if start > arrow_position:              # not covered by the current arrow
             arrows += 1
-            arrow = e                         # shoot at this balloon's end
+            arrow_position = end
     return arrows
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
+Time **O(n log n)**, Space O(1) beyond the sort.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Max Chain (LeetCode 646)
-Given pairs [a,b], pair (c,d) can follow (a,b) when b < c. Find the longest chain length.
+### Problem — Maximum Length of Pair Chain (LeetCode 646)
+Pair `(a, b)` can follow `(c, d)` only when `b < c` — **strictly**. Return the longest chain.
 
 ### Thought Process
-1. Building the longest chain mirrors selecting the most non-overlapping activities.
-2. Sort by the second element; greedily extend the chain when the next pair's first exceeds the last chosen second.
-3. The earliest-finishing pair leaves the most room, so the greedy choice is optimal.
+1. Same greedy, with one boundary change: chaining needs a strict gap, so the test is `start > lastFinish`, not `>=`.
+2. That single character changes the answer on touching pairs, which is worth seeing side by side with Example 1.
+3. There is also an O(n²) DP for this problem. It gives the same answer and is strictly worse here — but it is the formulation that survives when weights are added.
+4. **When weights are added, greedy becomes wrong**, and only the DP works. That boundary is the real lesson of this chapter.
 
 ### Dry Run
-pairs = [[1,2],[2,3],[3,4]] → sort by second: [1,2],[2,3],[3,4]
-take [1,2] cur=2; [2,3] first 2 not >2 skip; [3,4] first 3>2 take cur=4.
-chain length = 2.
+
+Input: `pairs = [[1,2], [2,3], [3,4]]` — already sorted by second element
+
+| pair | start | `start > lastFinish`? | action | lastFinish | chain |
+|------|-------|------------------------|--------|------------|-------|
+| `[1,2]` | 1 | `1 > −∞` yes | keep | 2 | 1 |
+| `[2,3]` | 2 | `2 > 2` **no** | skip — needs a strict gap | 2 | 1 |
+| `[3,4]` | 3 | `3 > 2` yes | keep | 4 | **2** |
+
+Output: **2** ✓ — the chain `[1,2] → [3,4]`.
+
+**The same input, two problems, two answers:**
+
+| problem | test | result |
+|---|---|---|
+| Non-overlapping (435) | `start >= lastFinish` | keeps **3** |
+| Pair Chain (646) | `start > lastFinish` | keeps **2** |
+
+`[1,2]` and `[2,3]` do not *overlap*, but they cannot *chain*. Read the statement, then pick the comparison.
+
+### Where greedy stops working
+
+Attach a weight to each interval and ask for maximum **total weight** instead of maximum count:
+
+```text
+[0,10] worth 100
+[0,3]  worth 1
+[4,6]  worth 1
+[7,9]  worth 1
+```
+
+Earliest-finish greedy takes `[0,3]`, `[4,6]`, `[7,9]` — three intervals, total weight **3**. The optimum is `[0,10]` alone, weight **100**.
+
+The exchange argument fails precisely here: swapping the greedy choice in preserves the *count* of a solution but says nothing about its *value*. The greedy-choice property no longer holds, so the algorithm loses its justification.
+
+**The DP that does work:** sort by finish time, then for each interval choose between taking it (its weight plus the best total ending at or before its start, located by binary search) and skipping it:
+
+```text
+best[i] = max( best[i-1],                       skip interval i
+               best[lastCompatible] + weight )  take interval i
+```
+
+O(n log n), and it degenerates to the greedy answer when all weights are 1.
 
 ### Visualization
-```
-input  ──▶ [ apply Activity Selection step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+unweighted (count):        weighted (value):
+
+  [0,3] [4,6] [7,9]          [0,10] worth 100
+  → 3 intervals              [0,3] [4,6] [7,9] worth 1 each
+
+  greedy gives 3  ✓          greedy gives 3   ✗
+                             optimum is 100   (one long interval)
+
+  the exchange argument preserves SIZE, not VALUE
+      ⇒ weights break greedy  ⇒  use DP
 ```
 
 ### Code
+
+```go
+func findLongestChain(pairs [][]int) int {
+    if len(pairs) == 0 {
+        return 0
+    }
+
+    sort.Slice(pairs, func(a, b int) bool {
+        return pairs[a][1] < pairs[b][1]
+    })
+
+    count := 0
+    lastFinish := math.MinInt32
+    for _, pair := range pairs {
+        // Strict >: chaining needs a real gap, unlike non-overlap.
+        if pair[0] > lastFinish {
+            count++
+            lastFinish = pair[1]
+        }
+    }
+    return count
+}
+
+// findMaxWeightChain is the WEIGHTED variant, where greedy is wrong.
+// pairs[i] = {start, finish, weight}.
+func findMaxWeightChain(pairs [][]int) int {
+    n := len(pairs)
+    if n == 0 {
+        return 0
+    }
+
+    sort.Slice(pairs, func(a, b int) bool {
+        return pairs[a][1] < pairs[b][1]
+    })
+
+    finishes := make([]int, n)
+    for i := range pairs {
+        finishes[i] = pairs[i][1]
+    }
+
+    // best[i] = maximum total weight using only the first i intervals.
+    best := make([]int, n+1)
+    for i := 1; i <= n; i++ {
+        start, weight := pairs[i-1][0], pairs[i-1][2]
+
+        // Rightmost earlier interval whose finish is <= start.
+        compatible := sort.SearchInts(finishes[:i-1], start+1)
+
+        take := best[compatible] + weight
+        skip := best[i-1]
+        if take > skip {
+            best[i] = take
+        } else {
+            best[i] = skip
+        }
+    }
+    return best[n]
+}
+```
+
 ```python
+from bisect import bisect_right
+
 def findLongestChain(pairs):
-    pairs.sort(key=lambda x: x[1])           # earliest end first
-    length, cur = 0, float('-inf')
-    for a, b in pairs:
-        if a > cur:                           # can follow the last link
-            length += 1
-            cur = b
-    return length
+    if not pairs:
+        return 0
+    pairs.sort(key=lambda p: p[1])              # earliest finish first
+
+    count, last_finish = 0, float("-inf")
+    for start, finish in pairs:
+        if start > last_finish:                 # strict: chaining needs a gap
+            count += 1
+            last_finish = finish
+    return count
+
+def findMaxWeightChain(pairs):
+    """WEIGHTED variant, where greedy is wrong. pairs = (start, finish, weight)."""
+    n = len(pairs)
+    if n == 0:
+        return 0
+    pairs.sort(key=lambda p: p[1])
+    finishes = [p[1] for p in pairs]
+
+    best = [0] * (n + 1)
+    for i in range(1, n + 1):
+        start, _, weight = pairs[i - 1]
+        compatible = bisect_right(finishes, start, 0, i - 1)
+        best[i] = max(best[i - 1], best[compatible] + weight)
+    return best[n]
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the greedy sweep is O(n).
+Greedy: **O(n log n)** time, O(1) extra space. Weighted DP: **O(n log n)** time, O(n) space.
 
+> The takeaway worth carrying out of this chapter is the *test*, not the rule. Before trusting any greedy, ask whether the exchange argument actually goes through. Here it does for counts and fails for weights — and knowing which side of that line you are on is what separates a correct answer from a plausible one.
+
+---
 
 ## 12. LeetCode Practice Set
 

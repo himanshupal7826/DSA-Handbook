@@ -41,32 +41,126 @@ gas station, greedy, circular, running total, reset start.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Can I get all the way along this route without running out — and where should I start, or where should I stop to refill?"*
+
 ### Intuition
-Try all orderings/choices (often exponential) to find the optimum.
+Try every starting station and simulate the whole trip.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each candidate start `i`:
+2. &nbsp;&nbsp;Set `tank = 0` and walk all `n` stations in circular order.
+3. &nbsp;&nbsp;At each station add its gas and subtract the cost to the next.
+4. &nbsp;&nbsp;If the tank ever goes negative, this start fails — try the next one.
+5. Return the first start that completes the loop.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n²)** — `n` candidate starts, each simulated over `n` stations.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Gas Station pattern is built to use.
+- Every failed simulation is thrown away entirely. But a failure carries information: it tells you about *many* starting points at once, not just the one you tried.
+- That discarded information is exactly what turns this into a single pass.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-When a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n).
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Gas Station invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **When a trip from `i` runs dry at station `j`, every station between `i` and `j` also fails — so skip past `j` instead of retrying them one by one.**
+
+### The thought process
+
+```text
+We need    : a starting station from which the loop completes.
+Obvious way: simulate from each start.
+Too slow   : O(n^2), and each failure is discarded.
+Notice     : if starting at i we run dry arriving at j, then for any
+             k strictly between i and j we ARRIVED at k with a
+             non-negative tank. Starting at k instead means arriving
+             with an EMPTY tank — never better. So k fails too.
+Therefore  : one failure eliminates the whole block i..j at once.
+             Jump the candidate start to j+1.
+Now        : each station is examined once → O(n).
+```
+
+### Why one failure eliminates a whole block
+
+This is the argument the whole chapter rests on, so it is worth writing out.
+
+Suppose starting at `i` we reach station `k` (with `i < k < j`) carrying `t ≥ 0` units of fuel, and then run dry at `j`.
+
+Starting *at* `k` instead means arriving at `k` with `0` units — that is `t` units **worse**, and `t ≥ 0`. Every subsequent tank reading is therefore at most what it was before, so we still run dry at or before `j`.
+
+```text
+start at i:   ... → k (tank = t ≥ 0) → ... → j  RAN DRY
+start at k:   ...   k (tank = 0)     → ... → j  ran dry no later
+```
+
+So no station in `(i, j)` can succeed. The next candidate worth trying is `j + 1`.
+
+### Why a solution exists exactly when total gas ≥ total cost
+
+Two halves:
+
+- **If `total(gas) < total(cost)`**, the loop consumes more than it provides, so no start can finish. Impossible.
+- **If `total(gas) ≥ total(cost)`**, a valid start is *guaranteed* to exist — and the elimination argument shows the last candidate the sweep lands on must be it. Every earlier station was ruled out, and something must work, so it is that one.
+
+That is why the algorithm needs **no second pass to verify**: check the totals once, and the surviving candidate is correct by construction.
+
+### Steps
+
+```text
+Step 1 → totalTank = 0, currentTank = 0, start = 0
+Step 2 → For i = 0 .. n-1:
+Step 3 →     gain = gas[i] - cost[i]
+Step 4 →     totalTank += gain
+Step 5 →     currentTank += gain
+Step 6 →     if currentTank < 0:          ← ran dry arriving here
+Step 7 →         start = i + 1            ← everything up to i is eliminated
+Step 8 →         currentTank = 0
+Step 9 → if totalTank < 0: return -1
+Step 10 → return start
+```
+
+### The sibling problem: "how few stops?"
+
+Gas Station asks *where to start*. The related family asks *how few refuels* are needed along a one-way route — and that needs a different greedy, because you get to choose **retroactively**.
+
+The trick is that you do not have to decide whether to refuel at a station **when you pass it**. Drive as far as you can, and only when you are about to run dry, look back and take the **largest** tank you passed but did not use.
+
+```text
+drive until the fuel runs out
+    → then "retroactively" refuel at the best station already passed
+    → a max-heap of passed stations makes that O(log n)
+```
+
+This works because deferring the decision loses nothing: any station you passed remains available to your past self, and taking the biggest one buys the most range per stop.
+
+| Question | Technique |
+|---|---|
+| Where can I start and finish the loop? | single sweep with the elimination argument — O(n) |
+| Fewest refuel stops to reach the target | max-heap of passed stations — O(n log n) |
+| Fewest jumps over a reachable range | contiguous-level sweep — O(n) |
+
+### How should I recognize this?
+
+```text
+If you see...
+  "circular route", "start where you can complete the circuit"
+  "will you run out of fuel/battery/resources"
+  "minimum refuels / stops / recharges to reach the target"
+        ↓
+Think about...
+  "When I fail, does that failure rule out more than one candidate?"
+  "Must I commit at each station, or can I decide retroactively?"
+        ↓
+Use...
+  find a valid start   → one sweep, reset start on a negative tank
+  fewest stops         → max-heap of passed options, refuel when dry
+```
 
 ### Visual explanation
 
@@ -95,64 +189,217 @@ When a greedy choice provably never hurts, a single sorted pass yields the optim
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Gas Station       : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+gas  = [1, 2, 3, 4, 5]
+cost = [3, 4, 5, 1, 2]
+gain = [-2, -2, -2, 3, 3]      total = 0 ≥ 0, so a solution exists
+
+i=0  gain -2  currentTank -2 < 0  →  start = 1, tank reset
+i=1  gain -2  currentTank -2 < 0  →  start = 2, tank reset
+i=2  gain -2  currentTank -2 < 0  →  start = 3, tank reset
+i=3  gain +3  currentTank  3
+i=4  gain +3  currentTank  6
+
+answer: start at station 3
 ```
 
 ### Interview explanation
-"This is a Gas Station problem. I'll when a greedy choice provably never hurts, a single sorted pass yields the optimum in O(n log n). That brings the complexity down to O(n log n) time and O(1) space — here's the template."
+"The brute force simulates from every start, but each failure tells us more than it looks. If starting at `i` I run dry arriving at `j`, then any station `k` in between was reached with a non-negative tank — so starting at `k` instead means arriving with an empty one, which is never better, and I'd still run dry by `j`. That means one failure eliminates the whole block, so I can jump the candidate start to `j+1` and never re-simulate. That's a single O(n) sweep with O(1) space. I also track the total gain: if total gas is less than total cost no start can work, and if it isn't, a solution is guaranteed to exist — so the candidate the sweep ends on must be correct, with no verification pass needed. The related 'fewest refuels' question needs a different greedy, because you can decide retroactively: drive until you're about to run dry, then take the largest tank among the stations you already passed, which a max-heap gives in O(log n)."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Greedy** family template. Adapt the comparison/condition to the specific problem.
+> One sweep, reset the start on a negative tank. For fewest stops, a max-heap of passed options.
 
 ```go
-// Maximum non-overlapping intervals: greedy by earliest finish time.
-func maxNonOverlap(intervals [][]int) int {
-    sort.Slice(intervals, func(i, j int) bool { return intervals[i][1] < intervals[j][1] })
-    count, end := 0, math.MinInt
-    for _, in := range intervals {
-        if in[0] >= end {       // compatible with last chosen
-            count++
-            end = in[1]
+// CanCompleteCircuit returns a starting station index from which the whole
+// circuit can be completed, or -1 if none exists.
+func CanCompleteCircuit(gas []int, cost []int) int {
+    totalTank, currentTank, start := 0, 0, 0
+
+    for i := 0; i < len(gas); i++ {
+        gain := gas[i] - cost[i]
+        totalTank += gain
+        currentTank += gain
+
+        if currentTank < 0 {
+            // Ran dry arriving here. Every station from `start` to i is
+            // eliminated: each was reached with a non-negative tank, so
+            // starting there is never better.
+            start = i + 1
+            currentTank = 0
         }
     }
-    return count
+
+    if totalTank < 0 {
+        return -1 // the route consumes more than it provides
+    }
+    // A solution is guaranteed to exist, and everything before `start`
+    // has been ruled out — so `start` is it. No verification pass needed.
+    return start
+}
+
+// MinRefuelStops returns the fewest refuelling stops needed to travel
+// `target` miles, or -1 if the target is unreachable.
+// stations[i] = {position, fuel}.
+func MinRefuelStops(target int, startFuel int, stations [][]int) int {
+    passed := &fuelHeap{} // max-heap of fuel at stations already driven past
+    heap.Init(passed)
+
+    fuel, stops, index := startFuel, 0, 0
+
+    for fuel < target {
+        // Bank every station we can currently reach.
+        for index < len(stations) && stations[index][0] <= fuel {
+            heap.Push(passed, stations[index][1])
+            index++
+        }
+
+        if passed.Len() == 0 {
+            return -1 // stranded with nothing left to draw on
+        }
+
+        // Retroactively refuel at the biggest tank we passed.
+        fuel += heap.Pop(passed).(int)
+        stops++
+    }
+
+    return stops
+}
+
+type fuelHeap []int
+
+func (h fuelHeap) Len() int           { return len(h) }
+func (h fuelHeap) Less(i, j int) bool { return h[i] > h[j] } // max-heap
+func (h fuelHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *fuelHeap) Push(x any)        { *h = append(*h, x.(int)) }
+func (h *fuelHeap) Pop() any {
+    old := *h
+    last := old[len(old)-1]
+    *h = old[:len(old)-1]
+    return last
 }
 ```
 
 ```python
-def max_non_overlap(intervals):
-    intervals.sort(key=lambda x: x[1])     # earliest finish first
-    count, end = 0, float('-inf')
-    for s, e in intervals:
-        if s >= end:                        # no overlap
-            count += 1
-            end = e
-    return count
+import heapq
+
+def can_complete_circuit(gas, cost):
+    """A valid starting station, or -1."""
+    total_tank = current_tank = start = 0
+
+    for i in range(len(gas)):
+        gain = gas[i] - cost[i]
+        total_tank += gain
+        current_tank += gain
+
+        if current_tank < 0:
+            # Everything from `start` to i is eliminated at once.
+            start = i + 1
+            current_tank = 0
+
+    if total_tank < 0:
+        return -1                       # consumes more than it provides
+    return start                        # guaranteed correct, no re-check
+
+def min_refuel_stops(target, start_fuel, stations):
+    """Fewest refuelling stops, or -1. stations[i] = (position, fuel)."""
+    passed = []                         # max-heap via negation
+    fuel, stops, index = start_fuel, 0, 0
+
+    while fuel < target:
+        # Bank every station we can currently reach.
+        while index < len(stations) and stations[index][0] <= fuel:
+            heapq.heappush(passed, -stations[index][1])
+            index += 1
+
+        if not passed:
+            return -1                   # stranded
+
+        fuel += -heapq.heappop(passed)  # retroactively take the biggest tank
+        stops += 1
+
+    return stops
 ```
 
 ```java
-int maxNonOverlap(int[][] intervals) {
-    Arrays.sort(intervals, (a, b) -> Integer.compare(a[1], b[1]));
-    int count = 0, end = Integer.MIN_VALUE;
-    for (int[] in : intervals)
-        if (in[0] >= end) { count++; end = in[1]; }
-    return count;
+import java.util.*;
+
+public class GasStation {
+    public static int canCompleteCircuit(int[] gas, int[] cost) {
+        int totalTank = 0, currentTank = 0, start = 0;
+
+        for (int i = 0; i < gas.length; i++) {
+            int gain = gas[i] - cost[i];
+            totalTank += gain;
+            currentTank += gain;
+
+            if (currentTank < 0) {      // eliminates the whole block
+                start = i + 1;
+                currentTank = 0;
+            }
+        }
+
+        return totalTank < 0 ? -1 : start;
+    }
+
+    // stations[i] = {position, fuel}
+    public static int minRefuelStops(int target, int startFuel, int[][] stations) {
+        PriorityQueue<Integer> passed = new PriorityQueue<>(Comparator.reverseOrder());
+        int fuel = startFuel, stops = 0, index = 0;
+
+        while (fuel < target) {
+            while (index < stations.length && stations[index][0] <= fuel)
+                passed.add(stations[index++][1]);       // bank what we passed
+
+            if (passed.isEmpty()) return -1;            // stranded
+
+            fuel += passed.poll();                       // biggest tank passed
+            stops++;
+        }
+        return stops;
+    }
 }
 ```
 
 ```cpp
-int maxNonOverlap(vector<vector<int>>& intervals) {
-    sort(intervals.begin(), intervals.end(),
-         [](auto& a, auto& b){ return a[1] < b[1]; });
-    int count = 0, end = INT_MIN;
-    for (auto& in : intervals)
-        if (in[0] >= end) { count++; end = in[1]; }
-    return count;
+#include <queue>
+#include <vector>
+using namespace std;
+
+int canCompleteCircuit(const vector<int>& gas, const vector<int>& cost) {
+    int totalTank = 0, currentTank = 0, start = 0;
+
+    for (int i = 0; i < (int)gas.size(); ++i) {
+        int gain = gas[i] - cost[i];
+        totalTank += gain;
+        currentTank += gain;
+
+        if (currentTank < 0) {          // eliminates the whole block
+            start = i + 1;
+            currentTank = 0;
+        }
+    }
+    return totalTank < 0 ? -1 : start;
+}
+
+// stations[i] = {position, fuel}
+int minRefuelStops(int target, int startFuel, const vector<vector<int>>& stations) {
+    priority_queue<int> passed;         // max-heap of fuel already driven past
+    int fuel = startFuel, stops = 0, index = 0;
+
+    while (fuel < target) {
+        while (index < (int)stations.size() && stations[index][0] <= fuel)
+            passed.push(stations[index++][1]);
+
+        if (passed.empty()) return -1;  // stranded
+
+        fuel += passed.top();           // retroactively take the biggest tank
+        passed.pop();
+        ++stops;
+    }
+    return stops;
 }
 ```
 
@@ -238,123 +485,327 @@ int maxNonOverlap(vector<vector<int>>& intervals) {
 ## 9. Solved Example 1
 
 ### Problem — Gas Station (LeetCode 134)
-gas[i] and cost[i] around a circular route; return the start index that completes the loop, or -1.
+There are `n` stations in a circle. Station `i` gives `gas[i]` fuel, and driving from `i` to `i+1` costs `cost[i]`. Starting with an empty tank, return the index you must begin at to complete the circuit, or `−1`. The answer is unique if it exists.
 
 ### Thought Process
-1. If total gas is less than total cost the trip is impossible, so return -1 immediately.
-2. Track a running tank; whenever it dips below zero, no start in the current segment works, so reset the candidate start to i+1.
-3. When the totals allow a solution, the surviving start is guaranteed to complete the circuit.
+1. Only the difference matters at each station: `gain[i] = gas[i] − cost[i]`.
+2. Sweep once, tracking the tank. When it goes negative arriving at `i`, every station from the current candidate through `i` is eliminated — each was reached with a non-negative tank, so starting there is never better.
+3. So jump the candidate to `i + 1` and reset the tank.
+4. Separately accumulate the total gain. If it is negative, the route consumes more than it provides and no start works.
+5. If the total is non-negative a solution is guaranteed, and everything before the surviving candidate has been ruled out — so it is the answer, with no verification pass.
 
-### Dry Run
-gas=[1,2,3,4,5], cost=[3,4,5,1,2]
-i0 tank -2 reset start=1; i1 -2 reset start=2; i2 -2 reset start=3; i3 +3; i4 +6.
-total gas 15 >= cost 15 → answer start = 3.
+### Dry Run — a solvable route
+
+Input: `gas = [1, 2, 3, 4, 5]`, `cost = [3, 4, 5, 1, 2]`
+
+`gain = [−2, −2, −2, 3, 3]`, total = **0** ≥ 0, so an answer exists.
+
+| i | gain | totalTank | currentTank before | currentTank after | negative? | start |
+|---|------|-----------|--------------------|--------------------|-----------|-------|
+| 0 | −2 | −2 | 0 | −2 | **yes** | → **1**, tank reset to 0 |
+| 1 | −2 | −4 | 0 | −2 | **yes** | → **2**, tank reset to 0 |
+| 2 | −2 | −6 | 0 | −2 | **yes** | → **3**, tank reset to 0 |
+| 3 | +3 | −3 | 0 | 3 | no | 3 |
+| 4 | +3 | **0** | 3 | 6 | no | **3** |
+
+`totalTank = 0 ≥ 0` → return **3** ✓
+
+Verify by simulating from station 3: start empty, take 4 gas → tank 4, pay 1 → 3. Station 4: take 5 → 8, pay 2 → 6. Station 0: take 1 → 7, pay 3 → 4. Station 1: take 2 → 6, pay 4 → 2. Station 2: take 3 → 5, pay 5 → 0. Back at station 3 with a non-negative tank throughout. ✓
+
+### Dry Run — an impossible route
+
+Input: `gas = [2, 3, 4]`, `cost = [3, 4, 3]`
+
+`gain = [−1, −1, 1]`, total = **−1** < 0.
+
+The sweep still runs and lands on some candidate, but the total is negative, so we return **`−1`** ✓ — the circuit consumes 10 units and supplies only 9.
 
 ### Visualization
-```
-input  ──▶ [ apply Gas Station step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+gain :  -2   -2   -2   +3   +3       total = 0
+
+  i=0  tank -2  → negative → start = 1
+  i=1  tank -2  → negative → start = 2
+  i=2  tank -2  → negative → start = 3
+  i=3  tank +3
+  i=4  tank +6                       never negative after start=3
+
+  answer: station 3
+
+  one failure at i eliminates EVERY candidate up to i,
+  because each was reached with tank >= 0
 ```
 
 ### Code
+
+```go
+func canCompleteCircuit(gas []int, cost []int) int {
+    totalTank, currentTank, start := 0, 0, 0
+
+    for i := 0; i < len(gas); i++ {
+        gain := gas[i] - cost[i]
+        totalTank += gain
+        currentTank += gain
+
+        if currentTank < 0 {
+            // Ran dry arriving at i. Every station from `start` through i
+            // was reached with a non-negative tank, so beginning at any of
+            // them is no better — the whole block is eliminated at once.
+            start = i + 1
+            currentTank = 0
+        }
+    }
+
+    if totalTank < 0 {
+        return -1 // the route consumes more than it supplies
+    }
+
+    // A solution is guaranteed when totalTank >= 0, and everything before
+    // `start` has been ruled out — so `start` is correct by construction.
+    return start
+}
+```
+
 ```python
 def canCompleteCircuit(gas, cost):
-    if sum(gas) < sum(cost):
-        return -1
-    start, tank = 0, 0
+    total_tank = current_tank = start = 0
+
     for i in range(len(gas)):
-        tank += gas[i] - cost[i]
-        if tank < 0:                          # can't reach i+1 from start
+        gain = gas[i] - cost[i]
+        total_tank += gain
+        current_tank += gain
+
+        if current_tank < 0:
+            # Eliminates every candidate from `start` through i at once.
             start = i + 1
-            tank = 0
-    return start
+            current_tank = 0
+
+    if total_tank < 0:
+        return -1                       # consumes more than it supplies
+    return start                        # guaranteed correct, no re-check
 ```
 
 ### Complexity
-Time O(n), Space O(1). One circular sweep with a running tank.
+Time **O(n)** — one sweep. Space **O(1)**.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Jump Game II (LeetCode 45)
-Every position is reachable via nums[i] max jumps; return the minimum jumps to the last index.
+Each `nums[i]` is the maximum jump length from index `i`. Return the **minimum** number of jumps to reach the last index.
 
 ### Thought Process
-1. Process the array in levels defined by how far the current number of jumps can carry you.
-2. Within each level, track the farthest index the next jump could reach.
-3. When the scan hits the level's end, spend one jump and extend the boundary to that farthest.
+1. Framed as a journey, this is "fewest stops to traverse the route" — the same question Example 3 asks with fuel.
+2. Here the resource is *reach* rather than fuel, and it is replaced rather than accumulated: landing at `i` gives you a fresh range of `nums[i]`.
+3. Because a jump permits **any** distance up to `nums[i]`, everything reachable in `k` jumps forms a contiguous range — so a BFS level can be tracked with two numbers instead of a queue.
+4. `currentEnd` is the end of the current level; `farthest` is the end of the next.
+5. Loop to `n − 2`: arriving at the last index means the journey is over, and continuing would count one stop too many.
 
 ### Dry Run
-nums = [2,3,0,1,4]
-i0 farthest=2, i==cur_end(0) → jumps=1 cur_end=2
-i1 farthest=max(2,4)=4; i2==cur_end(2) → jumps=2 cur_end=4 reaches last.
-answer = 2.
+
+Input: `nums = [2, 3, 1, 1, 4]` → loop `i = 0 .. 3`
+
+| i | `i + nums[i]` | `farthest` | `i == currentEnd`? | jumps | currentEnd |
+|---|----------------|------------|---------------------|-------|------------|
+| 0 | `0 + 2 = 2` | **2** | `0 == 0` **yes** | **1** | **2** |
+| 1 | `1 + 3 = 4` | **4** | `1 == 2` no | 1 | 2 |
+| 2 | `2 + 1 = 3` | 4 | `2 == 2` **yes** | **2** | **4** |
+| 3 | `3 + 1 = 4` | 4 | `3 == 4` no | 2 | 4 |
+
+Output: **2** ✓ — the route `0 → 1 → 4`.
+
+**The levels, made explicit:**
+
+```text
+level 0:  index 0            0 jumps
+level 1:  indices 1..2       1 jump   (reachable from 0)
+level 2:  indices 3..4       2 jumps  (reachable from 1 or 2)  ← contains the end
+```
+
+**Why the loop stops at `n − 2`.** At `i = 4` we would have `i == currentEnd == 4`, incrementing `jumps` to 3 — counting a jump *out of* the destination we had already arrived at.
 
 ### Visualization
-```
-input  ──▶ [ apply Gas Station step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums  =  2    3    1    1    4
+index :  0    1    2    3    4
+
+level 0: [0]
+level 1:      [1    2]              1 jump
+level 2:            [3    4]        2 jumps  ★ contains the end
+
+  each level is contiguous, so `currentEnd` and `farthest`
+  replace a BFS queue entirely
 ```
 
 ### Code
+
+```go
+func jump(nums []int) int {
+    jumps := 0
+    currentEnd := 0 // end of the level reachable with the jumps counted
+    farthest := 0   // end of the level reachable with ONE more jump
+
+    // Stop at n-2: arriving at the last index ends the journey, and
+    // continuing would count a jump that is never taken.
+    for i := 0; i < len(nums)-1; i++ {
+        if i+nums[i] > farthest {
+            farthest = i + nums[i]
+        }
+
+        if i == currentEnd { // the current level is exhausted
+            jumps++
+            currentEnd = farthest
+        }
+    }
+
+    return jumps
+}
+```
+
 ```python
 def jump(nums):
-    jumps = cur_end = farthest = 0
+    jumps = current_end = farthest = 0
+
+    # Stop at n-2: arriving at the last index ends the journey.
     for i in range(len(nums) - 1):
-        farthest = max(farthest, i + nums[i])
-        if i == cur_end:                      # exhausted this jump's range
+        farthest = max(farthest, i + nums[i])   # reach of ONE more jump
+        if i == current_end:                    # level exhausted
             jumps += 1
-            cur_end = farthest
+            current_end = farthest
+
     return jumps
 ```
 
 ### Complexity
-Time O(n), Space O(1). One pass tracking level boundaries.
+Time **O(n)**, Space **O(1)**.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Min Refuel (LeetCode 871)
-Reach target with startFuel; each station gives fuel at a position. Return the fewest stops, or -1.
+### Problem — Minimum Number of Refueling Stops (LeetCode 871)
+A car starts with `startFuel` and travels `target` miles, using one unit of fuel per mile. `stations[i] = [position, fuel]`. Return the fewest stops needed, or `−1`.
 
 ### Thought Process
-1. Drive as far as the current fuel allows, banking each passed station's fuel into a max-heap.
-2. When you can't reach the next station or the target, refuel from the largest banked station — the greediest gain per stop.
-3. If the heap is empty and you still fall short, the target is unreachable.
+1. Unlike Example 2, the resource **accumulates** — refuelling adds to what you have rather than replacing your range. So the level trick does not apply.
+2. The freeing insight: you do not have to decide at each station whether to stop. **Drive until you are about to run dry, then decide retroactively.**
+3. Keep a max-heap of the fuel amounts at every station already driven past but not used.
+4. Whenever `fuel < target` and you cannot reach further, pop the **largest** passed tank and count a stop. That buys the most range per stop.
+5. If the heap is empty and you still cannot reach the target, you are stranded → `−1`.
+
+Deferring the choice loses nothing: a station you drove past remains available to your past self, so postponing the decision only gives you more information.
 
 ### Dry Run
-target=100, startFuel=10, stations=[[10,60],[20,30],[30,30],[60,40]]
-fuel10 banks 60; can't pass 20 → pop 60 stops=1 fuel70; banks 30,30,40;
-fuel70<100 → pop 40 stops=2 fuel110>=100. answer = 2.
+
+Input: `target = 100`, `startFuel = 10`, `stations = [[10,60], [20,30], [30,30], [60,40]]`
+
+| step | fuel | stations reachable now (`position <= fuel`) | heap after banking | action | stops |
+|------|------|----------------------------------------------|--------------------|--------|-------|
+| 1 | 10 | `[10,60]` | `{60}` | `10 < 100`, pop **60** → fuel **70** | **1** |
+| 2 | 70 | `[20,30]`, `[30,30]`, `[60,40]` | `{40, 30, 30}` | `70 < 100`, pop **40** → fuel **110** | **2** |
+| 3 | 110 | — | `{30, 30}` | `110 >= 100` → stop | 2 |
+
+Output: **2** ✓
+
+**Watch the retroactive choice at step 2.** By the time we needed more fuel, we had already passed three stations offering 30, 30 and 40. We took the 40 — even though it is the one *furthest along* the road — because the decision is made after the fact. Committing greedily at the first station reachable would have taken a 30 and needed an extra stop.
+
+**The stranded case:** `target = 100`, `startFuel = 1`, `stations = [[10,100]]`. With 1 unit of fuel we cannot even reach position 10, so nothing is banked, the heap is empty, and we return **`−1`** ✓.
 
 ### Visualization
-```
-input  ──▶ [ apply Gas Station step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+target = 100,  startFuel = 10
+
+   0    10        20   30              60           100
+   |     |         |    |               |            |
+   ▼    [60]     [30] [30]            [40]           ▼
+   ─────┴─────────┴────┴───────────────┴──────────────
+
+fuel 10  → can reach position 10, bank 60
+         → need more: take 60          fuel 70   stops 1
+
+fuel 70  → can reach 20, 30, 60: bank 30, 30, 40
+         → need more: take the LARGEST (40)   fuel 110  stops 2
+
+110 >= 100  →  done in 2 stops
 ```
 
 ### Code
+
+```go
+func minRefuelStops(target int, startFuel int, stations [][]int) int {
+    // Max-heap of fuel at stations already driven past but not yet used.
+    passed := &passedFuelHeap{}
+    heap.Init(passed)
+
+    fuel, stops, index := startFuel, 0, 0
+
+    for fuel < target {
+        // Bank every station the current fuel lets us reach. We do NOT
+        // decide to stop at them yet — only that they are now available.
+        for index < len(stations) && stations[index][0] <= fuel {
+            heap.Push(passed, stations[index][1])
+            index++
+        }
+
+        if passed.Len() == 0 {
+            return -1 // stranded with nothing left to draw on
+        }
+
+        // Retroactively refuel at the biggest tank we passed: the most
+        // range bought per stop.
+        fuel += heap.Pop(passed).(int)
+        stops++
+    }
+
+    return stops
+}
+
+type passedFuelHeap []int
+
+func (h passedFuelHeap) Len() int           { return len(h) }
+func (h passedFuelHeap) Less(i, j int) bool { return h[i] > h[j] } // max-heap
+func (h passedFuelHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *passedFuelHeap) Push(x any)        { *h = append(*h, x.(int)) }
+func (h *passedFuelHeap) Pop() any {
+    old := *h
+    last := old[len(old)-1]
+    *h = old[:len(old)-1]
+    return last
+}
+```
+
 ```python
 import heapq
 
 def minRefuelStops(target, startFuel, stations):
-    heap = []                                 # max-heap of reachable fuels
-    fuel, stops, i, n = startFuel, 0, 0, len(stations)
+    passed = []                         # max-heap (negated) of passed tanks
+    fuel, stops, index = startFuel, 0, 0
+
     while fuel < target:
-        while i < n and stations[i][0] <= fuel:
-            heapq.heappush(heap, -stations[i][1])
-            i += 1
-        if not heap:
-            return -1
-        fuel += -heapq.heappop(heap)          # take the biggest tank
+        # Bank what we can reach — without deciding to stop there yet.
+        while index < len(stations) and stations[index][0] <= fuel:
+            heapq.heappush(passed, -stations[index][1])
+            index += 1
+
+        if not passed:
+            return -1                   # stranded
+
+        fuel += -heapq.heappop(passed)  # retroactively take the biggest tank
         stops += 1
+
     return stops
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Each station is pushed and popped at most once.
+Time **O(n log n)** — each station is pushed and popped at most once. Space **O(n)** for the heap.
 
+> The three examples separate three different resource shapes. Gas Station's failure *eliminates a block*, so one sweep suffices. Jump Game II's reach is *replaced* and contiguous, so two counters replace a queue. Refuelling *accumulates*, so the decision can be deferred — and a max-heap is what makes deferring cheap.
+
+---
 
 ## 12. LeetCode Practice Set
 
