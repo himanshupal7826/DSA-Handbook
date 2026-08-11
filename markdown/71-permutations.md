@@ -41,32 +41,144 @@ permutations, arrange, backtracking, used array, swap.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"List every ordering."* — where, unlike combinations, **order is the answer**.
+
 ### Intuition
-Generate all candidates then filter — wasteful, explores invalid branches fully.
+Generate every sequence of length `n` over the input values, then discard the ones that aren't valid arrangements.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Build all `nⁿ` sequences by choosing any element at each of the `n` positions.
+2. Discard any sequence that reuses an element.
+3. Keep the rest.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n · nⁿ)** to generate, of which only `n!` survive.
+- Space: O(n).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Permutations pattern is built to use.
+- The waste is enormous: at `n = 8` it builds 16.7 million sequences to keep 40,320 — over 99.7% discarded.
+- And every rejection is discovered at the very end. A sequence starting `[1, 1, …]` is already invalid after two positions, but the generate-then-filter approach explores all `n^(n−2)` completions of it anyway.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Permutations invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **At each position, choose only from the elements not yet used — so every path you build is a valid permutation by construction.**
+
+Nothing is ever discarded. The decision tree has exactly `n!` leaves, one per permutation.
+
+### The thought process
+
+```text
+We need    : all n! orderings.
+Obvious way: build all n^n sequences and filter out the invalid ones.
+Wasteful   : 99%+ discarded, and invalidity is only noticed at the end.
+Notice     : the constraint "each element once" can be enforced at the
+             moment of choosing, not after the fact.
+Therefore  : track which elements are used; loop over the unused ones.
+Now        : every leaf is a valid answer — O(n · n!), which is optimal
+             because that is the output size.
+```
+
+### `used[]` instead of `start` — and why
+
+This is the single structural difference from the Subsets/Combinations chapters:
+
+```text
+COMBINATIONS: order is irrelevant, so [1,2] and [2,1] are the SAME answer.
+              → loop from `start`, recurse with i+1
+              → each combination generated exactly once
+
+PERMUTATIONS: order IS the answer, so [1,2] and [2,1] are DIFFERENT.
+              → loop over ALL indices every time
+              → track used[] so no element is picked twice
+```
+
+A `start` index would forbid ever going "backwards" to a smaller index — which is exactly what permutations must do. So `start` is replaced by `used`.
+
+| | Combinations | Permutations |
+|---|---|---|
+| Loop | `for i := start; …` | `for i := 0; i < n; i++` |
+| Skip rule | — | `if used[i] { continue }` |
+| Recurse | `backtrack(i+1)` | `backtrack()` |
+| Record when | length `k` (or every node) | length `n` |
+| Count | `C(n,k)` | `n!` |
+
+### Steps
+
+```text
+Step 1 → used = all false; path = empty
+Step 2 → define backtrack():
+Step 3 →     if len(path) == n:  record a COPY;  return
+Step 4 →     for i = 0 .. n-1:
+Step 5 →         if used[i]: skip
+Step 6 →         used[i] = true;  append nums[i]      ← choose
+Step 7 →         backtrack()                          ← explore
+Step 8 →         remove last;  used[i] = false        ← un-choose
+```
+
+Step 8 must undo **both** things step 6 did. Forgetting to reset `used[i]` is the classic bug — the first branch consumes every element and all later branches find nothing available.
+
+### Duplicates: a different rule from combinations
+
+With duplicate inputs, `[1a, 1b, 2]` and `[1b, 1a, 2]` are the same permutation reached twice. Sort first, then add:
+
+```go
+if i > 0 && nums[i] == nums[i-1] && !used[i-1] {
+    continue
+}
+```
+
+Read it as: **use a duplicate only if its identical predecessor is already in the path.** That forces equal values to be consumed strictly left to right, so exactly one of their interchangeable orderings survives.
+
+The `!used[i-1]` part is what makes it correct, and it is easy to get backwards:
+
+```text
+used[i-1] == true   → the predecessor is in the path ABOVE me;
+                      I am extending it, which is the canonical order → ALLOW
+
+used[i-1] == false  → the predecessor was already tried and undone at
+                      THIS level; picking me now repeats that branch → SKIP
+```
+
+Note this differs from the combinations rule (`i > start`), because permutations have no `start` — the "same level" notion is carried by `used` instead.
+
+### There is no free lunch on complexity
+
+`n!` grows faster than anything else in this book:
+
+```text
+n = 8   →  40,320
+n = 10  →  3.6 million
+n = 12  →  479 million
+```
+
+O(n · n!) is optimal *for producing all permutations*, because that is the output size. If the problem only wants **one** permutation — the next one, the k-th one — do **not** enumerate. That is what the third example is about.
+
+### The O(1)-space alternative: next permutation
+
+To step from one arrangement to the next in lexicographic order, there is a four-step in-place algorithm that touches each element at most twice. It is the right tool whenever you need to *walk* permutations rather than *collect* them, and it is what `std::next_permutation` implements.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "all permutations / arrangements / orderings"
+  "in how many orders", "rearrange", "next permutation"
+  order MATTERS — [1,2] and [2,1] are different answers
+        ↓
+Think about...
+  "Do I need ALL of them, or just the next / k-th one?"
+        ↓
+Use...
+  all of them   → backtracking with used[]
+  duplicates    → sort + skip when nums[i]==nums[i-1] && !used[i-1]
+  just the next → the in-place four-step algorithm, O(n) time O(1) space
+```
 
 ### Visual explanation
 
@@ -99,82 +211,282 @@ DFS over the decision tree with pruning. Each recursion makes a choice, recurses
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Permutations      : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [1, 2, 3]
+
+                       []
+        ┌───────────────┼───────────────┐
+       [1]             [2]             [3]
+      ┌─┴─┐           ┌─┴─┐           ┌─┴─┐
+   [1,2] [1,3]     [2,1] [2,3]     [3,1] [3,2]
+     │     │         │     │         │     │
+ [1,2,3][1,3,2] [2,1,3][2,3,1] [3,1,2][3,2,1]
+
+3 choices, then 2, then 1  →  3! = 6 leaves
+only leaves are recorded (unlike subsets, where every node counts)
 ```
 
 ### Interview explanation
-"This is a Permutations problem. I'll dFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next. That brings the complexity down to O(branches^depth) time and O(depth) space — here's the template."
+"Permutations differ from combinations in one structural way: order matters, so I can't use a `start` index that only ever moves forward. Instead I loop over every index each time and keep a `used` array so no element is picked twice — that makes every path a valid permutation by construction, with no filtering. The un-choose step has to reset both the path and `used[i]`; forgetting the second is the usual bug. For duplicate inputs I sort and then skip `nums[i] == nums[i-1] && !used[i-1]`, which means a duplicate may only be used if its identical predecessor is already in the path — forcing equal values to be consumed left to right so each distinct permutation appears once. It's O(n · n!), which is optimal since that's the output size. If the problem only needs the *next* permutation rather than all of them, I'd use the in-place four-step algorithm instead: O(n) time, O(1) space."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Backtracking** family template. Adapt the comparison/condition to the specific problem.
+> `used[]` instead of `start`. Undo both the path and the flag.
 
 ```go
-// Subsets via choose/explore/un-choose.
-func subsets(nums []int) [][]int {
-    res := [][]int{}
-    var path []int
-    var dfs func(start int)
-    dfs = func(start int) {
-        cp := make([]int, len(path)); copy(cp, path)
-        res = append(res, cp)                 // record current subset
-        for i := start; i < len(nums); i++ {
-            path = append(path, nums[i])       // choose
-            dfs(i + 1)                         // explore
-            path = path[:len(path)-1]          // un-choose
+// Permutations generates all n! orderings.
+func Permutations(nums []int) [][]int {
+    result := [][]int{}
+    path := []int{}
+    used := make([]bool, len(nums))
+
+    var backtrack func()
+    backtrack = func() {
+        if len(path) == len(nums) {
+            snapshot := make([]int, len(path))
+            copy(snapshot, path)
+            result = append(result, snapshot)
+            return
+        }
+
+        // Every index, every time — order matters, so we may go "backwards".
+        for i := 0; i < len(nums); i++ {
+            if used[i] {
+                continue
+            }
+
+            used[i] = true                // choose
+            path = append(path, nums[i])
+
+            backtrack()                   // explore
+
+            path = path[:len(path)-1]     // un-choose: BOTH of them
+            used[i] = false
         }
     }
-    dfs(0)
-    return res
+
+    backtrack()
+    return result
+}
+
+// PermutationsUnique handles duplicate inputs.
+func PermutationsUnique(nums []int) [][]int {
+    sort.Ints(nums) // equal values must be adjacent for the skip to work
+
+    result := [][]int{}
+    path := []int{}
+    used := make([]bool, len(nums))
+
+    var backtrack func()
+    backtrack = func() {
+        if len(path) == len(nums) {
+            snapshot := make([]int, len(path))
+            copy(snapshot, path)
+            result = append(result, snapshot)
+            return
+        }
+
+        for i := 0; i < len(nums); i++ {
+            if used[i] {
+                continue
+            }
+            // Use a duplicate only if its identical predecessor is already
+            // in the path — forcing equal values left-to-right.
+            if i > 0 && nums[i] == nums[i-1] && !used[i-1] {
+                continue
+            }
+
+            used[i] = true
+            path = append(path, nums[i])
+            backtrack()
+            path = path[:len(path)-1]
+            used[i] = false
+        }
+    }
+
+    backtrack()
+    return result
+}
+
+// NextPermutation rearranges nums into the next lexicographic order,
+// in place, in O(n) time and O(1) space.
+func NextPermutation(nums []int) {
+    n := len(nums)
+
+    // 1. Find the rightmost position where the sequence stops descending.
+    pivot := n - 2
+    for pivot >= 0 && nums[pivot] >= nums[pivot+1] {
+        pivot--
+    }
+
+    if pivot >= 0 {
+        // 2. Find the rightmost element greater than the pivot.
+        successor := n - 1
+        for nums[successor] <= nums[pivot] {
+            successor--
+        }
+        // 3. Swap them.
+        nums[pivot], nums[successor] = nums[successor], nums[pivot]
+    }
+
+    // 4. Reverse the suffix, turning it from descending into ascending —
+    //    the smallest arrangement of those elements.
+    for left, right := pivot+1, n-1; left < right; left, right = left+1, right-1 {
+        nums[left], nums[right] = nums[right], nums[left]
+    }
 }
 ```
 
 ```python
-def subsets(nums):
-    res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
-            path.pop()                          # un-choose
-    dfs(0)
-    return res
+def permutations(nums):
+    """All n! orderings."""
+    result, path = [], []
+    used = [False] * len(nums)
+
+    def backtrack():
+        if len(path) == len(nums):
+            result.append(path[:])
+            return
+
+        for i in range(len(nums)):      # every index, every time
+            if used[i]:
+                continue
+            used[i] = True              # choose
+            path.append(nums[i])
+            backtrack()                 # explore
+            path.pop()                  # un-choose: BOTH
+            used[i] = False
+
+    backtrack()
+    return result
+
+def permutations_unique(nums):
+    """Duplicate inputs: equal values must be consumed left to right."""
+    nums.sort()
+    result, path = [], []
+    used = [False] * len(nums)
+
+    def backtrack():
+        if len(path) == len(nums):
+            result.append(path[:])
+            return
+
+        for i in range(len(nums)):
+            if used[i]:
+                continue
+            # Use a duplicate only if its predecessor is already in the path.
+            if i > 0 and nums[i] == nums[i - 1] and not used[i - 1]:
+                continue
+            used[i] = True
+            path.append(nums[i])
+            backtrack()
+            path.pop()
+            used[i] = False
+
+    backtrack()
+    return result
+
+def next_permutation(nums):
+    """Next lexicographic order, in place, O(n) time and O(1) space."""
+    n = len(nums)
+
+    pivot = n - 2                       # 1. rightmost non-descending step
+    while pivot >= 0 and nums[pivot] >= nums[pivot + 1]:
+        pivot -= 1
+
+    if pivot >= 0:
+        successor = n - 1               # 2. rightmost element bigger than it
+        while nums[successor] <= nums[pivot]:
+            successor -= 1
+        nums[pivot], nums[successor] = nums[successor], nums[pivot]   # 3. swap
+
+    nums[pivot + 1:] = reversed(nums[pivot + 1:])                     # 4. reverse
 ```
 
 ```java
-List<List<Integer>> subsets(int[] nums) {
-    List<List<Integer>> res = new ArrayList<>();
-    dfs(nums, 0, new ArrayList<>(), res);
-    return res;
-}
-void dfs(int[] nums, int start, List<Integer> path, List<List<Integer>> res) {
-    res.add(new ArrayList<>(path));
-    for (int i = start; i < nums.length; i++) {
-        path.add(nums[i]);
-        dfs(nums, i + 1, path, res);
-        path.remove(path.size() - 1);
+import java.util.*;
+
+public class PermutationsPattern {
+    public static List<List<Integer>> permute(int[] nums) {
+        List<List<Integer>> result = new ArrayList<>();
+        backtrack(nums, new boolean[nums.length], new ArrayList<>(), result);
+        return result;
+    }
+
+    private static void backtrack(int[] nums, boolean[] used,
+                                  List<Integer> path, List<List<Integer>> result) {
+        if (path.size() == nums.length) {
+            result.add(new ArrayList<>(path));      // a COPY
+            return;
+        }
+        for (int i = 0; i < nums.length; i++) {     // every index, every time
+            if (used[i]) continue;
+            used[i] = true;                          // choose
+            path.add(nums[i]);
+            backtrack(nums, used, path, result);     // explore
+            path.remove(path.size() - 1);            // un-choose: BOTH
+            used[i] = false;
+        }
+    }
+
+    public static void nextPermutation(int[] nums) {
+        int n = nums.length, pivot = n - 2;
+        while (pivot >= 0 && nums[pivot] >= nums[pivot + 1]) pivot--;
+
+        if (pivot >= 0) {
+            int successor = n - 1;
+            while (nums[successor] <= nums[pivot]) successor--;
+            int t = nums[pivot]; nums[pivot] = nums[successor]; nums[successor] = t;
+        }
+
+        for (int l = pivot + 1, r = n - 1; l < r; l++, r--) {
+            int t = nums[l]; nums[l] = nums[r]; nums[r] = t;
+        }
     }
 }
 ```
 
 ```cpp
-void dfs(vector<int>& nums, int start, vector<int>& path, vector<vector<int>>& res) {
-    res.push_back(path);
-    for (int i = start; i < (int)nums.size(); ++i) {
+#include <algorithm>
+#include <vector>
+using namespace std;
+
+void backtrackPermute(const vector<int>& nums, vector<bool>& used,
+                      vector<int>& path, vector<vector<int>>& result) {
+    if (path.size() == nums.size()) {
+        result.push_back(path);
+        return;
+    }
+    for (int i = 0; i < (int)nums.size(); ++i) {    // every index, every time
+        if (used[i]) continue;
+        used[i] = true;                              // choose
         path.push_back(nums[i]);
-        dfs(nums, i + 1, path, res);
-        path.pop_back();
+        backtrackPermute(nums, used, path, result);  // explore
+        path.pop_back();                             // un-choose: BOTH
+        used[i] = false;
     }
 }
-vector<vector<int>> subsets(vector<int>& nums) {
-    vector<vector<int>> res; vector<int> path;
-    dfs(nums, 0, path, res);
-    return res;
+
+vector<vector<int>> permute(const vector<int>& nums) {
+    vector<vector<int>> result;
+    vector<int> path;
+    vector<bool> used(nums.size(), false);
+    backtrackPermute(nums, used, path, result);
+    return result;
+}
+
+void nextPermutation(vector<int>& nums) {
+    int n = (int)nums.size(), pivot = n - 2;
+    while (pivot >= 0 && nums[pivot] >= nums[pivot + 1]) --pivot;
+
+    if (pivot >= 0) {
+        int successor = n - 1;
+        while (nums[successor] <= nums[pivot]) --successor;
+        swap(nums[pivot], nums[successor]);
+    }
+    reverse(nums.begin() + pivot + 1, nums.end());
 }
 ```
 
@@ -260,145 +572,358 @@ vector<vector<int>> subsets(vector<int>& nums) {
 ## 9. Solved Example 1
 
 ### Problem — Permutations (LeetCode 46)
-Return every ordering of a list of distinct integers.
+Given an array of **distinct** integers, return all possible permutations.
 
 ### Thought Process
-1. Order matters, so at each level we may place any element that has not been used yet — track this with a `used` boolean array.
-2. When `len(path) == len(nums)` we have a full permutation; snapshot it.
-3. Loop over all indices, skip the used ones, choose → recurse → un-choose (resetting `used[i]`).
+1. Order matters, so a `start` index is wrong — we must be able to pick a smaller index after a larger one.
+2. Track `used[]` and loop over **every** index, skipping the ones already taken.
+3. Every path of length `n` is a valid permutation, so nothing is ever filtered out.
+4. Record only at full length — unlike subsets, intermediate nodes are not answers.
+5. Un-choose must reset both `path` and `used[i]`.
 
 ### Dry Run
-Input `nums = [1,2,3]`:
-- place 1 → place 2 → place 3 → `[1,2,3]` ✓; back up, `[1,3,2]` ✓.
-- place 2 → `[2,1,3]`, `[2,3,1]` ✓.
-- place 3 → `[3,1,2]`, `[3,2,1]` ✓.
-- Result: 6 permutations.
+
+Input: `nums = [1, 2, 3]`
+
+| depth 0 pick | depth 1 pick | depth 2 pick | recorded |
+|--------------|--------------|--------------|----------|
+| `1` | `2` | `3` | **`[1,2,3]`** |
+| `1` | `3` | `2` | **`[1,3,2]`** |
+| `2` | `1` | `3` | **`[2,1,3]`** |
+| `2` | `3` | `1` | **`[2,3,1]`** |
+| `3` | `1` | `2` | **`[3,1,2]`** |
+| `3` | `2` | `1` | **`[3,2,1]`** |
+
+Output: **`[[1,2,3], [1,3,2], [2,1,3], [2,3,1], [3,1,2], [3,2,1]]`** ✓ — that is `3! = 6`.
+
+Trace the first backtrack in detail. After recording `[1,2,3]`:
+
+```text
+return from depth 3 → pop 3, used[2] = false      path = [1,2]
+return from depth 2 → pop 2, used[1] = false      path = [1]
+now the depth-1 loop continues at i = 2 → picks 3 → path = [1,3]
+```
+
+That reset of `used[1]` is what makes `2` available again for the `[1,3,2]` branch. Skipping it would leave `2` permanently consumed and the output would be missing four of the six permutations.
 
 ### Visualization
-```
-[1,2,3] ──▶ pick any unused index each level (used[] flags them)
-record when len(path)==len(nums) ──▶ 3! = 6 orderings
+
+```text
+                       []
+        ┌───────────────┼───────────────┐
+       [1]             [2]             [3]
+      ┌─┴─┐           ┌─┴─┐           ┌─┴─┐
+   [1,2] [1,3]     [2,1] [2,3]     [3,1] [3,2]
+     │     │         │     │         │     │
+ [1,2,3][1,3,2] [2,1,3][2,3,1] [3,1,2][3,2,1]
+
+3 choices → 2 → 1  =  6 leaves, all recorded
 ```
 
 ### Code
+
+```go
+func permute(nums []int) [][]int {
+    result := [][]int{}
+    path := []int{}
+    used := make([]bool, len(nums))
+
+    var backtrack func()
+    backtrack = func() {
+        if len(path) == len(nums) { // only full-length paths are answers
+            snapshot := make([]int, len(path))
+            copy(snapshot, path)
+            result = append(result, snapshot)
+            return
+        }
+
+        // Every index each time: order matters, so we may pick a smaller
+        // index after a larger one. That is why there is no `start`.
+        for i := 0; i < len(nums); i++ {
+            if used[i] {
+                continue
+            }
+
+            used[i] = true                // choose
+            path = append(path, nums[i])
+
+            backtrack()                   // explore
+
+            path = path[:len(path)-1]     // un-choose: BOTH the path...
+            used[i] = false               // ...and the flag
+        }
+    }
+
+    backtrack()
+    return result
+}
+```
+
 ```python
 def permute(nums):
-    res, path = [], []
+    result, path = [], []
     used = [False] * len(nums)
-    def dfs():
+
+    def backtrack():
         if len(path) == len(nums):
-            res.append(path[:])
+            result.append(path[:])      # a COPY
             return
-        for i in range(len(nums)):
+
+        for i in range(len(nums)):      # every index, every time
             if used[i]:
                 continue
-            used[i] = True
-            path.append(nums[i])                # choose
-            dfs()                               # explore
-            path.pop()                          # un-choose
+            used[i] = True              # choose
+            path.append(nums[i])
+            backtrack()                 # explore
+            path.pop()                  # un-choose: BOTH
             used[i] = False
-    dfs()
-    return res
+
+    backtrack()
+    return result
 ```
 
 ### Complexity
-Time O(n · n!) to build every permutation, Space O(n) for the path and `used` array.
+Time **O(n · n!)** — `n!` permutations, each copied in O(n). That is optimal, since the output is that large. Space O(n) for the recursion, path and flags.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Permutations II (LeetCode 47)
-Return every **unique** ordering of a list that may contain duplicate integers.
+Same, but the input **may contain duplicates**, and the result must contain each distinct permutation exactly once.
 
 ### Thought Process
-1. Sort `nums` first so equal values are adjacent, enabling a clean duplicate skip.
-2. Use a `used` array as before, recording when `len(path) == len(nums)`.
-3. Skip a duplicate at the same level with `if i > 0 and nums[i] == nums[i-1] and not used[i-1]: continue` — only the first unused copy in a group may start a branch.
+1. With `[1, 1, 2]`, picking the first `1` then the second gives the same permutation as picking them the other way round.
+2. Sort so equal values are adjacent, then add one skip rule.
+3. **Use a duplicate only if its identical predecessor is already in the path**: `if i > 0 && nums[i] == nums[i-1] && !used[i-1] { continue }`.
+4. That forces equal values to be consumed strictly left to right, so exactly one of their interchangeable orderings survives.
+5. Everything else is unchanged from Example 1.
 
 ### Dry Run
-Input `nums = [1,1,2]` (already sorted):
-- place first 1 → place second 1 → place 2 → `[1,1,2]` ✓; back up → `[1,2,1]` ✓.
-- place 2 → place 1 → `[2,1,1]` ✓.
-- the second leading 1 is skipped (its previous equal is unused), avoiding a repeat.
-- Result: `[[1,1,2],[1,2,1],[2,1,1]]`.
+
+Input: `nums = [1, 1, 2]` (already sorted) — call the two ones `1ₐ` (index 0) and `1ᵦ` (index 1).
+
+| depth | path | i | `used[i-1]` | decision |
+|-------|------|---|-------------|----------|
+| 0 | `[]` | 0 (`1ₐ`) | — | take → `used[0] = true` |
+| 1 | `[1]` | 1 (`1ᵦ`) | `used[0] = **true**` | rule says skip only if `!used[0]`, which is false → **allowed** |
+| 2 | `[1,1]` | 2 (`2`) | — | take → record **`[1,1,2]`** |
+| 1 (back) | `[1]` | 2 (`2`) | — | take → `[1,2]` |
+| 2 | `[1,2]` | 1 (`1ᵦ`) | `used[0] = true` → allowed | record **`[1,2,1]`** |
+| 0 (back) | `[]` | 1 (`1ᵦ`) | `used[0] = **false**` (undone) | `nums[1]==nums[0] && !used[0]` → **SKIP** |
+| 0 | `[]` | 2 (`2`) | — | take → `[2]` |
+| 1 | `[2]` | 0 (`1ₐ`) | — | take → `[2,1]` |
+| 2 | `[2,1]` | 1 (`1ᵦ`) | `used[0] = true` → allowed | record **`[2,1,1]`** |
+| 1 (back) | `[2]` | 1 (`1ᵦ`) | `used[0] = false` | **SKIP** |
+
+Output: **`[[1,1,2], [1,2,1], [2,1,1]]`** ✓ — three distinct permutations, not `3! = 6`.
+
+**The rule, read carefully.** The two decisive rows are the ones where `i = 1`:
+
+- Inside the `1ₐ` branch, `used[0]` is `true` — the predecessor is *above me in the path*, so taking `1ᵦ` extends it in canonical order. **Allowed.**
+- Back at the top level, `used[0]` is `false` — `1ₐ` was already tried and undone *at this level*, so starting a branch with `1ᵦ` would repeat exactly what `1ₐ` already did. **Skipped.**
 
 ### Visualization
-```
-sorted [1,1,2] ──▶ skip nums[i]==nums[i-1] when used[i-1] is False
-record full path ──▶ [1,1,2] [1,2,1] [2,1,1]  (no duplicates)
+
+```text
+sorted: [1ₐ, 1ᵦ, 2]
+
+top level:   take 1ₐ  ✓        take 1ᵦ  ✗ (predecessor undone at this level)
+                                        take 2   ✓
+
+inside 1ₐ:   take 1ᵦ  ✓ (predecessor is in the path above → canonical)
+
+results: [1,1,2]  [1,2,1]  [2,1,1]      — 3, not 6
 ```
 
 ### Code
+
+```go
+func permuteUnique(nums []int) [][]int {
+    // Sorting puts equal values next to each other, which the skip needs.
+    sort.Ints(nums)
+
+    result := [][]int{}
+    path := []int{}
+    used := make([]bool, len(nums))
+
+    var backtrack func()
+    backtrack = func() {
+        if len(path) == len(nums) {
+            snapshot := make([]int, len(path))
+            copy(snapshot, path)
+            result = append(result, snapshot)
+            return
+        }
+
+        for i := 0; i < len(nums); i++ {
+            if used[i] {
+                continue
+            }
+            // Use a duplicate only if its identical predecessor is already
+            // in the path. If the predecessor was undone at THIS level,
+            // starting with this copy would repeat that same branch.
+            if i > 0 && nums[i] == nums[i-1] && !used[i-1] {
+                continue
+            }
+
+            used[i] = true
+            path = append(path, nums[i])
+            backtrack()
+            path = path[:len(path)-1]
+            used[i] = false
+        }
+    }
+
+    backtrack()
+    return result
+}
+```
+
 ```python
 def permuteUnique(nums):
-    nums.sort()
-    res, path = [], []
+    nums.sort()                         # equal values must be adjacent
+    result, path = [], []
     used = [False] * len(nums)
-    def dfs():
+
+    def backtrack():
         if len(path) == len(nums):
-            res.append(path[:])
+            result.append(path[:])
             return
+
         for i in range(len(nums)):
             if used[i]:
                 continue
+            # Only extend a duplicate whose predecessor is already in the path.
             if i > 0 and nums[i] == nums[i - 1] and not used[i - 1]:
-                continue                        # skip duplicate at this level
+                continue
             used[i] = True
-            path.append(nums[i])                # choose
-            dfs()                               # explore
-            path.pop()                          # un-choose
+            path.append(nums[i])
+            backtrack()
+            path.pop()
             used[i] = False
-    dfs()
-    return res
+
+    backtrack()
+    return result
 ```
 
 ### Complexity
-Time O(n · n!) worst case, Space O(n) for the path and `used` array.
+Time **O(n · n!)** worst case (all distinct); much less when duplicates collapse branches. Space O(n).
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Next Permutation (LeetCode 31)
-Rearrange `nums` in place into the lexicographically next greater permutation (or the smallest ordering if none exists).
+Rearrange the numbers into the **next** lexicographically greater permutation, in place. If none exists, rearrange into the smallest (ascending) order.
 
 ### Thought Process
-1. Scan from the right for the first index `i` where `nums[i] < nums[i+1]` — the pivot that can be increased. If none, the array is the last permutation; reverse it to the first.
-2. Find the rightmost `j` with `nums[j] > nums[i]` and swap `i` and `j` — the smallest increase to the pivot.
-3. The suffix after `i` is descending; reverse it to make it ascending, giving the smallest tail. This is the standard array algorithm, not backtracking.
+1. Enumerating all `n!` permutations to find the next one is absurd — `n = 12` alone is 479 million.
+2. Think about what "next" means. A **descending** suffix is already the largest arrangement of its elements, so nothing inside it can increase. The change must happen just before it.
+3. Four steps:
+   - **Find the pivot**: the rightmost index `i` with `nums[i] < nums[i+1]`. Everything to its right is descending.
+   - If no pivot exists, the whole array is descending — it is the last permutation, so reverse it to get the first.
+   - **Find the successor**: the rightmost element greater than the pivot. Swapping gives the smallest possible increase at that position.
+   - **Reverse the suffix**: it was descending, so reversing makes it ascending — the smallest arrangement of what remains.
+4. O(n) time, O(1) space.
 
 ### Dry Run
-Input `nums = [1,3,2]`:
-- from the right, `nums[0]=1 < nums[1]=3` → pivot `i = 0`.
-- rightmost `j` with `nums[j] > 1` is `j = 2` (`nums[2]=2`); swap → `[2,3,1]`.
-- reverse suffix from index 1 → `[2,1,3]`.
-- Result: `[2,1,3]`.
+
+Input: `nums = [1, 3, 2]`
+
+| step | action | array |
+|------|--------|-------|
+| — | start | `[1, 3, 2]` |
+| 1 | find pivot: `nums[1]=3 >= nums[2]=2` → move left; `nums[0]=1 < nums[1]=3` → **pivot = 0** | `[1, 3, 2]` |
+| 2 | find rightmost element `> 1`: `nums[2] = 2` → **successor = 2** | `[1, 3, 2]` |
+| 3 | swap pivot and successor | `[2, 3, 1]` |
+| 4 | reverse the suffix from index 1: `[3,1] → [1,3]` | **`[2, 1, 3]`** |
+
+Output: **`[2, 1, 3]`** ✓
+
+Verify by listing permutations of `{1,2,3}` in order: `123, 132, 213, 231, 312, 321`. The one after `132` is indeed `213`. ✓
+
+**The no-pivot case**, `nums = [3, 2, 1]`: scanning left from index 1, every `nums[i] >= nums[i+1]`, so `pivot` falls to `−1`. Steps 2 and 3 are skipped, and step 4 reverses from index `0`, giving **`[1, 2, 3]`** — the smallest permutation. ✓
+
+**A case with duplicates**, `nums = [1, 1, 5]`: pivot is index 1 (`1 < 5`); the rightmost element greater than `1` is `5` at index 2; swap → `[1, 5, 1]`; reverse the one-element suffix → **`[1, 5, 1]`**. ✓
 
 ### Visualization
-```
-[1,3,2] ──▶ pivot i where nums[i]<nums[i+1], swap with rightmost bigger j
-reverse suffix after i ──▶ [2,1,3]   (if no pivot, reverse whole array)
+
+```text
+[1, 3, 2]
+    ↑  └─ descending suffix: already maximal, cannot grow
+  pivot = 0 (the last place where the sequence rises)
+
+step 2: rightmost element > 1  is  2
+step 3: swap        →  [2, 3, 1]
+step 4: reverse the suffix [3,1]  →  [1,3]
+
+        →  [2, 1, 3]
+
+swapping with the RIGHTMOST greater element gives the smallest bump;
+reversing the suffix makes the tail as small as possible
 ```
 
 ### Code
+
+```go
+func nextPermutation(nums []int) {
+    n := len(nums)
+
+    // 1. Find the pivot: the rightmost index that is still ascending.
+    //    Everything to its right is non-increasing, hence already maximal.
+    pivot := n - 2
+    for pivot >= 0 && nums[pivot] >= nums[pivot+1] {
+        pivot--
+    }
+
+    if pivot >= 0 {
+        // 2. Find the rightmost element greater than the pivot. It is the
+        //    smallest value that still increases this position.
+        successor := n - 1
+        for nums[successor] <= nums[pivot] {
+            successor--
+        }
+        // 3. Swap: the position now holds the smallest possible larger value.
+        nums[pivot], nums[successor] = nums[successor], nums[pivot]
+    }
+    // If pivot < 0 the array was fully descending — the last permutation —
+    // and step 4 alone turns it into the first.
+
+    // 4. The suffix is descending; reversing makes it ascending, which is
+    //    the smallest arrangement of those elements.
+    for left, right := pivot+1, n-1; left < right; left, right = left+1, right-1 {
+        nums[left], nums[right] = nums[right], nums[left]
+    }
+}
+```
+
 ```python
 def nextPermutation(nums):
     n = len(nums)
-    i = n - 2
-    while i >= 0 and nums[i] >= nums[i + 1]:    # find pivot
-        i -= 1
-    if i >= 0:
-        j = n - 1
-        while nums[j] <= nums[i]:               # rightmost value > pivot
-            j -= 1
-        nums[i], nums[j] = nums[j], nums[i]
-    left, right = i + 1, n - 1                   # reverse the suffix
-    while left < right:
-        nums[left], nums[right] = nums[right], nums[left]
-        left += 1
-        right -= 1
+
+    # 1. Rightmost ascending step; everything after it is already maximal.
+    pivot = n - 2
+    while pivot >= 0 and nums[pivot] >= nums[pivot + 1]:
+        pivot -= 1
+
+    if pivot >= 0:
+        # 2. Rightmost element greater than the pivot = smallest valid bump.
+        successor = n - 1
+        while nums[successor] <= nums[pivot]:
+            successor -= 1
+        nums[pivot], nums[successor] = nums[successor], nums[pivot]   # 3. swap
+
+    # 4. The suffix was descending; reversing gives the smallest tail.
+    nums[pivot + 1:] = reversed(nums[pivot + 1:])
 ```
 
 ### Complexity
-Time O(n) single passes, Space O(1) in place.
+Time **O(n)** — each step scans at most once. Space **O(1)**, fully in place.
 
+> Calling this repeatedly walks every permutation in lexicographic order using constant extra memory, which is how `std::next_permutation` works. It is the right tool whenever you need to *iterate* permutations rather than *materialise* them.
+
+---
 
 ## 12. LeetCode Practice Set
 

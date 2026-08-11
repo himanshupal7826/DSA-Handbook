@@ -41,32 +41,135 @@ n queens, backtracking, constraints, diagonal, prune.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Place things on a board so that none of them conflict."*
+
 ### Intuition
-Generate all candidates then filter — wasteful, explores invalid branches fully.
+Try every way to put `n` queens on `n²` squares, then check each arrangement.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Enumerate every choice of `n` squares from the `n²` available.
+2. For each arrangement, compare all `C(n,2)` pairs of queens.
+3. Keep the arrangements where no pair shares a row, column, or diagonal.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **C(n², n) · n²** — for `n = 8` that is over 4 billion arrangements before any checking.
+- Space: O(n).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the N Queens pattern is built to use.
+- It ignores a fact the problem hands you for free: **no two queens can share a row**, so there is exactly one queen per row. That alone cuts the search space from `C(n², n)` to `nⁿ`.
+- And it validates only at the very end. Two queens attacking each other in the first two rows dooms every completion, yet the brute force explores all of them.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-DFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the N Queens invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Place one queen per row, and before placing each one, check in O(1) whether its column or either diagonal is already taken.**
+
+Two ideas combine:
+
+```text
+1. ONE QUEEN PER ROW    →  the search is a choice of column per row: n^n, not C(n², n)
+2. O(1) CONFLICT CHECK  →  maintain sets of used columns and diagonals
+```
+
+### The thought process
+
+```text
+We need    : all non-attacking placements of n queens.
+Obvious way: try every set of n squares, then validate.
+Hopeless   : C(n², n) arrangements, validated pairwise at the end.
+Notice     : no two queens share a row ⇒ exactly one per row.
+             So "which squares" becomes "which column for each row".
+Notice too : a conflict can be detected the MOMENT a queen is placed,
+             killing an entire subtree instead of a single leaf.
+Therefore  : recurse row by row; keep sets of occupied columns and
+             diagonals so each check is O(1).
+Now        : n=8 solves instantly.
+```
+
+### The diagonal trick, which is the whole chapter
+
+Checking "does this square share a diagonal with any placed queen?" looks like it needs a scan. It doesn't, because of two identities:
+
+```text
+"\" diagonals (top-left to bottom-right):   row - col  is CONSTANT
+"/" diagonals (top-right to bottom-left):   row + col  is CONSTANT
+```
+
+Verify on a 4×4 board — the value of `row + col` for each square:
+
+```text
+      col 0   1   2   3
+row 0   0   1   2   3
+row 1   1   2   3   4
+row 2   2   3   4   5
+row 3   3   4   5   6
+```
+
+Every anti-diagonal has one value. Likewise `row − col` is constant along the other diagonal. So a diagonal is just a number, and "is it taken?" is an array lookup.
+
+**Index shifting.** `row + col` ranges over `0 … 2n−2`, so an array of size `2n−1` holds it directly. But `row − col` ranges over `−(n−1) … n−1`, which cannot index an array — shift it by `n − 1`:
+
+```go
+diag  := row - col + n - 1   // 0 .. 2n-2
+anti  := row + col           // 0 .. 2n-2
+```
+
+### Steps
+
+```text
+Step 1 → cols, diag, anti = all false; board = empty
+Step 2 → define place(row):
+Step 3 →     if row == n:  record the board;  return
+Step 4 →     for col = 0 .. n-1:
+Step 5 →         if cols[col] or diag[row-col+n-1] or anti[row+col]: skip
+Step 6 →         mark all three; put a queen at (row, col)      ← choose
+Step 7 →         place(row + 1)                                 ← explore
+Step 8 →         unmark all three; remove the queen             ← un-choose
+```
+
+Step 8 must undo **all three** marks. Forgetting one leaves the board permanently over-constrained and silently loses solutions.
+
+### Why this prunes so hard
+
+The check in step 5 rejects a square before recursing, so an invalid prefix is never extended. For `n = 8` the theoretical `8⁸ ≈ 16.7 million` column choices collapse to about **2,057 nodes actually visited**, yielding 92 solutions. The constraint sets are doing almost all the work.
+
+### Counting versus listing
+
+If the problem asks only **how many** solutions exist (LeetCode 52), do not build boards. Increment a counter at step 3 and skip the string construction entirely — it is the same search with the output stage removed, and noticeably faster.
+
+### The same shape, other problems
+
+| Problem | One decision | Constraint sets |
+|---|---|---|
+| N-Queens | which column for this row | columns, both diagonals |
+| Sudoku | which digit for this cell | row, column, 3×3 box |
+| Graph colouring | which colour for this node | colours used by neighbours |
+| Word Search | which direction to step | cells already on the path |
+
+The recipe is identical: **pick the next slot, try each candidate, reject with an O(1) check, recurse, undo.**
+
+### How should I recognize this?
+
+```text
+If you see...
+  "place N things so none conflict", "N-Queens", "sudoku"
+  "colour the map", "assign without collisions"
+  a board or grid with rules about what may share a line/region
+        ↓
+Think about...
+  "What is one decision? What constraint sets make the
+   conflict check O(1) instead of a scan?"
+        ↓
+Use...
+  recurse over slots (one per row/cell)
+  boolean sets for each constraint dimension
+  mark → recurse → unmark, undoing EVERY mark
+```
 
 ### Visual explanation
 
@@ -94,82 +197,240 @@ DFS over the decision tree with pruning. Each recursion makes a choice, recurses
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-N Queens          : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+n = 4, placing row by row
+
+row 0:  . Q . .        col 1 taken, diag/anti marked
+row 1:  . . . Q        cols 0 and 2 rejected by diagonal conflicts
+row 2:  Q . . .
+row 3:  . . Q .        complete → record
+
+row+col identifies the "/" diagonals:
+
+      col 0  1  2  3
+row 0    0  1  2  3
+row 1    1  2  3  4
+row 2    2  3  4  5
+row 3    3  4  5  6      ← every anti-diagonal has one value
 ```
 
 ### Interview explanation
-"This is a N Queens problem. I'll dFS over the decision tree with pruning. Each recursion makes a choice, recurses, then undoes it to try the next. That brings the complexity down to O(branches^depth) time and O(depth) space — here's the template."
+"The key simplification is that no two queens can share a row, so there is exactly one queen per row and the problem becomes choosing a column for each row — that's `nⁿ` instead of `C(n², n)`. Then I make the conflict check O(1) using two identities: along one diagonal `row − col` is constant, and along the other `row + col` is constant. So I keep three boolean arrays — columns, `row−col` shifted by `n−1` to make it non-negative, and `row+col` — and before placing a queen I check all three. Because the check happens before recursing, an invalid prefix is never extended, which prunes enormously: for `n = 8` it visits about two thousand nodes instead of sixteen million. The un-choose step has to clear all three marks. If the problem only wants the count, I skip building the board strings entirely."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Backtracking** family template. Adapt the comparison/condition to the specific problem.
+> One decision per row, three O(1) constraint sets, undo every mark.
 
 ```go
-// Subsets via choose/explore/un-choose.
-func subsets(nums []int) [][]int {
-    res := [][]int{}
-    var path []int
-    var dfs func(start int)
-    dfs = func(start int) {
-        cp := make([]int, len(path)); copy(cp, path)
-        res = append(res, cp)                 // record current subset
-        for i := start; i < len(nums); i++ {
-            path = append(path, nums[i])       // choose
-            dfs(i + 1)                         // explore
-            path = path[:len(path)-1]          // un-choose
+// SolveNQueens returns every arrangement as a list of board rows.
+func SolveNQueens(n int) [][]string {
+    result := [][]string{}
+
+    queenCol := make([]int, n)      // queenCol[row] = the column used
+    cols := make([]bool, n)         // occupied columns
+    diag := make([]bool, 2*n-1)     // "\" diagonals, keyed by row-col+n-1
+    anti := make([]bool, 2*n-1)     // "/" diagonals, keyed by row+col
+
+    var place func(row int)
+    place = func(row int) {
+        if row == n {
+            result = append(result, renderBoard(queenCol, n))
+            return
+        }
+
+        for col := 0; col < n; col++ {
+            d, a := row-col+n-1, row+col
+            if cols[col] || diag[d] || anti[a] {
+                continue // O(1) rejection, before any recursion
+            }
+
+            cols[col], diag[d], anti[a] = true, true, true // choose
+            queenCol[row] = col
+
+            place(row + 1) // explore
+
+            cols[col], diag[d], anti[a] = false, false, false // un-choose ALL
         }
     }
-    dfs(0)
-    return res
+
+    place(0)
+    return result
+}
+
+// renderBoard turns the column choices into the string form.
+func renderBoard(queenCol []int, n int) []string {
+    board := make([]string, n)
+    for row := 0; row < n; row++ {
+        line := make([]byte, n)
+        for col := range line {
+            line[col] = '.'
+        }
+        line[queenCol[row]] = 'Q'
+        board[row] = string(line)
+    }
+    return board
+}
+
+// CountNQueens is the same search with the output stage removed.
+func CountNQueens(n int) int {
+    count := 0
+    cols := make([]bool, n)
+    diag := make([]bool, 2*n-1)
+    anti := make([]bool, 2*n-1)
+
+    var place func(row int)
+    place = func(row int) {
+        if row == n {
+            count++ // no board is built
+            return
+        }
+        for col := 0; col < n; col++ {
+            d, a := row-col+n-1, row+col
+            if cols[col] || diag[d] || anti[a] {
+                continue
+            }
+            cols[col], diag[d], anti[a] = true, true, true
+            place(row + 1)
+            cols[col], diag[d], anti[a] = false, false, false
+        }
+    }
+
+    place(0)
+    return count
 }
 ```
 
 ```python
-def subsets(nums):
-    res, path = [], []
-    def dfs(start):
-        res.append(path[:])                    # record
-        for i in range(start, len(nums)):
-            path.append(nums[i])               # choose
-            dfs(i + 1)                          # explore
-            path.pop()                          # un-choose
-    dfs(0)
-    return res
+def solve_n_queens(n):
+    """Every arrangement, as a list of board rows."""
+    result = []
+    queen_col = [0] * n
+    cols = [False] * n                  # occupied columns
+    diag = [False] * (2 * n - 1)        # "\" diagonals: row - col + n - 1
+    anti = [False] * (2 * n - 1)        # "/" diagonals: row + col
+
+    def place(row):
+        if row == n:
+            result.append(["." * c + "Q" + "." * (n - c - 1) for c in queen_col])
+            return
+
+        for col in range(n):
+            d, a = row - col + n - 1, row + col
+            if cols[col] or diag[d] or anti[a]:
+                continue                # O(1) rejection before recursing
+
+            cols[col] = diag[d] = anti[a] = True    # choose
+            queen_col[row] = col
+            place(row + 1)                          # explore
+            cols[col] = diag[d] = anti[a] = False   # un-choose ALL
+
+    place(0)
+    return result
+
+def count_n_queens(n):
+    """Same search, output stage removed."""
+    cols = [False] * n
+    diag = [False] * (2 * n - 1)
+    anti = [False] * (2 * n - 1)
+    count = 0
+
+    def place(row):
+        nonlocal count
+        if row == n:
+            count += 1
+            return
+        for col in range(n):
+            d, a = row - col + n - 1, row + col
+            if cols[col] or diag[d] or anti[a]:
+                continue
+            cols[col] = diag[d] = anti[a] = True
+            place(row + 1)
+            cols[col] = diag[d] = anti[a] = False
+
+    place(0)
+    return count
 ```
 
 ```java
-List<List<Integer>> subsets(int[] nums) {
-    List<List<Integer>> res = new ArrayList<>();
-    dfs(nums, 0, new ArrayList<>(), res);
-    return res;
-}
-void dfs(int[] nums, int start, List<Integer> path, List<List<Integer>> res) {
-    res.add(new ArrayList<>(path));
-    for (int i = start; i < nums.length; i++) {
-        path.add(nums[i]);
-        dfs(nums, i + 1, path, res);
-        path.remove(path.size() - 1);
+import java.util.*;
+
+public class NQueens {
+    public static List<List<String>> solveNQueens(int n) {
+        List<List<String>> result = new ArrayList<>();
+        int[] queenCol = new int[n];
+        boolean[] cols = new boolean[n];
+        boolean[] diag = new boolean[2 * n - 1];    // row - col + n - 1
+        boolean[] anti = new boolean[2 * n - 1];    // row + col
+        place(0, n, queenCol, cols, diag, anti, result);
+        return result;
+    }
+
+    private static void place(int row, int n, int[] queenCol, boolean[] cols,
+                              boolean[] diag, boolean[] anti,
+                              List<List<String>> result) {
+        if (row == n) {
+            List<String> board = new ArrayList<>();
+            for (int r = 0; r < n; r++) {
+                char[] line = new char[n];
+                Arrays.fill(line, '.');
+                line[queenCol[r]] = 'Q';
+                board.add(new String(line));
+            }
+            result.add(board);
+            return;
+        }
+
+        for (int col = 0; col < n; col++) {
+            int d = row - col + n - 1, a = row + col;
+            if (cols[col] || diag[d] || anti[a]) continue;   // O(1) rejection
+
+            cols[col] = diag[d] = anti[a] = true;            // choose
+            queenCol[row] = col;
+            place(row + 1, n, queenCol, cols, diag, anti, result);
+            cols[col] = diag[d] = anti[a] = false;           // un-choose ALL
+        }
     }
 }
 ```
 
 ```cpp
-void dfs(vector<int>& nums, int start, vector<int>& path, vector<vector<int>>& res) {
-    res.push_back(path);
-    for (int i = start; i < (int)nums.size(); ++i) {
-        path.push_back(nums[i]);
-        dfs(nums, i + 1, path, res);
-        path.pop_back();
+#include <string>
+#include <vector>
+using namespace std;
+
+void place(int row, int n, vector<int>& queenCol, vector<bool>& cols,
+           vector<bool>& diag, vector<bool>& anti,
+           vector<vector<string>>& result) {
+    if (row == n) {
+        vector<string> board;
+        for (int r = 0; r < n; ++r) {
+            string line(n, '.');
+            line[queenCol[r]] = 'Q';
+            board.push_back(line);
+        }
+        result.push_back(board);
+        return;
+    }
+
+    for (int col = 0; col < n; ++col) {
+        int d = row - col + n - 1, a = row + col;
+        if (cols[col] || diag[d] || anti[a]) continue;      // O(1) rejection
+
+        cols[col] = diag[d] = anti[a] = true;               // choose
+        queenCol[row] = col;
+        place(row + 1, n, queenCol, cols, diag, anti, result);
+        cols[col] = diag[d] = anti[a] = false;              // un-choose ALL
     }
 }
-vector<vector<int>> subsets(vector<int>& nums) {
-    vector<vector<int>> res; vector<int> path;
-    dfs(nums, 0, path, res);
-    return res;
+
+vector<vector<string>> solveNQueens(int n) {
+    vector<vector<string>> result;
+    vector<int> queenCol(n);
+    vector<bool> cols(n, false), diag(2 * n - 1, false), anti(2 * n - 1, false);
+    place(0, n, queenCol, cols, diag, anti, result);
+    return result;
 }
 ```
 
@@ -255,153 +516,397 @@ vector<vector<int>> subsets(vector<int>& nums) {
 ## 9. Solved Example 1
 
 ### Problem — N-Queens (LeetCode 51)
-A representative **N Queens** problem. The signal: place queens column by column, pruning conflicting diagonals/rows.
+Place `n` queens on an `n × n` board so that none attack each other. Return every distinct solution as a list of board rows.
 
 ### Thought Process
-1. Place exactly one queen per row, recursing from row 0 down to row n.
-2. Track occupied `cols`, `diag` (r − c), and `anti` (r + c) as sets so a conflict check is O(1).
-3. If a column is free on all three axes, place the queen (record its column), recurse to the next row, then undo before trying the next column.
-4. When `row == n`, every row holds a safe queen — turn the recorded columns into `"...Q.."` strings and append the board.
+1. No two queens share a row, so place exactly one per row — the search becomes "which column for each row".
+2. Conflicts are column, `"\"` diagonal, and `"/"` diagonal. Keep a boolean array for each so every check is O(1).
+3. `row − col` is constant along a `"\"` diagonal; shift by `n − 1` to make it a valid index. `row + col` is constant along a `"/"` diagonal and is already non-negative.
+4. Check before recursing, so an invalid prefix is never extended.
+5. Un-choose must clear all three marks.
 
 ### Dry Run
-n = 4, place row by row:
-- row0 → col0; cols={0}, diag={0}, anti={0}.
-- row1 → col2 is safe (col1 hits anti, others clash); recurse.
-- row2 → no safe column (all clash) → backtrack up to row1, then row0.
-- Eventually row0=col1, row1=col3, row2=col0, row3=col2 succeeds → board `.Q..`,`...Q`,`Q...`,`..Q.`; the mirror solution is also found → 2 boards.
+
+Input: `n = 4`
+
+The recursion places one queen per row, rejecting any column whose column-, diag- or anti-set is already marked.
+
+| row | columns tried | outcome |
+|-----|---------------|---------|
+| 0 | col 0 | placed; marks `cols[0]`, `diag[3]`, `anti[0]` |
+| 1 | col 0 ✗ (column), col 1 ✗ (anti = 2? no — `diag[1-1+3]=3` taken) , col 2 ✓ | placed |
+| 2 | every column conflicts | **dead end → backtrack** |
+| 1 | col 3 ✓ | placed |
+| 2 | col 1 ✓ | placed |
+| 3 | every column conflicts | **dead end → backtrack all the way** |
+| 0 | col 1 ✓ | placed; marks `cols[1]`, `diag[1-... ]`, `anti[1]` |
+| 1 | col 3 ✓ | placed |
+| 2 | col 0 ✓ | placed |
+| 3 | col 2 ✓ | **row == 4 → record** |
+
+First solution — queen columns `[1, 3, 0, 2]`:
+
+```text
+. Q . .
+. . . Q
+Q . . .
+. . Q .
+```
+
+Continuing the search finds the mirror image, columns `[2, 0, 3, 1]`:
+
+```text
+. . Q .
+Q . . .
+. . . Q
+. Q . .
+```
+
+Output: **both boards** ✓ — `n = 4` has exactly 2 solutions.
+
+**Check one conflict by hand.** Queens at `(0,1)` and `(1,3)`: different columns ✓; `row − col` is `−1` and `−2` — different ✓; `row + col` is `1` and `4` — different ✓. No attack. Now try `(0,1)` and `(1,2)`: `row + col` is `1` and `3` (fine), but `row − col` is `−1` and `−1` — **same `"\"` diagonal**, so it is rejected. That is the `diag` array doing its job in O(1).
 
 ### Visualization
-```
-row-by-row placement, sets cols/diag(r-c)/anti(r+c) prune attacked columns before recursing
+
+```text
+row - col  (the "\" diagonals), n = 4, shifted by +3 to index an array:
+
+      col 0  1  2  3
+row 0    3  2  1  0
+row 1    4  3  2  1
+row 2    5  4  3  2
+row 3    6  5  4  3
+         ↑
+   every "\" diagonal carries one value
+
+solution [1,3,0,2]:
+        . Q . .
+        . . . Q
+        Q . . .
+        . . Q .
 ```
 
 ### Code
+
+```go
+func solveNQueens(n int) [][]string {
+    result := [][]string{}
+
+    queenCol := make([]int, n)  // queenCol[row] = chosen column
+    cols := make([]bool, n)     // occupied columns
+    diag := make([]bool, 2*n-1) // "\" diagonals, keyed by row-col+n-1
+    anti := make([]bool, 2*n-1) // "/" diagonals, keyed by row+col
+
+    var place func(row int)
+    place = func(row int) {
+        if row == n { // all rows filled: a complete solution
+            board := make([]string, n)
+            for r := 0; r < n; r++ {
+                line := make([]byte, n)
+                for c := range line {
+                    line[c] = '.'
+                }
+                line[queenCol[r]] = 'Q'
+                board[r] = string(line)
+            }
+            result = append(result, board)
+            return
+        }
+
+        for col := 0; col < n; col++ {
+            // row-col is constant along a "\" diagonal, shifted to be >= 0.
+            // row+col is constant along a "/" diagonal.
+            d, a := row-col+n-1, row+col
+
+            if cols[col] || diag[d] || anti[a] {
+                continue // O(1) rejection, before recursing
+            }
+
+            cols[col], diag[d], anti[a] = true, true, true // choose
+            queenCol[row] = col
+
+            place(row + 1) // explore
+
+            cols[col], diag[d], anti[a] = false, false, false // un-choose ALL
+        }
+    }
+
+    place(0)
+    return result
+}
+```
+
 ```python
 def solveNQueens(n):
-    res, cols, diag, anti = [], set(), set(), set()
-    queens = []  # queens[r] = column of the queen in row r
+    result = []
+    queen_col = [0] * n
+    cols = [False] * n                  # occupied columns
+    diag = [False] * (2 * n - 1)        # "\" diagonals: row - col + n - 1
+    anti = [False] * (2 * n - 1)        # "/" diagonals: row + col
 
-    def backtrack(row):
+    def place(row):
         if row == n:
-            res.append(["".join("Q" if c == queens[r] else "."
-                                 for c in range(n)) for r in range(n)])
+            result.append(["." * c + "Q" + "." * (n - c - 1) for c in queen_col])
             return
-        for col in range(n):
-            if col in cols or (row - col) in diag or (row + col) in anti:
-                continue
-            cols.add(col); diag.add(row - col); anti.add(row + col)
-            queens.append(col)
-            backtrack(row + 1)
-            queens.pop()
-            cols.remove(col); diag.remove(row - col); anti.remove(row + col)
 
-    backtrack(0)
-    return res
+        for col in range(n):
+            d, a = row - col + n - 1, row + col
+            if cols[col] or diag[d] or anti[a]:
+                continue                # O(1) rejection before recursing
+
+            cols[col] = diag[d] = anti[a] = True     # choose
+            queen_col[row] = col
+            place(row + 1)                           # explore
+            cols[col] = diag[d] = anti[a] = False    # un-choose ALL
+
+    place(0)
+    return result
 ```
 
 ### Complexity
-Time O(n!) (branching shrinks as columns/diagonals fill), Space O(n) for the recursion depth and the three tracking sets.
+Time **O(n!)** loosely — row `0` has `n` choices, row `1` at most `n−1`, and so on, with the constraint sets pruning far below that in practice. Space O(n) for the arrays and recursion, excluding the output.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — N-Queens II (LeetCode 52)
-A representative **N Queens** problem. The signal: place queens column by column, pruning conflicting diagonals/rows.
+Return only the **number** of distinct solutions.
 
 ### Thought Process
-1. Identical backtracking to LC51 — one queen per row, pruning with `cols`, `diag` (r − c), `anti` (r + c).
-2. We only need the number of solutions, so never build board strings.
-3. When `row == n`, a full valid placement was reached — increment a counter instead of appending a board.
+1. Identical search. The only change is what happens at a complete placement.
+2. Instead of building `n` strings, increment a counter — the board is never materialised.
+3. That removes an O(n²) step per solution, which matters at `n = 9` where there are 352 solutions.
+4. Nothing about the pruning or the constraint sets changes.
+5. This is the general lesson: **when a problem asks "how many", delete the output stage rather than writing a different algorithm.**
 
 ### Dry Run
-n = 4, count completions:
-- Explore row0=col0 branch → dead-ends (no full placement).
-- row0=col1 → row1=col3 → row2=col0 → row3=col2 completes → count = 1.
-- row0=col2 → the mirror completes → count = 2.
-- Remaining branches dead-end → return 2.
+
+Input: `n = 4`
+
+The search visits exactly the same nodes as Example 1. The two complete placements — columns `[1,3,0,2]` and `[2,0,3,1]` — each hit `row == n` and increment the counter.
+
+| complete placement reached | counter |
+|----------------------------|---------|
+| `[1, 3, 0, 2]` | 1 |
+| `[2, 0, 3, 1]` | **2** |
+
+Output: **2** ✓
+
+**How much pruning is happening?** For `n = 8` there are `8⁸ = 16,777,216` ways to pick a column per row. The constraint checks reduce the nodes actually visited to roughly two thousand, and 92 of those are complete solutions. The O(1) rejection in the loop is what makes that difference.
+
+Known values worth remembering as a sanity check:
+
+| n | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| solutions | 1 | 0 | 0 | 2 | 10 | 4 | 40 | 92 |
+
+`n = 2` and `n = 3` have **zero** solutions — a useful edge case, since the recursion must simply exhaust every branch and return 0.
 
 ### Visualization
-```
-same row-by-row pruning as LC51, but each complete placement just bumps an int counter
+
+```text
+same tree as Example 1, different leaf action:
+
+  row == n  →  Example 1: build n strings, append to result
+            →  Example 2: count++          (no allocation at all)
+
+n = 4  →  2 leaves reached  →  answer 2
+n = 8  →  92 leaves reached out of ~2,000 nodes visited
 ```
 
 ### Code
+
+```go
+func totalNQueens(n int) int {
+    count := 0
+
+    cols := make([]bool, n)
+    diag := make([]bool, 2*n-1)
+    anti := make([]bool, 2*n-1)
+
+    var place func(row int)
+    place = func(row int) {
+        if row == n {
+            count++ // the only difference: no board is built
+            return
+        }
+
+        for col := 0; col < n; col++ {
+            d, a := row-col+n-1, row+col
+            if cols[col] || diag[d] || anti[a] {
+                continue
+            }
+
+            cols[col], diag[d], anti[a] = true, true, true
+            place(row + 1)
+            cols[col], diag[d], anti[a] = false, false, false
+        }
+    }
+
+    place(0)
+    return count
+}
+```
+
 ```python
 def totalNQueens(n):
-    cols, diag, anti = set(), set(), set()
+    cols = [False] * n
+    diag = [False] * (2 * n - 1)
+    anti = [False] * (2 * n - 1)
     count = 0
 
-    def backtrack(row):
+    def place(row):
         nonlocal count
         if row == n:
-            count += 1
+            count += 1                  # no board is built
             return
         for col in range(n):
-            if col in cols or (row - col) in diag or (row + col) in anti:
+            d, a = row - col + n - 1, row + col
+            if cols[col] or diag[d] or anti[a]:
                 continue
-            cols.add(col); diag.add(row - col); anti.add(row + col)
-            backtrack(row + 1)
-            cols.remove(col); diag.remove(row - col); anti.remove(row + col)
+            cols[col] = diag[d] = anti[a] = True
+            place(row + 1)
+            cols[col] = diag[d] = anti[a] = False
 
-    backtrack(0)
+    place(0)
     return count
 ```
 
 ### Complexity
-Time O(n!), Space O(n) for the recursion stack and the three conflict sets — no board storage needed.
+Same search as Example 1, but **O(1)** work per solution instead of O(n²). Space O(n).
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Sudoku (LeetCode 37)
-A representative **N Queens** problem. The signal: place queens column by column, pruning conflicting diagonals/rows.
+### Problem — Valid Sudoku (LeetCode 36)
+Determine whether a partially filled 9×9 Sudoku board is **valid** — no digit repeats within any row, column, or 3×3 box. Empty cells are `'.'` and the board need not be solvable.
+
+> **Why this and not Sudoku Solver (37) from the practice set?** Solver 37 is exactly *this* constraint logic plus the choose/explore/un-choose search from Examples 1 and 2. Getting the three constraint sets right is the half people actually get wrong, so it is worth isolating here; the Sudoku Solver chapter then assembles both halves.
 
 ### Thought Process
-1. Scan the 9×9 grid for the next empty cell (`'.'`); if none remain the board is solved.
-2. Try digits `'1'`..`'9'`; a digit is valid only if it is absent from that row, column, and 3×3 box.
-3. Place a valid digit and recurse; if the recursion solves the rest, propagate `True`.
-4. Otherwise reset the cell to `'.'` and try the next digit; return `False` when no digit fits.
+1. This is the constraint-set idea without any search — a single pass that only *checks*, which makes it the right stepping stone before the full solver.
+2. Three families of constraints, so three sets of seen-digits: one per row, one per column, one per 3×3 box.
+3. The box index is the piece worth knowing: `box = (row / 3) * 3 + (col / 3)`, using integer division. It maps each 3×3 block to `0..8`.
+4. Scan every cell once; on a digit, check all three sets and then mark all three.
+5. Any repeat means invalid; surviving the scan means valid.
+
+**Deriving the box index.** `row / 3` gives which band of rows (0, 1 or 2) and `col / 3` gives which stack of columns. Numbering the boxes row-major means multiplying the band by 3 and adding the stack:
+
+```text
+box index:      col/3 = 0   1   2
+     row/3 = 0        0   1   2
+     row/3 = 1        3   4   5
+     row/3 = 2        6   7   8
+```
 
 ### Dry Run
-Solving from the top-left empty cell:
-- First empty cell (0,2): try `'1'` — already in row → skip; `'4'` valid → place, recurse.
-- Deeper cell hits a contradiction (no digit fits) → return `False`, undo `'4'`.
-- Backtrack tries the next digit at (0,2); continue until every cell is filled consistently.
-- All cells filled → return `True`, board mutated in place to the unique solution.
+
+Consider the first three rows of a board, focusing on cell `(0, 0) = '5'` and a conflict introduced at `(1, 0)`:
+
+```text
+row 0:  5 3 . | . 7 . | . . .
+row 1:  6 . . | 1 9 5 | . . .
+row 2:  . 9 8 | . . . | . 6 .
+```
+
+| cell | digit | row set | col set | box index | box set | verdict |
+|------|-------|---------|---------|-----------|---------|---------|
+| (0,0) | `5` | row0: {} → add | col0: {} → add | `(0/3)*3 + (0/3)` = **0** | box0: {} → add | ok |
+| (0,1) | `3` | row0: {5} → add | col1: {} → add | 0 | box0: {5} → add | ok |
+| (0,4) | `7` | row0: {5,3} → add | col4: {} → add | `(0/3)*3 + (4/3)` = **1** | box1: {} → add | ok |
+| (1,0) | `6` | row1: {} → add | col0: **{5}** → add | 0 | box0: {5,3} → add | ok |
+| (2,1) | `9` | row2: {} → add | col1: {3} → add | 0 | box0: {5,3,6} → add | ok |
+| (2,2) | `8` | row2: {9} → add | col2: {} → add | 0 | box0: {5,3,6,9} → add | ok |
+
+All checks pass so far. Now suppose `(2,2)` held `'5'` instead of `'8'`:
+
+| cell | digit | box index | box set contains `5`? | verdict |
+|------|-------|-----------|------------------------|---------|
+| (2,2) | `5` | 0 | **yes** (from `(0,0)`) | **invalid → return false** |
+
+Row 2 has no other `5` and column 2 has no other `5` — only the **box** check catches it. That is why all three constraint families are needed. ✓
 
 ### Visualization
-```
-next empty cell → try 1..9 valid in row/col/box → recurse; first full grid returns True, undo on dead ends
+
+```text
+      col:  0 1 2 | 3 4 5 | 6 7 8
+    row 0:  5 3 . | . 7 . | . . .      box 0 │ box 1 │ box 2
+    row 1:  6 . . | 1 9 5 | . . .      ──────┼───────┼──────
+    row 2:  . 9 8 | . . . | . 6 .      box 3 │ box 4 │ box 5
+            ───────────────────────    ──────┼───────┼──────
+                                       box 6 │ box 7 │ box 8
+
+  box = (row/3)*3 + (col/3)      integer division
+
+  cell (2,2) → (2/3)*3 + (2/3) = 0*3 + 0 = box 0
+  cell (0,0) → box 0 as well  →  a 5 in both would collide
 ```
 
 ### Code
+
+```go
+func isValidSudoku(board [][]byte) bool {
+    // Three constraint families, nine sets each. seen[d] marks digit d+1.
+    var rowSeen, colSeen, boxSeen [9][9]bool
+
+    for row := 0; row < 9; row++ {
+        for col := 0; col < 9; col++ {
+            cell := board[row][col]
+            if cell == '.' {
+                continue // empty cells constrain nothing
+            }
+
+            digit := int(cell - '1') // '1'..'9' → 0..8
+            // Integer division maps the cell to its 3x3 block, row-major.
+            box := (row/3)*3 + (col / 3)
+
+            if rowSeen[row][digit] || colSeen[col][digit] || boxSeen[box][digit] {
+                return false // a repeat in any of the three families
+            }
+
+            rowSeen[row][digit] = true
+            colSeen[col][digit] = true
+            boxSeen[box][digit] = true
+        }
+    }
+    return true
+}
+```
+
 ```python
-def solveSudoku(board):
-    def valid(r, c, ch):
-        for i in range(9):
-            if board[r][i] == ch or board[i][c] == ch:
-                return False
-            if board[3 * (r // 3) + i // 3][3 * (c // 3) + i % 3] == ch:
-                return False
-        return True
+def isValidSudoku(board):
+    # Three constraint families, nine sets each.
+    row_seen = [set() for _ in range(9)]
+    col_seen = [set() for _ in range(9)]
+    box_seen = [set() for _ in range(9)]
 
-    def solve():
-        for r in range(9):
-            for c in range(9):
-                if board[r][c] == '.':
-                    for ch in "123456789":
-                        if valid(r, c, ch):
-                            board[r][c] = ch
-                            if solve():
-                                return True
-                            board[r][c] = '.'
-                    return False  # no digit works here → backtrack
-        return True  # no empty cell left → solved
+    for row in range(9):
+        for col in range(9):
+            digit = board[row][col]
+            if digit == ".":
+                continue                # empty cells constrain nothing
 
-    solve()
+            box = (row // 3) * 3 + col // 3     # row-major 3x3 block index
+
+            if (digit in row_seen[row] or digit in col_seen[col]
+                    or digit in box_seen[box]):
+                return False
+
+            row_seen[row].add(digit)
+            col_seen[col].add(digit)
+            box_seen[box].add(digit)
+
+    return True
 ```
 
 ### Complexity
-Time O(9^(m)) worst case where m is the number of empty cells, Space O(m) for the recursion depth (board solved in place).
+Time **O(81) = O(1)** — the board is a fixed size, so this is a constant-time check. Space O(1) for the 27 fixed-size sets.
 
+> These same three sets, combined with the choose/explore/un-choose loop from Examples 1 and 2, give the full Sudoku **solver** — which is the subject of the next chapter. Validity checking is the constraint half; the search is the other.
+
+---
 
 ## 12. LeetCode Practice Set
 
