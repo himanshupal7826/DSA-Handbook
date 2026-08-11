@@ -41,32 +41,131 @@ dfs, tree, preorder, inorder, postorder, recursion.
 
 ## 3. Brute Force Approach
 
-### Intuition
-Recompute subtree properties repeatedly across calls — O(n^2).
+**The question this pattern keeps answering:** *"Visit every node of a tree — and combine what the children tell me into an answer for the parent."*
 
-### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+### Intuition
+There isn't really a "brute force" for visiting a tree; every node must be seen at least once. The naive part is in **how** you manage the walk.
+
+### Algorithm (the awkward manual version)
+1. Start at the root.
+2. Keep a list of nodes you still need to visit and a set of nodes already seen.
+3. Repeatedly pick a node, mark it seen, and append its children to the list.
+4. Afterwards, make a second pass to compute whatever the question asked for.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: O(n) — unavoidable, every node is visited.
+- Space: O(n) for the bookkeeping.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Tree DFS pattern is built to use.
+- The "already seen" set is **pure waste in a tree**: a tree has no cycles and every node has exactly one parent, so you can never arrive twice. That set is only needed for graphs.
+- Separating "walk the tree" from "compute the answer" forces two passes and extra storage, when a single recursive walk can compute the answer on the way back up.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Tree DFS invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **A tree is made of smaller trees, so solve the whole problem by asking each child the *same question* and combining their answers.**
+
+That is all DFS on a tree is. The recursion mirrors the structure of the data.
+
+```text
+                answer(node)
+                     │
+        ┌────────────┴────────────┐
+   answer(left)              answer(right)
+        │                         │
+      ...                       ...
+```
+
+### The thought process
+
+```text
+We need    : some fact about a tree (depth, sum, a traversal order).
+Notice     : the left subtree is a tree. So is the right subtree.
+             The question I'm asking about the whole tree is exactly
+             the question I'd ask about each of them.
+Therefore  : write a function that answers it for a node, assuming
+             the recursive calls answer it for the children.
+Now        : the only two things left to decide are
+               1. the BASE CASE (what does an empty tree return?)
+               2. the COMBINE step (how do child answers make mine?)
+```
+
+### The two questions that define every tree DFS
+
+Every solution in this family is these two lines and nothing more:
+
+```text
+1. BASE CASE  — what do I return for a nil node?
+2. COMBINE    — given left's answer and right's answer, what is mine?
+```
+
+| Problem | Base case | Combine |
+|---|---|---|
+| Max depth | `0` | `1 + max(left, right)` |
+| Node count | `0` | `1 + left + right` |
+| Sum of values | `0` | `node.Val + left + right` |
+| Contains a value | `false` | `left \|\| right \|\| node.Val == target` |
+
+Get the base case right and the combine step usually writes itself.
+
+### Why `nil → 0` and not "a leaf → 1"
+
+The tempting base case is *"if the node is a leaf, return 1"*. It is worse, for two reasons:
+
+- It needs **two** checks (`node == nil` for safety **and** `isLeaf`), so it's longer, not shorter.
+- It breaks on a node with exactly one child. `if isLeaf return 1` never fires for such a node, and the missing branch returns whatever `nil` returns — so you need the `nil` case anyway.
+
+**Always handle `nil` first.** It is the true empty tree, it makes one-child nodes fall out automatically, and it is a single check.
+
+### The three DFS orders — one line of code apart
+
+The traversal orders differ *only* in where you touch the node relative to the recursive calls:
+
+```text
+PREORDER   visit(node); go left; go right      → node before its subtrees
+INORDER    go left; visit(node); go right      → node between them
+POSTORDER  go left; go right; visit(node)      → node after its subtrees
+```
+
+Which one you need follows from the question:
+
+| You need… | Order | Why |
+|---|---|---|
+| To copy/serialise a tree top-down | **preorder** | the parent must exist before its children |
+| Sorted output from a **BST** | **inorder** | left subtree < node < right subtree |
+| To compute from children upward | **postorder** | children's answers must be ready first |
+| To delete/free a tree | **postorder** | you cannot free a parent before its children |
+
+> Almost every "compute a value" tree problem is postorder — because you need the children's answers before you can produce your own.
+
+### Recursion vs an explicit stack
+
+Recursion *is* a stack; the compiler manages it. Write it recursively first.
+
+Use an explicit stack when the tree could be deep enough to overflow — a degenerate tree of 10⁵ nodes is a linked list, and many languages blow the stack around that depth. The iterative preorder is easy (push right, then left). Iterative inorder and postorder are noticeably fiddlier, which is exactly why the recursive version is the one to reach for by default.
+
+### How should I recognize this?
+
+```text
+If you see...
+  a binary tree and "depth / height / sum / count / path / check property"
+  "traverse", "preorder / inorder / postorder"
+  anything where a node's answer depends on its subtrees
+        ↓
+Think about...
+  "What do I return for nil, and how do I combine left and right?"
+        ↓
+Use...
+  compute a value      → postorder recursion
+  sorted BST output    → inorder
+  top-down copy/print  → preorder
+  very deep tree       → the same order, with an explicit stack
+```
 
 ### Visual explanation
 
@@ -93,69 +192,266 @@ Trees are recursive: solve children first, combine their results at the parent. 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Tree DFS          : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+        3
+       / \
+      9  20
+        /  \
+       15   7
+
+maxDepth(3)
+  ├── maxDepth(9)  → 1 + max(0, 0) = 1
+  └── maxDepth(20)
+        ├── maxDepth(15) → 1
+        └── maxDepth(7)  → 1
+        → 1 + max(1, 1) = 2
+  → 1 + max(1, 2) = 3
+
+answers flow UP from the leaves — that is postorder
 ```
 
 ### Interview explanation
-"This is a Tree DFS problem. I'll trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates. That brings the complexity down to O(n) time and O(h) space — here's the template."
+"A tree is recursive by construction, so I'll write a recursive function and let it mirror the structure. The only two decisions are the base case and the combine step: for `nil` I return the identity value — 0 for a depth or a sum — and for a real node I combine the two child answers. I handle `nil` rather than checking for a leaf, because that also covers nodes with a single child without a special case. This is postorder: I need both children's answers before I can produce mine. It's O(n) time since every node is visited once, and O(h) space for the recursion stack, which is O(log n) on a balanced tree and O(n) in the degenerate case. If the tree could be deep enough to overflow the stack, I'd convert it to an explicit stack."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Trees** family template. Adapt the comparison/condition to the specific problem.
+> Decide the base case, decide the combine step. Everything else follows.
 
 ```go
-// Post-order DFS returning subtree height; also tracks diameter.
-type TreeNode struct { Val int; Left, Right *TreeNode }
-func height(node *TreeNode, best *int) int {
-    if node == nil { return 0 }
-    l := height(node.Left, best)
-    r := height(node.Right, best)
-    if l+r > *best { *best = l + r }   // path through this node
-    if l > r { return l + 1 }
-    return r + 1
+// MaxDepth is the canonical postorder shape: combine the children's answers.
+func MaxDepth(root *TreeNode) int {
+    if root == nil {
+        return 0 // base case: an empty tree has depth 0
+    }
+    left := MaxDepth(root.Left)
+    right := MaxDepth(root.Right)
+
+    // Combine: my depth is one more than my deeper child's.
+    if left > right {
+        return left + 1
+    }
+    return right + 1
+}
+
+// Preorder: node, then left, then right.
+func Preorder(root *TreeNode) []int {
+    result := []int{}
+    var walk func(*TreeNode)
+    walk = func(node *TreeNode) {
+        if node == nil {
+            return
+        }
+        result = append(result, node.Val) // visit BEFORE the subtrees
+        walk(node.Left)
+        walk(node.Right)
+    }
+    walk(root)
+    return result
+}
+
+// Inorder: left, then node, then right. On a BST this yields sorted order.
+func Inorder(root *TreeNode) []int {
+    result := []int{}
+    var walk func(*TreeNode)
+    walk = func(node *TreeNode) {
+        if node == nil {
+            return
+        }
+        walk(node.Left)
+        result = append(result, node.Val) // visit BETWEEN the subtrees
+        walk(node.Right)
+    }
+    walk(root)
+    return result
+}
+
+// Postorder: left, then right, then node.
+func Postorder(root *TreeNode) []int {
+    result := []int{}
+    var walk func(*TreeNode)
+    walk = func(node *TreeNode) {
+        if node == nil {
+            return
+        }
+        walk(node.Left)
+        walk(node.Right)
+        result = append(result, node.Val) // visit AFTER the subtrees
+    }
+    walk(root)
+    return result
+}
+
+// PreorderIterative avoids recursion for very deep trees.
+// Push right before left so left is processed first.
+func PreorderIterative(root *TreeNode) []int {
+    result := []int{}
+    if root == nil {
+        return result
+    }
+    stack := []*TreeNode{root}
+
+    for len(stack) > 0 {
+        node := stack[len(stack)-1]
+        stack = stack[:len(stack)-1]
+        result = append(result, node.Val)
+
+        if node.Right != nil {
+            stack = append(stack, node.Right)
+        }
+        if node.Left != nil {
+            stack = append(stack, node.Left) // popped first
+        }
+    }
+    return result
 }
 ```
 
 ```python
 class TreeNode:
     def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
+        self.val = val
+        self.left = left
+        self.right = right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+def max_depth(root):
+    """Postorder: combine the children's answers."""
+    if root is None:
+        return 0                        # base case: empty tree
+    return 1 + max(max_depth(root.left), max_depth(root.right))
+
+def preorder(root):
+    result = []
+    def walk(node):
+        if node is None:
+            return
+        result.append(node.val)         # visit BEFORE the subtrees
+        walk(node.left)
+        walk(node.right)
+    walk(root)
+    return result
+
+def inorder(root):
+    """On a BST this yields sorted order."""
+    result = []
+    def walk(node):
+        if node is None:
+            return
+        walk(node.left)
+        result.append(node.val)         # visit BETWEEN the subtrees
+        walk(node.right)
+    walk(root)
+    return result
+
+def postorder(root):
+    result = []
+    def walk(node):
+        if node is None:
+            return
+        walk(node.left)
+        walk(node.right)
+        result.append(node.val)         # visit AFTER the subtrees
+    walk(root)
+    return result
+
+def preorder_iterative(root):
+    """Push right before left so left is processed first."""
+    if root is None:
+        return []
+    result, stack = [], [root]
+    while stack:
+        node = stack.pop()
+        result.append(node.val)
+        if node.right:
+            stack.append(node.right)
+        if node.left:
+            stack.append(node.left)
+    return result
 ```
 
 ```java
-class TreeNode { int val; TreeNode left, right; }
-int best = 0;
-int height(TreeNode node) {
-    if (node == null) return 0;
-    int l = height(node.left), r = height(node.right);
-    best = Math.max(best, l + r);
-    return 1 + Math.max(l, r);
+import java.util.*;
+
+public class TreeDFS {
+    public static class TreeNode {
+        int val; TreeNode left, right;
+        TreeNode(int val) { this.val = val; }
+    }
+
+    // Postorder: combine the children's answers.
+    public static int maxDepth(TreeNode root) {
+        if (root == null) return 0;                     // base case
+        return 1 + Math.max(maxDepth(root.left), maxDepth(root.right));
+    }
+
+    public static List<Integer> preorder(TreeNode root) {
+        List<Integer> result = new ArrayList<>();
+        walkPre(root, result);
+        return result;
+    }
+
+    private static void walkPre(TreeNode node, List<Integer> out) {
+        if (node == null) return;
+        out.add(node.val);              // visit BEFORE the subtrees
+        walkPre(node.left, out);
+        walkPre(node.right, out);
+    }
+
+    public static List<Integer> inorder(TreeNode root) {
+        List<Integer> result = new ArrayList<>();
+        walkIn(root, result);
+        return result;
+    }
+
+    private static void walkIn(TreeNode node, List<Integer> out) {
+        if (node == null) return;
+        walkIn(node.left, out);
+        out.add(node.val);              // visit BETWEEN the subtrees
+        walkIn(node.right, out);
+    }
 }
 ```
 
 ```cpp
-struct TreeNode { int val; TreeNode *left, *right; };
-int best = 0;
-int height(TreeNode* node) {
-    if (!node) return 0;
-    int l = height(node->left), r = height(node->right);
-    best = max(best, l + r);
-    return 1 + max(l, r);
+#include <functional>
+#include <vector>
+using namespace std;
+
+struct TreeNode {
+    int val;
+    TreeNode *left, *right;
+    explicit TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}
+};
+
+// Postorder: combine the children's answers.
+int maxDepth(TreeNode* root) {
+    if (root == nullptr) return 0;                      // base case
+    return 1 + max(maxDepth(root->left), maxDepth(root->right));
+}
+
+vector<int> preorder(TreeNode* root) {
+    vector<int> result;
+    function<void(TreeNode*)> walk = [&](TreeNode* node) {
+        if (node == nullptr) return;
+        result.push_back(node->val);    // visit BEFORE the subtrees
+        walk(node->left);
+        walk(node->right);
+    };
+    walk(root);
+    return result;
+}
+
+vector<int> inorder(TreeNode* root) {
+    vector<int> result;
+    function<void(TreeNode*)> walk = [&](TreeNode* node) {
+        if (node == nullptr) return;
+        walk(node->left);
+        result.push_back(node->val);    // visit BETWEEN the subtrees
+        walk(node->right);
+    };
+    walk(root);
+    return result;
 }
 ```
 
@@ -240,130 +536,387 @@ int height(TreeNode* node) {
 
 ## 9. Solved Example 1
 
-### Problem — Max Depth (LeetCode 104)
-Find the length of the longest root-to-leaf path — the canonical post-order Tree DFS combine.
+### Problem — Maximum Depth of Binary Tree (LeetCode 104)
+Return the number of nodes along the longest path from the root down to a leaf.
 
 ### Thought Process
-1. The depth of an empty subtree is 0 — that is the recursion's base case.
-2. A node's depth is 1 plus the deeper of its two subtree depths (combine after recursing).
-3. DFS dives to the leaves, then folds the child depths back up to the root.
+1. Ask the two defining questions. **Base case:** an empty tree has depth `0`. **Combine:** my depth is `1 + ` the deeper of my two children.
+2. That is postorder — I cannot answer until both children have answered.
+3. Handling `nil` (rather than checking for a leaf) makes single-child nodes work with no extra case.
+4. Every node is visited exactly once.
 
 ### Dry Run
-Tree `[3,9,20,null,null,15,7]`:
-- leaves 9, 15, 7 each return depth 1
-- node 20 = 1 + max(1,1) = 2
-- root 3 = 1 + max(1,2) = 3 → answer 3
+
+Input:
+
+```text
+        3
+       / \
+      9  20
+        /  \
+       15   7
+```
+
+Calls unwind from the leaves upward:
+
+| call | left result | right result | returns |
+|------|-------------|--------------|---------|
+| `maxDepth(9)`  | `maxDepth(nil)` = 0 | `maxDepth(nil)` = 0 | `1 + max(0,0)` = **1** |
+| `maxDepth(15)` | 0 | 0 | **1** |
+| `maxDepth(7)`  | 0 | 0 | **1** |
+| `maxDepth(20)` | 1 (from 15) | 1 (from 7) | `1 + max(1,1)` = **2** |
+| `maxDepth(3)`  | 1 (from 9) | 2 (from 20) | `1 + max(1,2)` = **3** |
+
+Output: **3** ✓
+
+Check by hand: the longest root-to-leaf path is `3 → 20 → 15`, which has 3 nodes. ✓
+
+Notice nothing is computed on the way *down*. Every value is produced on the way back **up** — that is what postorder means in practice.
 
 ### Visualization
-```
-input  ──▶ [ apply Tree DFS step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+        3  ──────────────── returns 1 + max(1, 2) = 3
+       / \
+      9  20 ─────────────── returns 1 + max(1, 1) = 2
+   (1)   /  \
+       15    7
+      (1)   (1)  ────────── leaves return 1 + max(0, 0) = 1
+
+answers flow UPWARD ↑
 ```
 
 ### Code
-```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
 
+```go
+func maxDepth(root *TreeNode) int {
+    if root == nil {
+        return 0 // base case: an empty tree has depth 0
+    }
+
+    // Both children must answer before I can.
+    left := maxDepth(root.Left)
+    right := maxDepth(root.Right)
+
+    if left > right {
+        return left + 1
+    }
+    return right + 1
+}
+```
+
+```python
 def maxDepth(root):
-    if not root:
-        return 0
+    if root is None:
+        return 0                        # base case: empty tree
+    # Both children answer first; then combine.
     return 1 + max(maxDepth(root.left), maxDepth(root.right))
 ```
 
 ### Complexity
-Time O(n), Space O(h) for the recursion stack.
+Time **O(n)** — each node is visited once. Space **O(h)** for the recursion stack: O(log n) on a balanced tree, O(n) on a degenerate one.
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Preorder (LeetCode 144)
-Return the values in preorder (node, then left, then right) using DFS.
+### Problem — Binary Tree Preorder Traversal (LeetCode 144)
+Return the node values in preorder: node, then left subtree, then right subtree.
 
 ### Thought Process
-1. Preorder means: record the current node's value first, before its children.
-2. Then recurse into the left subtree fully, then the right subtree.
-3. DFS visits each subtree completely before moving on to the sibling.
+1. Preorder means visit the node **before** recursing — the only difference from the other two orders is where that line sits.
+2. Recursive version: append `node.Val`, then walk left, then walk right.
+3. The iterative version uses an explicit stack, which matters for trees deep enough to overflow the call stack.
+4. **Push right before left.** A stack is last-in-first-out, so the child pushed *last* is popped first — and preorder needs left first.
+5. Never push `nil` children; the pop loop stays clean.
 
 ### Dry Run
-Tree `[1,null,2,3]` (1's right child is 2, whose left child is 3):
-- visit 1 → out=[1]; left of 1 is None
-- recurse right to 2 → out=[1,2]; left of 2 is 3 → out=[1,2,3]
-- answer [1,2,3]
+
+Input:
+
+```text
+      1
+       \
+        2
+       /
+      3
+```
+
+**Recursive:**
+
+| call | action | output so far |
+|------|--------|---------------|
+| `walk(1)` | append `1`, then go left | `[1]` |
+| `walk(nil)` | return | `[1]` |
+| `walk(2)` | append `2`, then go left | `[1, 2]` |
+| `walk(3)` | append `3`, both children nil | `[1, 2, 3]` |
+
+**Iterative** — watch the push order:
+
+| step | stack before (top on the right) | pop | push | output |
+|------|----------------------------------|-----|------|--------|
+| 1 | `[1]` | `1` | right `2` (no left) | `[1]` |
+| 2 | `[2]` | `2` | no right; left `3` | `[1, 2]` |
+| 3 | `[3]` | `3` | none | `[1, 2, 3]` |
+
+Output: **`[1, 2, 3]`** ✓
+
+A fuller push-order example on a two-child root:
+
+```text
+      1
+     / \
+    2   3
+
+push 1        stack [1]
+pop 1, push 3 then 2   stack [3, 2]   ← right first, so left is on top
+pop 2         output [1, 2]
+pop 3         output [1, 2, 3]        ✓
+```
+
+Pushing left first would produce `[1, 3, 2]` — the mirror image.
 
 ### Visualization
-```
-input  ──▶ [ apply Tree DFS step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+preorder = node, left, right
+
+      1          visit 1  ──▶ output 1
+       \
+        2        visit 2  ──▶ output 2
+       /
+      3          visit 3  ──▶ output 3
+
+  [1, 2, 3]
 ```
 
 ### Code
-```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
 
-def preorderTraversal(root):
-    out = []
-    def dfs(node):
-        if not node:
+```go
+func preorderTraversal(root *TreeNode) []int {
+    result := []int{}
+
+    var walk func(*TreeNode)
+    walk = func(node *TreeNode) {
+        if node == nil {
             return
-        out.append(node.val)   # visit node before its children
-        dfs(node.left)
-        dfs(node.right)
-    dfs(root)
-    return out
+        }
+        result = append(result, node.Val) // visit BEFORE the subtrees
+        walk(node.Left)
+        walk(node.Right)
+    }
+
+    walk(root)
+    return result
+}
+
+// preorderIterative is the same order without recursion, for very deep trees.
+func preorderIterative(root *TreeNode) []int {
+    result := []int{}
+    if root == nil {
+        return result
+    }
+
+    stack := []*TreeNode{root}
+    for len(stack) > 0 {
+        node := stack[len(stack)-1]
+        stack = stack[:len(stack)-1]
+        result = append(result, node.Val)
+
+        // Push RIGHT first so LEFT is popped first (a stack is LIFO).
+        if node.Right != nil {
+            stack = append(stack, node.Right)
+        }
+        if node.Left != nil {
+            stack = append(stack, node.Left)
+        }
+    }
+    return result
+}
+```
+
+```python
+def preorderTraversal(root):
+    result = []
+
+    def walk(node):
+        if node is None:
+            return
+        result.append(node.val)         # visit BEFORE the subtrees
+        walk(node.left)
+        walk(node.right)
+
+    walk(root)
+    return result
+
+def preorder_iterative(root):
+    """Same order without recursion; push RIGHT first so LEFT pops first."""
+    if root is None:
+        return []
+    result, stack = [], [root]
+    while stack:
+        node = stack.pop()
+        result.append(node.val)
+        if node.right:
+            stack.append(node.right)
+        if node.left:
+            stack.append(node.left)
+    return result
 ```
 
 ### Complexity
-Time O(n), Space O(h) for the recursion stack.
+Time O(n), Space O(h) — the recursion stack, or the explicit stack, holds at most one node per level.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Inorder (LeetCode 94)
-Return the values in inorder (left, then node, then right) using DFS.
+### Problem — Binary Tree Inorder Traversal (LeetCode 94)
+Return the node values in inorder: left subtree, then node, then right subtree.
 
 ### Thought Process
-1. Inorder means: fully traverse the left subtree before recording the node.
-2. Record the node's value between the left and right recursions.
-3. On a BST this emits the values in sorted order.
+1. Inorder moves the visit **between** the two recursive calls — one line different from preorder.
+2. This is the order that matters most, because **inorder on a BST produces sorted output.** The BST property (`left < node < right`) makes it fall out.
+3. The iterative version is genuinely trickier than preorder: you must descend all the way left, pushing as you go, before visiting anything.
+4. Then pop, visit, and move to the popped node's right child — repeating the whole descent from there.
+5. The loop continues while either the stack is non-empty or there is still a node to descend into.
 
 ### Dry Run
-Tree `[1,null,2,3]`:
-- dfs(1): left is None → record 1 → out=[1]
-- recurse right to 2: its left is 3 → record 3 → out=[1,3]; then record 2 → out=[1,3,2]
-- answer [1,3,2]
+
+Input:
+
+```text
+      1
+       \
+        2
+       /
+      3
+```
+
+**Recursive:**
+
+| call | action | output |
+|------|--------|--------|
+| `walk(1)` | go left first → `nil`, return | — |
+| back at `1` | append `1`, go right | `[1]` |
+| `walk(2)` | go left | — |
+| `walk(3)` | left is nil; append `3`; right is nil | `[1, 3]` |
+| back at `2` | append `2`, go right → nil | `[1, 3, 2]` |
+
+Output: **`[1, 3, 2]`** ✓
+
+**Iterative** — the descend/visit alternation:
+
+| step | current | stack | action | output |
+|------|---------|-------|--------|--------|
+| 1 | `1` | `[]` | push 1, go left | — |
+| 2 | `nil` | `[1]` | pop 1, visit, go right | `[1]` |
+| 3 | `2` | `[]` | push 2, go left | `[1]` |
+| 4 | `3` | `[2]` | push 3, go left | `[1]` |
+| 5 | `nil` | `[2,3]` | pop 3, visit, go right | `[1, 3]` |
+| 6 | `nil` | `[2]` | pop 2, visit, go right | `[1, 3, 2]` |
+| 7 | `nil` | `[]` | both empty → stop | `[1, 3, 2]` |
+
+**And the reason inorder matters** — on a BST:
+
+```text
+        2
+       / \
+      1   3        inorder → [1, 2, 3]   sorted ✓
+```
 
 ### Visualization
-```
-input  ──▶ [ apply Tree DFS step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+inorder = left, node, right
+
+      1
+       \           left of 1 is empty → visit 1
+        2
+       /           inside 2: go left to 3 first
+      3            3 has no left → visit 3, then back up → visit 2
+
+  [1, 3, 2]
 ```
 
 ### Code
-```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
 
-def inorderTraversal(root):
-    out = []
-    def dfs(node):
-        if not node:
+```go
+func inorderTraversal(root *TreeNode) []int {
+    result := []int{}
+
+    var walk func(*TreeNode)
+    walk = func(node *TreeNode) {
+        if node == nil {
             return
-        dfs(node.left)
-        out.append(node.val)   # visit node between the two subtrees
-        dfs(node.right)
-    dfs(root)
-    return out
+        }
+        walk(node.Left)
+        result = append(result, node.Val) // visit BETWEEN the subtrees
+        walk(node.Right)
+    }
+
+    walk(root)
+    return result
+}
+
+// inorderIterative: descend left pushing as you go, then pop-visit-go-right.
+func inorderIterative(root *TreeNode) []int {
+    result := []int{}
+    stack := []*TreeNode{}
+    current := root
+
+    for current != nil || len(stack) > 0 {
+        // Go as far left as possible, remembering the path.
+        for current != nil {
+            stack = append(stack, current)
+            current = current.Left
+        }
+
+        // Nothing further left: the top of the stack is next in order.
+        node := stack[len(stack)-1]
+        stack = stack[:len(stack)-1]
+        result = append(result, node.Val)
+
+        // Now do the same for its right subtree.
+        current = node.Right
+    }
+    return result
+}
+```
+
+```python
+def inorderTraversal(root):
+    result = []
+
+    def walk(node):
+        if node is None:
+            return
+        walk(node.left)
+        result.append(node.val)         # visit BETWEEN the subtrees
+        walk(node.right)
+
+    walk(root)
+    return result
+
+def inorder_iterative(root):
+    """Descend left pushing as you go, then pop-visit-go-right."""
+    result, stack, current = [], [], root
+    while current or stack:
+        while current:                  # go as far left as possible
+            stack.append(current)
+            current = current.left
+        node = stack.pop()              # nothing further left: visit it
+        result.append(node.val)
+        current = node.right            # repeat on the right subtree
+    return result
 ```
 
 ### Complexity
-Time O(n), Space O(h) for the recursion stack.
+Time O(n), Space O(h).
 
+> The payoff: inorder on a **BST** is sorted, which turns "validate a BST", "find the k-th smallest", and "find the minimum absolute difference" into one-pass problems — you just check or scan the inorder sequence.
+
+---
 
 ## 12. LeetCode Practice Set
 

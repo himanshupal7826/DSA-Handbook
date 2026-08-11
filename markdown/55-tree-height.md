@@ -41,32 +41,146 @@ height, depth, recursion, postorder, tree.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"How tall is this tree?"* — and, more sharply, *"how far is the nearest or farthest leaf?"*
+
 ### Intuition
-Recompute subtree properties repeatedly across calls — O(n^2).
+Enumerate every root-to-leaf path, measure each, take the longest (or shortest).
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Walk the tree, carrying the current path.
+2. Each time you reach a leaf, record the path's length.
+3. After the walk, return the maximum (or minimum) recorded length.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: O(n) to walk, but building and copying paths adds up.
+- Space: **O(n · h)** if you store every path, versus O(h) if you only ever keep a counter.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Tree Height pattern is built to use.
+- Materialising the paths is pure overhead — we only ever needed their **lengths**, never their contents.
+- It also splits the work into "collect" and then "reduce", when a single recursive pass can return the number directly.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Tree Height invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **The height of a node is one more than the height of its tallest child — so let the recursion carry the number up, and never build a path at all.**
+
+```text
+height(node) = 1 + max( height(left), height(right) )
+height(nil)  = 0
+```
+
+Two lines, and the whole family of problems is variations on them.
+
+### First, get the vocabulary straight
+
+These two are constantly confused, and mixing them up produces off-by-one bugs that are hard to spot:
+
+```text
+        3          ← depth 0,  height 3
+       / \
+      9  20        ← depth 1,  height(9) = 1, height(20) = 2
+        /  \
+       15   7      ← depth 2,  height 1
+
+DEPTH  is measured DOWNWARD FROM THE ROOT   → known on the way DOWN
+HEIGHT is measured UPWARD FROM THE LEAVES   → known on the way UP
+```
+
+LeetCode 104 says "maximum depth", but what it actually asks for is the **height of the root**, counted in nodes. Depth and height of the root coincide, which is why the sloppy naming survives.
+
+Also fix the unit: this chapter counts **nodes**, so a single-node tree has height 1 and an empty tree has height 0. Some textbooks count **edges**, making those 0 and −1. Neither is wrong — but say which you mean, because it moves every answer by one.
+
+### The thought process
+
+```text
+We need    : the distance to the farthest (or nearest) leaf.
+Obvious way: enumerate all root-to-leaf paths and measure them.
+Wasteful   : we build paths only to take their lengths.
+Notice     : a node's height depends only on its children's heights.
+             That is a number, and it flows upward.
+Therefore  : return the number from the recursion instead of
+             collecting paths.
+Now        : O(n) time, O(h) space, and no allocation.
+```
+
+### The trap: minimum depth is NOT the mirror image
+
+This is the one genuinely tricky thing in the chapter. The obvious "just swap max for min" is **wrong**:
+
+```go
+// WRONG
+return 1 + min(minDepth(root.Left), minDepth(root.Right))
+```
+
+Consider a tree that is really a chain:
+
+```text
+      2
+       \
+        3
+         \
+          4
+```
+
+At node `2` the left child is `nil`, so `minDepth(nil)` returns `0`, and `min(0, 2)` is `0`. The function reports depth **1** — as if `2` were a leaf. It isn't; it has no left subtree at all.
+
+The fix comes from the definition: minimum depth is the distance to the nearest **leaf**, and a leaf is a node with **no children**. A `nil` child is not a leaf — it is the absence of a subtree, and a path cannot end there.
+
+```text
+if left is nil  → the answer must come through the right:  1 + right
+if right is nil → the answer must come through the left:   1 + left
+otherwise       → 1 + min(left, right)
+```
+
+Maximum depth needs no such care, because a missing subtree returns `0` and `max` ignores it automatically. **Only the `min` version needs the guard** — and that asymmetry is exactly what interviewers probe.
+
+### Steps (height / maximum depth)
+
+```text
+Step 1 → if node is nil, return 0
+Step 2 → left  = height(node.Left)
+Step 3 → right = height(node.Right)
+Step 4 → return 1 + max(left, right)
+```
+
+### Steps (minimum depth)
+
+```text
+Step 1 → if node is nil, return 0
+Step 2 → if both children are nil, return 1        ← a real leaf
+Step 3 → if left is nil,  return 1 + minDepth(right)
+Step 4 → if right is nil, return 1 + minDepth(left)
+Step 5 → return 1 + min(minDepth(left), minDepth(right))
+```
+
+### When BFS beats recursion
+
+For **minimum** depth, BFS can stop the moment it meets the first leaf, because levels are visited in increasing order of depth. DFS must explore every branch before it can be sure. On a tree with one short branch and one enormous one, that is the difference between reading a handful of nodes and reading all of them.
+
+For **maximum** depth there is no early exit either way — you must see every node — so recursion is the simpler choice.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "height", "depth", "how many levels", "distance to the nearest leaf"
+  "is it balanced", "deepest node"
+  any answer that is a number flowing upward from the leaves
+        ↓
+Think about...
+  "Is my answer 1 + something about my children?"
+  "Does a MISSING child mean zero, or does it mean 'not a path'?"
+        ↓
+Use...
+  maximum depth → 1 + max(left, right), nil = 0
+  minimum depth → guard the nil children, or use BFS with early exit
+  n-ary tree    → 1 + max over ALL children
+```
 
 ### Visual explanation
 
@@ -99,69 +213,188 @@ Trees are recursive: solve children first, combine their results at the parent. 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Tree Height       : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+        3
+       / \
+      9  20
+        /  \
+       15   7
+
+heights computed on the way UP:
+
+  height(9)  = 1        height(15) = 1     height(7) = 1
+  height(20) = 1 + max(1, 1) = 2
+  height(3)  = 1 + max(1, 2) = 3      ← the answer
+
+minimum depth on the SAME tree:
+  node 9 is a real leaf at depth 2  →  minDepth = 2
 ```
 
 ### Interview explanation
-"This is a Tree Height problem. I'll trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates. That brings the complexity down to O(n) time and O(h) space — here's the template."
+"Height is one plus the height of the taller child, with an empty tree counting as 0 — so I let the recursion return the number rather than building paths. That's O(n) time and O(h) stack. The subtlety is minimum depth: swapping `max` for `min` is wrong, because a missing child returns 0 and drags the minimum down, making a one-child node look like a leaf. Minimum depth is the distance to a node with *no* children, so I guard: if one side is nil, the answer must come through the other. I'd also mention that BFS is strictly better for minimum depth — it stops at the first leaf, whereas DFS has to explore everything."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Trees** family template. Adapt the comparison/condition to the specific problem.
+> `1 + max(children)` for height. For minimum depth, guard the nil children.
 
 ```go
-// Post-order DFS returning subtree height; also tracks diameter.
-type TreeNode struct { Val int; Left, Right *TreeNode }
-func height(node *TreeNode, best *int) int {
-    if node == nil { return 0 }
-    l := height(node.Left, best)
-    r := height(node.Right, best)
-    if l+r > *best { *best = l + r }   // path through this node
-    if l > r { return l + 1 }
-    return r + 1
+// Height returns the number of nodes on the longest root-to-leaf path.
+// An empty tree has height 0; a single node has height 1.
+func Height(root *TreeNode) int {
+    if root == nil {
+        return 0 // base case: no nodes
+    }
+    left := Height(root.Left)
+    right := Height(root.Right)
+
+    if left > right {
+        return left + 1
+    }
+    return right + 1
+}
+
+// MinDepth returns the distance to the NEAREST leaf.
+// A nil child is not a leaf, so it must not contribute 0 to the minimum.
+func MinDepth(root *TreeNode) int {
+    if root == nil {
+        return 0
+    }
+    // A real leaf: no children at all.
+    if root.Left == nil && root.Right == nil {
+        return 1
+    }
+    // Exactly one child: the path must go through it.
+    if root.Left == nil {
+        return 1 + MinDepth(root.Right)
+    }
+    if root.Right == nil {
+        return 1 + MinDepth(root.Left)
+    }
+
+    left := MinDepth(root.Left)
+    right := MinDepth(root.Right)
+    if left < right {
+        return left + 1
+    }
+    return right + 1
+}
+
+// MinDepthBFS stops at the first leaf — the real reason to prefer BFS here.
+func MinDepthBFS(root *TreeNode) int {
+    if root == nil {
+        return 0
+    }
+
+    queue := []*TreeNode{root}
+    depth := 1
+
+    for len(queue) > 0 {
+        levelSize := len(queue)
+        for i := 0; i < levelSize; i++ {
+            node := queue[0]
+            queue = queue[1:]
+
+            if node.Left == nil && node.Right == nil {
+                return depth // the first leaf is on the shallowest level
+            }
+            if node.Left != nil {
+                queue = append(queue, node.Left)
+            }
+            if node.Right != nil {
+                queue = append(queue, node.Right)
+            }
+        }
+        depth++
+    }
+    return depth
 }
 ```
 
 ```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
+def height(root):
+    """Nodes on the longest root-to-leaf path. Empty tree = 0."""
+    if root is None:
+        return 0
+    return 1 + max(height(root.left), height(root.right))
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+def min_depth(root):
+    """Distance to the NEAREST leaf. A nil child is not a leaf."""
+    if root is None:
+        return 0
+    if root.left is None and root.right is None:
+        return 1                             # a real leaf
+    if root.left is None:
+        return 1 + min_depth(root.right)     # path must go right
+    if root.right is None:
+        return 1 + min_depth(root.left)      # path must go left
+    return 1 + min(min_depth(root.left), min_depth(root.right))
+
+def min_depth_bfs(root):
+    """BFS stops at the first leaf."""
+    from collections import deque
+    if root is None:
+        return 0
+    queue, depth = deque([root]), 1
+    while queue:
+        for _ in range(len(queue)):
+            node = queue.popleft()
+            if node.left is None and node.right is None:
+                return depth
+            if node.left:
+                queue.append(node.left)
+            if node.right:
+                queue.append(node.right)
+        depth += 1
+    return depth
 ```
 
 ```java
-class TreeNode { int val; TreeNode left, right; }
-int best = 0;
-int height(TreeNode node) {
-    if (node == null) return 0;
-    int l = height(node.left), r = height(node.right);
-    best = Math.max(best, l + r);
-    return 1 + Math.max(l, r);
+public class TreeHeight {
+    public static class TreeNode {
+        int val; TreeNode left, right;
+        TreeNode(int val) { this.val = val; }
+    }
+
+    public static int height(TreeNode root) {
+        if (root == null) return 0;
+        return 1 + Math.max(height(root.left), height(root.right));
+    }
+
+    // A nil child is NOT a leaf, so it must not contribute 0 to the minimum.
+    public static int minDepth(TreeNode root) {
+        if (root == null) return 0;
+        if (root.left == null && root.right == null) return 1;    // real leaf
+        if (root.left == null) return 1 + minDepth(root.right);
+        if (root.right == null) return 1 + minDepth(root.left);
+        return 1 + Math.min(minDepth(root.left), minDepth(root.right));
+    }
 }
 ```
 
 ```cpp
-struct TreeNode { int val; TreeNode *left, *right; };
-int best = 0;
-int height(TreeNode* node) {
-    if (!node) return 0;
-    int l = height(node->left), r = height(node->right);
-    best = max(best, l + r);
-    return 1 + max(l, r);
+#include <algorithm>
+using namespace std;
+
+struct TreeNode {
+    int val;
+    TreeNode *left, *right;
+    explicit TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}
+};
+
+int height(TreeNode* root) {
+    if (root == nullptr) return 0;
+    return 1 + max(height(root->left), height(root->right));
+}
+
+// A nil child is NOT a leaf, so it must not contribute 0 to the minimum.
+int minDepth(TreeNode* root) {
+    if (root == nullptr) return 0;
+    if (root->left == nullptr && root->right == nullptr) return 1;   // real leaf
+    if (root->left == nullptr) return 1 + minDepth(root->right);
+    if (root->right == nullptr) return 1 + minDepth(root->left);
+    return 1 + min(minDepth(root->left), minDepth(root->right));
 }
 ```
 
@@ -246,127 +479,338 @@ int height(TreeNode* node) {
 
 ## 9. Solved Example 1
 
-### Problem — Max Depth (LeetCode 104)
-A representative **Tree Height** problem. The signal: post-order recursion returns subtree height to its parent.
+### Problem — Maximum Depth of Binary Tree (LeetCode 104)
+Return the number of nodes along the longest path from the root down to a leaf.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (height, depth, recursion, postorder, tree).
-2. Reach for the Tree Height template below and map the problem's entities onto it.
-3. Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
+1. "Maximum depth" here is the **height of the root**, counted in nodes.
+2. Base case: an empty tree has depth `0`.
+3. Combine: `1 + max(left, right)`.
+4. A missing child contributes `0`, and `max` ignores it — so no guard is needed. (Contrast this with minimum depth in the next example.)
+5. Answers flow upward from the leaves; nothing is computed on the way down.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input:
+
+```text
+        3
+       / \
+      9  20
+        /  \
+       15   7
+```
+
+| call | left | right | returns |
+|------|------|-------|---------|
+| `maxDepth(9)`  | 0 | 0 | `1 + max(0,0)` = **1** |
+| `maxDepth(15)` | 0 | 0 | **1** |
+| `maxDepth(7)`  | 0 | 0 | **1** |
+| `maxDepth(20)` | 1 | 1 | `1 + max(1,1)` = **2** |
+| `maxDepth(3)`  | 1 | 2 | `1 + max(1,2)` = **3** |
+
+Output: **3** ✓
+
+The longest path is `3 → 20 → 15` (or `3 → 20 → 7`), which has 3 nodes. ✓
+
+**Why no nil-guard is needed here.** Take the chain `2 → 3 → 4`: at node `2`, `maxDepth(nil) = 0` and `maxDepth(3) = 2`, so `max(0, 2) = 2` and we return 3. The missing subtree simply loses the `max`, which is exactly right.
 
 ### Visualization
-```
-input  ──▶ [ apply Tree Height step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+        3  ─────────── 1 + max(1, 2) = 3   ★
+       / \
+      9  20 ────────── 1 + max(1, 1) = 2
+     (1)  / \
+       15    7
+      (1)   (1) ────── leaves: 1 + max(0, 0) = 1
+
+values flow UP ↑ from the leaves
 ```
 
 ### Code
-```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+```go
+func maxDepth(root *TreeNode) int {
+    if root == nil {
+        return 0 // an empty tree has depth 0
+    }
+
+    left := maxDepth(root.Left)
+    right := maxDepth(root.Right)
+
+    // A missing child returns 0, which max discards — no guard needed.
+    if left > right {
+        return left + 1
+    }
+    return right + 1
+}
+```
+
+```python
+def maxDepth(root):
+    if root is None:
+        return 0                        # empty tree has depth 0
+    # A missing child returns 0, which max() discards — no guard needed.
+    return 1 + max(maxDepth(root.left), maxDepth(root.right))
 ```
 
 ### Complexity
-Time O(n), Space O(h). Visit each node once; recursion stack is O(height).
+Time **O(n)**, Space **O(h)** — O(log n) on a balanced tree, O(n) on a degenerate one.
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Min Depth (LeetCode 111)
-A representative **Tree Height** problem. The signal: post-order recursion returns subtree height to its parent.
+### Problem — Minimum Depth of Binary Tree (LeetCode 111)
+Return the number of nodes along the **shortest** path from the root down to a **leaf** — a node with no children.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (height, depth, recursion, postorder, tree).
-2. Reach for the Tree Height template below and map the problem's entities onto it.
-3. Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
+1. The obvious mirror of Example 1, `1 + min(left, right)`, is **wrong**.
+2. A `nil` child returns `0`, and `min(0, anything)` is `0` — so a node with exactly one child would be reported as depth 1, as if it were a leaf. It isn't: a path cannot end at a missing subtree.
+3. The definition is the fix. A leaf has **no** children. So if one side is `nil`, the shortest path must go through the other side.
+4. Three cases: both children nil (a real leaf), exactly one nil (recurse the other side), or two children (take the min).
+5. BFS is the better tool here — it returns at the first leaf it meets.
 
-### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+### Dry Run — the case that exposes the bug
+
+Input: `[2, null, 3, null, 4, null, 5, null, 6]`, a right-leaning chain:
+
+```text
+      2
+       \
+        3
+         \
+          4
+           \
+            5
+             \
+              6
+```
+
+**The naive `1 + min(left, right)`:**
+
+| node | left | right | naive result |
+|------|------|-------|--------------|
+| `2` | `minDepth(nil)` = **0** | `minDepth(3)` = … | `1 + min(0, …)` = **1** ✗ |
+
+It stops at 1 — claiming node `2` is a leaf. It has no left subtree, but it certainly has a right child.
+
+**The correct version:**
+
+| call | situation | returns |
+|------|-----------|---------|
+| `minDepth(6)` | both children nil → real leaf | **1** |
+| `minDepth(5)` | left nil → go right | `1 + 1` = **2** |
+| `minDepth(4)` | left nil → go right | `1 + 2` = **3** |
+| `minDepth(3)` | left nil → go right | `1 + 3` = **4** |
+| `minDepth(2)` | left nil → go right | `1 + 4` = **5** |
+
+Output: **5** ✓
+
+**A tree where the minimum really is shallower than the maximum:**
+
+```text
+        3
+       / \
+      9  20
+        /  \
+       15   7
+```
+
+Node `9` is a genuine leaf at depth 2, so `minDepth = 2` while `maxDepth = 3`. Here both children of `3` exist, so the `min` branch applies normally.
 
 ### Visualization
-```
-input  ──▶ [ apply Tree Height step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+      2            left is nil  →  cannot end here
+       \               the path MUST continue right
+        3
+         \
+          4          naive:   min(0, ...) = 0  →  returns 1   ✗
+           \
+            5        correct: skip the nil side  →  returns 5  ✓
+             \
+              6      ← the only real leaf
 ```
 
 ### Code
-```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+```go
+func minDepth(root *TreeNode) int {
+    if root == nil {
+        return 0
+    }
+
+    // A real leaf: no children at all.
+    if root.Left == nil && root.Right == nil {
+        return 1
+    }
+
+    // Exactly one child: a nil side is NOT a leaf, so the path must
+    // continue through the side that exists.
+    if root.Left == nil {
+        return 1 + minDepth(root.Right)
+    }
+    if root.Right == nil {
+        return 1 + minDepth(root.Left)
+    }
+
+    // Both children exist: now min is safe.
+    left := minDepth(root.Left)
+    right := minDepth(root.Right)
+    if left < right {
+        return left + 1
+    }
+    return right + 1
+}
+
+// minDepthBFS stops at the first leaf, which DFS cannot do.
+func minDepthBFS(root *TreeNode) int {
+    if root == nil {
+        return 0
+    }
+
+    queue := []*TreeNode{root}
+    depth := 1
+
+    for len(queue) > 0 {
+        levelSize := len(queue)
+        for i := 0; i < levelSize; i++ {
+            node := queue[0]
+            queue = queue[1:]
+
+            if node.Left == nil && node.Right == nil {
+                return depth // shallowest level containing a leaf
+            }
+            if node.Left != nil {
+                queue = append(queue, node.Left)
+            }
+            if node.Right != nil {
+                queue = append(queue, node.Right)
+            }
+        }
+        depth++
+    }
+    return depth
+}
+```
+
+```python
+def minDepth(root):
+    if root is None:
+        return 0
+    if root.left is None and root.right is None:
+        return 1                             # a real leaf
+    if root.left is None:
+        return 1 + minDepth(root.right)      # nil is not a leaf: go right
+    if root.right is None:
+        return 1 + minDepth(root.left)       # nil is not a leaf: go left
+    return 1 + min(minDepth(root.left), minDepth(root.right))
 ```
 
 ### Complexity
-Time O(n), Space O(h). Visit each node once; recursion stack is O(height).
+DFS: O(n) time, O(h) space. **BFS: O(n) worst case but often far less** — it stops at the first leaf, so a tree with one short branch and one huge branch is resolved almost immediately.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — N-ary Depth (LeetCode 559)
-A representative **Tree Height** problem. The signal: post-order recursion returns subtree height to its parent.
+### Problem — Maximum Depth of N-ary Tree (LeetCode 559)
+Each node has a list of children instead of exactly two. Return the maximum depth.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (height, depth, recursion, postorder, tree).
-2. Reach for the Tree Height template below and map the problem's entities onto it.
-3. Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
+1. Nothing conceptual changes: the height is still one more than the tallest child's height.
+2. `max(left, right)` becomes a loop taking the max over **all** children.
+3. A node with an empty children list is a leaf and returns 1 — which the loop handles for free, since the running max starts at 0.
+4. Base case is still `nil → 0`.
+5. Every node is visited once, so it stays O(n) regardless of branching factor.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `root = [1, null, 3, 2, 4, null, 5, 6]` — node `1` has children `3, 2, 4`, and node `3` has children `5, 6`:
+
+```text
+          1
+        / | \
+       3  2  4
+      / \
+     5   6
+```
+
+| call | children's heights | max over children | returns |
+|------|--------------------|-------------------|---------|
+| `depth(5)` | none | 0 | **1** |
+| `depth(6)` | none | 0 | **1** |
+| `depth(2)` | none | 0 | **1** |
+| `depth(4)` | none | 0 | **1** |
+| `depth(3)` | `5 → 1`, `6 → 1` | 1 | `1 + 1` = **2** |
+| `depth(1)` | `3 → 2`, `2 → 1`, `4 → 1` | 2 | `1 + 2` = **3** |
+
+Output: **3** ✓
+
+The longest path is `1 → 3 → 5` (or `1 → 3 → 6`), which has 3 nodes. ✓
+
+Note `depth(2)` and `depth(4)`: their children lists are empty, so the loop body never runs, the running max stays 0, and they correctly return 1.
 
 ### Visualization
-```
-input  ──▶ [ apply Tree Height step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+          1  ────────── 1 + max(2, 1, 1) = 3   ★
+        / | \
+       3  2  4
+      /|   (1) (1)
+     5 6  ────────────── 3 returns 1 + max(1, 1) = 2
+   (1)(1)
+
+the only change from the binary case: max over ALL children
 ```
 
 ### Code
-```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+```go
+// NaryNode has an arbitrary number of children instead of exactly two.
+type NaryNode struct {
+    Val      int
+    Children []*NaryNode
+}
+
+func maxDepthNary(root *NaryNode) int {
+    if root == nil {
+        return 0
+    }
+
+    // Max over ALL children. An empty list leaves this at 0,
+    // so a leaf correctly returns 1.
+    tallestChild := 0
+    for _, child := range root.Children {
+        if h := maxDepthNary(child); h > tallestChild {
+            tallestChild = h
+        }
+    }
+
+    return 1 + tallestChild
+}
+```
+
+```python
+def maxDepth(root):
+    """N-ary version: max over ALL children."""
+    if root is None:
+        return 0
+    # An empty children list leaves the max at 0, so a leaf returns 1.
+    tallest_child = 0
+    for child in root.children:
+        tallest_child = max(tallest_child, maxDepth(child))
+    return 1 + tallest_child
 ```
 
 ### Complexity
-Time O(n), Space O(h). Visit each node once; recursion stack is O(height).
+Time **O(n)** — every node is visited once, whatever the branching factor. Space **O(h)** for the recursion stack.
 
+> The same generalisation applies to every problem in this chapter: swap the two hard-coded child slots for a loop over the children list, and the logic is unchanged. That is a good sign the recursion was expressing the actual structure rather than an accident of binary trees.
+
+---
 
 ## 12. LeetCode Practice Set
 

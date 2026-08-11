@@ -41,32 +41,126 @@ bfs, tree, level order, queue, breadth.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Process the tree one **level** at a time — and know where each level begins and ends."*
+
 ### Intuition
-Recompute subtree properties repeatedly across calls — O(n^2).
+If you only have DFS, you can still get levels: record every node's depth, then group by depth afterwards.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Run a DFS, passing each node's depth down as a parameter.
+2. Store pairs `(depth, value)` in a list.
+3. Afterwards, group the list by depth and sort the groups.
+4. Emit the groups in depth order.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: O(n) for the walk plus O(n log n) if you sort the groups.
+- Space: O(n) for all the pairs.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Tree BFS pattern is built to use.
+- It needs a **second pass** and a grouping structure just to recover information the traversal order could have given for free.
+- Left-to-right order within a level isn't guaranteed unless you're careful about how you append.
+- And it can't answer "what is the *first* level satisfying X?" without walking the entire tree — a BFS could have stopped at that level.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Tree BFS invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Use a queue. It naturally visits nodes in level order — and if you record the queue's length before processing, you know exactly how many nodes are in the current level.**
+
+That length snapshot is the whole pattern. Without it you get the right *order* but no idea where the levels break.
+
+### The thought process
+
+```text
+We need    : nodes grouped by level, in left-to-right order.
+Obvious way: DFS with depths, then group afterwards.
+Awkward    : two passes, extra structure, and no early exit.
+Notice     : a QUEUE is first-in-first-out — enqueue the root, and
+             children always come out after every node at their
+             parent's level. So the ORDER is already correct.
+Problem    : the queue mixes levels, so where does a level end?
+Notice too : at the START of an iteration the queue holds EXACTLY
+             the current level and nothing else.
+Therefore  : snapshot len(queue), then process exactly that many.
+Now        : one pass, levels perfectly delimited, early exit possible.
+```
+
+### Why the length snapshot works
+
+This is the invariant that makes everything correct:
+
+> At the top of each outer iteration, the queue contains **precisely** the nodes of one level.
+
+It holds inductively. Start: the queue holds just the root — level 0. During an iteration you remove all `k` nodes of the current level and enqueue only their children. So when the iteration ends, the queue holds exactly the next level.
+
+```text
+queue: [3]                  size = 1  →  level 0 is [3]
+  process 3, enqueue 9, 20
+queue: [9, 20]              size = 2  →  level 1 is [9, 20]
+  process 9 (no children), process 20, enqueue 15, 7
+queue: [15, 7]              size = 2  →  level 2 is [15, 7]
+```
+
+**The snapshot must be taken before the inner loop**, and the inner loop must count against that saved number — not against a live `len(queue)`, which grows as you enqueue children. Reading the length inside the loop condition is the classic bug: it merges every level into one.
+
+### Steps
+
+```text
+Step 1 → If the root is nil, return empty.
+Step 2 → queue = [root]
+Step 3 → While the queue is not empty:
+Step 4 →     levelSize = len(queue)          ← snapshot BEFORE processing
+Step 5 →     Repeat levelSize times:
+Step 6 →         node = dequeue
+Step 7 →         record node.Val into the current level
+Step 8 →         enqueue node.Left and node.Right if non-nil
+Step 9 →     Append the finished level to the result.
+```
+
+### The variations are all "what do I do with one level?"
+
+The skeleton never changes. Only the line inside the inner loop does:
+
+| Problem | What changes |
+|---|---|
+| Level order (102) | collect all values in the level |
+| Zigzag (103) | reverse the level list on odd levels |
+| Right side view (199) | keep only the **last** node of each level |
+| Level averages (637) | sum the level, divide by `levelSize` |
+| Minimum depth (111) | return the level index at the **first leaf** you see |
+| Largest value per level (515) | keep the max of the level |
+
+That last-but-one entry is the real argument for BFS: **minimum depth** is O(shallowest level) with BFS because you stop the instant you meet a leaf, while DFS must explore everything.
+
+### BFS or DFS?
+
+| Use BFS when… | Use DFS when… |
+|---|---|
+| the answer depends on **levels** | the answer combines **subtree** results |
+| you want the **shallowest** thing (early exit) | you need depth-first order (in/pre/post) |
+| the tree is deep but narrow | the tree is shallow but wide |
+
+Memory is the mirror image: BFS holds up to one full level — **O(w)** for the widest level, which is O(n/2) for a complete tree. DFS holds one root-to-node path, **O(h)**. Neither dominates; pick by shape.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "level order", "level by level", "each row", "zigzag"
+  "right/left side view", "average per level", "minimum depth"
+  "shortest path in an unweighted structure"
+        ↓
+Think about...
+  "Does the answer group by DEPTH? Then use a queue —
+   and snapshot its length to delimit each level."
+        ↓
+Use...
+  queue + levelSize := len(queue) before the inner loop
+```
 
 ### Visual explanation
 
@@ -99,69 +193,202 @@ Trees are recursive: solve children first, combine their results at the parent. 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Tree BFS          : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+        3
+       / \
+      9  20
+        /  \
+       15   7
+
+queue [3]        size 1 → level 0: [3]      enqueue 9, 20
+queue [9,20]     size 2 → level 1: [9,20]   enqueue 15, 7
+queue [15,7]     size 2 → level 2: [15,7]   nothing to enqueue
+queue []         done
+
+result: [[3], [9,20], [15,7]]
 ```
 
 ### Interview explanation
-"This is a Tree BFS problem. I'll trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates. That brings the complexity down to O(n) time and O(h) space — here's the template."
+"I'll use BFS with a queue, which visits nodes in level order naturally. The one trick is delimiting the levels: at the top of each iteration the queue holds exactly the current level, so I snapshot its length and process precisely that many nodes, enqueueing their children as I go. Taking the snapshot *before* the inner loop is essential — reading the live length inside the loop would merge every level into one. That gives one pass, O(n) time, and O(w) space for the widest level. BFS is also what lets me exit early for shallowest-answer questions like minimum depth, which DFS can't do."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Trees** family template. Adapt the comparison/condition to the specific problem.
+> Queue, snapshot the length, process exactly that many. Change only what happens per level.
 
 ```go
-// Post-order DFS returning subtree height; also tracks diameter.
-type TreeNode struct { Val int; Left, Right *TreeNode }
-func height(node *TreeNode, best *int) int {
-    if node == nil { return 0 }
-    l := height(node.Left, best)
-    r := height(node.Right, best)
-    if l+r > *best { *best = l + r }   // path through this node
-    if l > r { return l + 1 }
-    return r + 1
+// LevelOrder returns the node values grouped by level, left to right.
+func LevelOrder(root *TreeNode) [][]int {
+    result := [][]int{}
+    if root == nil {
+        return result
+    }
+
+    queue := []*TreeNode{root}
+    for len(queue) > 0 {
+        // Snapshot BEFORE processing: the queue is exactly this level.
+        levelSize := len(queue)
+        level := make([]int, 0, levelSize)
+
+        for i := 0; i < levelSize; i++ {
+            node := queue[0]
+            queue = queue[1:]
+            level = append(level, node.Val)
+
+            if node.Left != nil {
+                queue = append(queue, node.Left)
+            }
+            if node.Right != nil {
+                queue = append(queue, node.Right)
+            }
+        }
+        result = append(result, level)
+    }
+    return result
+}
+
+// MinDepth shows BFS's real advantage: it stops at the first leaf.
+func MinDepth(root *TreeNode) int {
+    if root == nil {
+        return 0
+    }
+
+    queue := []*TreeNode{root}
+    depth := 1
+
+    for len(queue) > 0 {
+        levelSize := len(queue)
+        for i := 0; i < levelSize; i++ {
+            node := queue[0]
+            queue = queue[1:]
+
+            // The first leaf we meet is on the shallowest level.
+            if node.Left == nil && node.Right == nil {
+                return depth
+            }
+            if node.Left != nil {
+                queue = append(queue, node.Left)
+            }
+            if node.Right != nil {
+                queue = append(queue, node.Right)
+            }
+        }
+        depth++
+    }
+    return depth
 }
 ```
 
 ```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
+from collections import deque
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+def level_order(root):
+    """Node values grouped by level, left to right."""
+    result = []
+    if root is None:
+        return result
+
+    queue = deque([root])
+    while queue:
+        level_size = len(queue)          # snapshot BEFORE processing
+        level = []
+        for _ in range(level_size):
+            node = queue.popleft()
+            level.append(node.val)
+            if node.left:
+                queue.append(node.left)
+            if node.right:
+                queue.append(node.right)
+        result.append(level)
+    return result
+
+def min_depth(root):
+    """BFS stops at the first leaf — DFS would have to explore everything."""
+    if root is None:
+        return 0
+
+    queue = deque([root])
+    depth = 1
+    while queue:
+        for _ in range(len(queue)):
+            node = queue.popleft()
+            if node.left is None and node.right is None:
+                return depth             # shallowest leaf
+            if node.left:
+                queue.append(node.left)
+            if node.right:
+                queue.append(node.right)
+        depth += 1
+    return depth
 ```
 
 ```java
-class TreeNode { int val; TreeNode left, right; }
-int best = 0;
-int height(TreeNode node) {
-    if (node == null) return 0;
-    int l = height(node.left), r = height(node.right);
-    best = Math.max(best, l + r);
-    return 1 + Math.max(l, r);
+import java.util.*;
+
+public class TreeBFS {
+    public static List<List<Integer>> levelOrder(TreeNode root) {
+        List<List<Integer>> result = new ArrayList<>();
+        if (root == null) return result;
+
+        Queue<TreeNode> queue = new ArrayDeque<>();
+        queue.add(root);
+
+        while (!queue.isEmpty()) {
+            int levelSize = queue.size();          // snapshot BEFORE processing
+            List<Integer> level = new ArrayList<>(levelSize);
+
+            for (int i = 0; i < levelSize; i++) {
+                TreeNode node = queue.poll();
+                level.add(node.val);
+                if (node.left != null) queue.add(node.left);
+                if (node.right != null) queue.add(node.right);
+            }
+            result.add(level);
+        }
+        return result;
+    }
+
+    public static class TreeNode {
+        int val; TreeNode left, right;
+        TreeNode(int val) { this.val = val; }
+    }
 }
 ```
 
 ```cpp
-struct TreeNode { int val; TreeNode *left, *right; };
-int best = 0;
-int height(TreeNode* node) {
-    if (!node) return 0;
-    int l = height(node->left), r = height(node->right);
-    best = max(best, l + r);
-    return 1 + max(l, r);
+#include <queue>
+#include <vector>
+using namespace std;
+
+struct TreeNode {
+    int val;
+    TreeNode *left, *right;
+    explicit TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}
+};
+
+vector<vector<int>> levelOrder(TreeNode* root) {
+    vector<vector<int>> result;
+    if (root == nullptr) return result;
+
+    queue<TreeNode*> q;
+    q.push(root);
+
+    while (!q.empty()) {
+        int levelSize = (int)q.size();             // snapshot BEFORE processing
+        vector<int> level;
+        level.reserve(levelSize);
+
+        for (int i = 0; i < levelSize; ++i) {
+            TreeNode* node = q.front();
+            q.pop();
+            level.push_back(node->val);
+            if (node->left) q.push(node->left);
+            if (node->right) q.push(node->right);
+        }
+        result.push_back(level);
+    }
+    return result;
 }
 ```
 
@@ -246,149 +473,357 @@ int height(TreeNode* node) {
 
 ## 9. Solved Example 1
 
-### Problem — Level Order (LeetCode 102)
-Return the node values grouped level by level, top to bottom.
+### Problem — Binary Tree Level Order Traversal (LeetCode 102)
+Return the node values grouped level by level, left to right.
 
 ### Thought Process
-1. Process the tree one level at a time with a FIFO queue.
-2. Snapshot the queue length at the start of a level — that is exactly its node count.
-3. Drain that many nodes into a list, enqueuing their children for the next level.
+1. A queue gives level order for free — children always leave the queue after every node at their parent's level.
+2. The only missing piece is the level boundaries, and the queue supplies those too: at the start of each iteration it holds exactly one level.
+3. Snapshot `len(queue)` **before** the inner loop, then process precisely that many nodes.
+4. Enqueue children as you go; they form the next level.
+5. Append the finished level to the result and repeat.
 
 ### Dry Run
-Tree `[3,9,20,null,null,15,7]`:
-- q=[3] → level [3]; enqueue 9,20
-- q=[9,20] → level [9,20]; enqueue 15,7
-- q=[15,7] → level [15,7]
-- answer [[3],[9,20],[15,7]]
+
+Input:
+
+```text
+        3
+       / \
+      9  20
+        /  \
+       15   7
+```
+
+| iteration | queue at start | levelSize | nodes processed | children enqueued | level produced |
+|-----------|----------------|-----------|-----------------|--------------------|----------------|
+| 1 | `[3]` | **1** | `3` | `9`, `20` | `[3]` |
+| 2 | `[9, 20]` | **2** | `9`, `20` | `15`, `7` (from 20; 9 has none) | `[9, 20]` |
+| 3 | `[15, 7]` | **2** | `15`, `7` | none | `[15, 7]` |
+| 4 | `[]` | — | — | — | queue empty → stop |
+
+Output: **`[[3], [9, 20], [15, 7]]`** ✓
+
+**Why the snapshot must come first.** In iteration 2 the queue starts at length 2, but after processing `20` it holds `[15, 7]` — still length 2. If the inner loop tested against the live length it would keep going and swallow `15` and `7` into level 1, producing `[[3], [9,20,15,7]]`. Saving `levelSize` up front is what prevents that.
 
 ### Visualization
-```
-input  ──▶ [ apply Tree BFS step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+queue [3]        ─┐ size 1
+                  └─▶ level 0 = [3]        enqueue 9, 20
+
+queue [9,20]     ─┐ size 2
+                  └─▶ level 1 = [9,20]     enqueue 15, 7
+
+queue [15,7]     ─┐ size 2
+                  └─▶ level 2 = [15,7]     nothing to enqueue
+
+queue []            done
 ```
 
 ### Code
+
+```go
+func levelOrder(root *TreeNode) [][]int {
+    result := [][]int{}
+    if root == nil {
+        return result
+    }
+
+    queue := []*TreeNode{root}
+    for len(queue) > 0 {
+        // Snapshot BEFORE the inner loop: the queue is exactly this level.
+        levelSize := len(queue)
+        level := make([]int, 0, levelSize)
+
+        for i := 0; i < levelSize; i++ {
+            node := queue[0]
+            queue = queue[1:]
+            level = append(level, node.Val)
+
+            if node.Left != nil {
+                queue = append(queue, node.Left)
+            }
+            if node.Right != nil {
+                queue = append(queue, node.Right)
+            }
+        }
+        result = append(result, level)
+    }
+    return result
+}
+```
+
 ```python
 from collections import deque
 
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
-
 def levelOrder(root):
-    if not root:
-        return []
-    out, q = [], deque([root])
-    while q:
+    result = []
+    if root is None:
+        return result
+
+    queue = deque([root])
+    while queue:
+        level_size = len(queue)          # snapshot BEFORE the inner loop
         level = []
-        for _ in range(len(q)):
-            node = q.popleft()
+        for _ in range(level_size):
+            node = queue.popleft()
             level.append(node.val)
-            if node.left:  q.append(node.left)
-            if node.right: q.append(node.right)
-        out.append(level)
-    return out
+            if node.left:
+                queue.append(node.left)
+            if node.right:
+                queue.append(node.right)
+        result.append(level)
+    return result
 ```
 
 ### Complexity
-Time O(n), Space O(n) for the queue.
+Time **O(n)** — each node is enqueued and dequeued once. Space **O(w)** where `w` is the widest level, up to O(n/2) for a complete tree.
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Zigzag (LeetCode 103)
-Level order, but alternate the reading direction on each successive level.
+### Problem — Binary Tree Zigzag Level Order Traversal (LeetCode 103)
+Same as level order, but alternate direction: left-to-right on level 0, right-to-left on level 1, and so on.
 
 ### Thought Process
-1. Run a standard level-order BFS.
-2. Keep a direction flag: append values on left-to-right levels, prepend on right-to-left levels.
-3. Flip the flag after finishing each level.
+1. The traversal itself does not change at all — only the presentation of each finished level.
+2. So keep the identical BFS and reverse the collected level when its index is odd.
+3. **Do not reverse the queue or change the enqueue order.** That would corrupt the parent-child ordering for every level below, not just this one.
+4. Track a boolean that flips each iteration, or just test the level index's parity.
+5. Reversing a level of size `k` is O(k), and the levels sum to `n`, so the total stays O(n).
 
 ### Dry Run
-Tree `[3,9,20,null,null,15,7]`:
-- level 0 (L→R): [3]
-- level 1 (R→L): prepend 9 then 20 → [20,9]
-- level 2 (L→R): [15,7]
-- answer [[3],[20,9],[15,7]]
+
+Input:
+
+```text
+        3
+       / \
+      9  20
+        /  \
+       15   7
+```
+
+| level index | collected left-to-right | odd index? | emitted |
+|-------------|--------------------------|------------|---------|
+| 0 | `[3]` | no | `[3]` |
+| 1 | `[9, 20]` | **yes** | `[20, 9]` |
+| 2 | `[15, 7]` | no | `[15, 7]` |
+
+Output: **`[[3], [20, 9], [15, 7]]`** ✓
+
+Note level 2 came out `[15, 7]` — left to right — even though level 1 was emitted reversed. That is only correct because we reversed the *output list* and left the queue untouched. Had we enqueued children in reversed order for level 1, level 2 would have come out `[7, 15]` and the alternation would break down.
 
 ### Visualization
-```
-input  ──▶ [ apply Tree BFS step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+level 0:   [3]              →  left to right   →  [3]
+                                    ↓
+level 1:   [9, 20]          →  reverse         →  [20, 9]
+                                    ↓
+level 2:   [15, 7]          →  left to right   →  [15, 7]
+
+the QUEUE always runs left to right; only the output flips
 ```
 
 ### Code
+
+```go
+func zigzagLevelOrder(root *TreeNode) [][]int {
+    result := [][]int{}
+    if root == nil {
+        return result
+    }
+
+    queue := []*TreeNode{root}
+    leftToRight := true
+
+    for len(queue) > 0 {
+        levelSize := len(queue)
+        level := make([]int, 0, levelSize)
+
+        // The traversal itself never changes — always left to right.
+        for i := 0; i < levelSize; i++ {
+            node := queue[0]
+            queue = queue[1:]
+            level = append(level, node.Val)
+
+            if node.Left != nil {
+                queue = append(queue, node.Left)
+            }
+            if node.Right != nil {
+                queue = append(queue, node.Right)
+            }
+        }
+
+        // Only the OUTPUT is flipped, never the queue order.
+        if !leftToRight {
+            for i, j := 0, len(level)-1; i < j; i, j = i+1, j-1 {
+                level[i], level[j] = level[j], level[i]
+            }
+        }
+        leftToRight = !leftToRight
+
+        result = append(result, level)
+    }
+    return result
+}
+```
+
 ```python
 from collections import deque
 
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
-
 def zigzagLevelOrder(root):
-    if not root:
-        return []
-    out, q, left_to_right = [], deque([root]), True
-    while q:
-        level = deque()
-        for _ in range(len(q)):
-            node = q.popleft()
-            if left_to_right:
-                level.append(node.val)
-            else:
-                level.appendleft(node.val)
-            if node.left:  q.append(node.left)
-            if node.right: q.append(node.right)
-        out.append(list(level))
+    result = []
+    if root is None:
+        return result
+
+    queue = deque([root])
+    left_to_right = True
+
+    while queue:
+        level = []
+        for _ in range(len(queue)):      # traversal is always left to right
+            node = queue.popleft()
+            level.append(node.val)
+            if node.left:
+                queue.append(node.left)
+            if node.right:
+                queue.append(node.right)
+
+        if not left_to_right:            # only the OUTPUT flips
+            level.reverse()
         left_to_right = not left_to_right
-    return out
+
+        result.append(level)
+    return result
 ```
 
 ### Complexity
-Time O(n), Space O(n) for the queue.
+Time **O(n)** — the reversals add O(n) in total across all levels. Space O(w).
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Right Side View (LeetCode 199)
-A representative **Tree BFS** problem. The signal: queue-based level traversal for level-aggregate problems.
+### Problem — Binary Tree Right Side View (LeetCode 199)
+Standing to the right of the tree, return the values visible from top to bottom.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (bfs, tree, level order, queue, breadth).
-2. Reach for the Tree BFS template below and map the problem's entities onto it.
-3. Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
+1. What you see from the right is exactly the **last node of each level** — not the rightmost path, which is a different and wrong idea.
+2. Why not the rightmost path? Because a node's right child may be missing while a deeper node further left is still the last on its level.
+3. So run the standard BFS and, within each level, keep only the node at index `levelSize − 1`.
+4. That is a one-line change to the template.
+5. (The DFS alternative visits right before left and records the first node seen at each new depth — same answer, different traversal.)
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input:
+
+```text
+      1
+     / \
+    2   3
+     \    \
+      5    4
+```
+
+| level | nodes left to right | last node | visible |
+|-------|---------------------|-----------|---------|
+| 0 | `1` | `1` | **1** |
+| 1 | `2, 3` | `3` | **3** |
+| 2 | `5, 4` | `4` | **4** |
+
+Output: **`[1, 3, 4]`** ✓
+
+**The case that kills the "walk the right spine" idea.** Consider:
+
+```text
+      1
+     / \
+    2   3
+   /
+  5
+```
+
+The right spine is `1 → 3`, and `3` has no children, so that approach returns `[1, 3]`. But level 2 contains `5`, which *is* visible from the right — nothing blocks it. The correct answer is `[1, 3, 5]`, and the level-based method gets it because `5` is the only (hence last) node on its level.
 
 ### Visualization
-```
-input  ──▶ [ apply Tree BFS step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+      1              level 0:  [1]        → last = 1   👁
+     / \
+    2   3            level 1:  [2, 3]     → last = 3   👁
+     \    \
+      5    4         level 2:  [5, 4]     → last = 4   👁
+
+viewer stands here ──▶  sees 1, 3, 4
 ```
 
 ### Code
-```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+```go
+func rightSideView(root *TreeNode) []int {
+    result := []int{}
+    if root == nil {
+        return result
+    }
+
+    queue := []*TreeNode{root}
+    for len(queue) > 0 {
+        levelSize := len(queue)
+
+        for i := 0; i < levelSize; i++ {
+            node := queue[0]
+            queue = queue[1:]
+
+            // The last node of the level is the one visible from the right.
+            if i == levelSize-1 {
+                result = append(result, node.Val)
+            }
+
+            if node.Left != nil {
+                queue = append(queue, node.Left)
+            }
+            if node.Right != nil {
+                queue = append(queue, node.Right)
+            }
+        }
+    }
+    return result
+}
+```
+
+```python
+from collections import deque
+
+def rightSideView(root):
+    result = []
+    if root is None:
+        return result
+
+    queue = deque([root])
+    while queue:
+        level_size = len(queue)
+        for i in range(level_size):
+            node = queue.popleft()
+            if i == level_size - 1:      # last node of the level
+                result.append(node.val)
+            if node.left:
+                queue.append(node.left)
+            if node.right:
+                queue.append(node.right)
+    return result
 ```
 
 ### Complexity
-Time O(n), Space O(h). Visit each node once; recursion stack is O(height).
+Time O(n), Space O(w).
 
+> Swap `i == levelSize-1` for `i == 0` and you get the **left** side view. That interchangeability is the sign you've internalised the template: the BFS skeleton is fixed, and each problem is a single decision about what to do inside one level.
+
+---
 
 ## 12. LeetCode Practice Set
 
