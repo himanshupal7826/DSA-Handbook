@@ -41,32 +41,156 @@ graph dfs, connected components, recursion, visited, islands.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Which things are reachable from here?"* — connected components, islands, whole-graph copies.
+
 ### Intuition
-Naive reachability/path checks rescan the graph repeatedly — exponential or O(V*E^2).
+Without any memory of where you've been, follow edges and hope.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Start at a node and follow an edge.
+2. Keep following edges to unexplored-looking neighbours.
+3. Whenever you return to a node you've already processed, you have no way to tell — so you process it again.
+4. Repeat for every starting node to find all components.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **unbounded** — on any graph containing a cycle this never terminates.
+- Even on a DAG it is **exponential**, because a node reachable by many distinct paths is re-explored once per path.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Graph DFS pattern is built to use.
+- This is the one place where the naive approach isn't merely slow — it is **wrong**. A graph is not a tree: nodes can have multiple parents and edges can form cycles, so "follow the edges" can loop forever.
+- That single difference is what every graph traversal is built around.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Graph DFS invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Same recursion as a tree DFS, plus one thing a tree never needed: a `visited` set, checked *before* you recurse.**
+
+```text
+tree DFS   :  visit node → recurse into children
+graph DFS  :  if already visited, STOP
+              mark visited
+              recurse into neighbours
+```
+
+That guard is the entire difference, and it is what turns a non-terminating walk into a linear one.
+
+### The thought process
+
+```text
+We need    : everything reachable from a starting node.
+Obvious way: follow edges recursively, like a tree.
+Breaks     : graphs have cycles and multiple parents, so this
+             loops forever or re-explores exponentially.
+Notice     : a node's reachable set doesn't change based on HOW
+             we arrived. Visiting it twice can never teach us
+             anything new.
+Therefore  : mark each node the first time we see it, and never
+             enter it again.
+Now        : every node and edge is handled once → O(V + E).
+```
+
+### Why trees don't need `visited` and graphs do
+
+A tree guarantees three things a general graph does not:
+
+```text
+tree                          graph
+─────────────────────────     ─────────────────────────
+no cycles                     cycles are normal
+exactly one parent per node   many parents allowed
+one path between any two      many paths possible
+```
+
+Each of those independently breaks the naive walk. Cycles make it non-terminating; multiple paths make it exponential. **A tree is just a graph where the guard happens to be unnecessary.**
+
+### Mark on entry, not on exit
+
+The single most common bug in this pattern:
+
+```go
+var adjacency [][]int
+var visited []bool
+
+// WRONG — the mark comes too late.
+func dfsBroken(node int) {
+    for _, next := range adjacency[node] {
+        dfsBroken(next) // a cycle re-enters `node` before it is ever marked
+    }
+    visited[node] = true
+}
+
+// RIGHT — the mark happens before any neighbour is touched.
+func dfsCorrect(node int) {
+    if visited[node] {
+        return
+    }
+    visited[node] = true
+    for _, next := range adjacency[node] {
+        dfsCorrect(next)
+    }
+}
+```
+
+By the time the mark is written, the recursion may already have come back around. **Mark the node the instant you enter it**, before touching any neighbour.
+
+### Steps
+
+```text
+Step 1 → visited = empty set
+Step 2 → define dfs(node):
+Step 3 →     if node is in visited, return
+Step 4 →     add node to visited          ← immediately, before recursing
+Step 5 →     for each neighbour of node:  dfs(neighbour)
+Step 6 → to cover the WHOLE graph, loop over every node and dfs it
+          if it isn't visited yet; each such call is one component
+```
+
+Step 6 matters: a graph may be **disconnected**, so a single DFS from one node can miss entire regions. The outer loop is what makes "count the components" work — and the number of times you *start* a fresh DFS is exactly the component count.
+
+### Grids are graphs in disguise
+
+Most "islands" problems are grid problems, and the translation is mechanical:
+
+```text
+node       = cell (row, col)
+neighbours = the 4 (or 8) adjacent cells, if in bounds and passable
+visited    = a bool grid, OR mutate the input cell to mark it
+```
+
+Overwriting the input (turning a `'1'` into a `'0'`) saves the O(V) visited grid, but it destroys the caller's data. Say which trade you are making — some interviewers care.
+
+### DFS or BFS?
+
+For pure reachability, **either works and both are O(V + E)**. Choose on other grounds:
+
+| Use DFS when… | Use BFS when… |
+|---|---|
+| you just need reachability / components | you need the **shortest** path in an unweighted graph |
+| you need path structure (cycle detection, topological order) | the graph is very deep (recursion would overflow) |
+| the recursive code is simpler to write | you need level-by-level information |
+
+DFS uses O(depth) stack; BFS uses O(width) queue. Neither dominates.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "number of islands / provinces / connected components"
+  "can I reach X from Y", "flood fill", "clone / copy a graph"
+  a grid where adjacent same-valued cells form regions
+        ↓
+Think about...
+  "What is a node, what is an edge, and what does visited mean?"
+        ↓
+Use...
+  DFS/BFS with a visited set, marked ON ENTRY
+  plus an outer loop over all nodes if the graph may be disconnected
+```
 
 ### Visual explanation
 
@@ -92,84 +216,218 @@ Pick the traversal by structure: BFS for unweighted shortest paths, DFS for conn
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Graph DFS         : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+grid:   1 1 0
+        1 0 0
+        0 0 1
+
+start DFS at (0,0):
+    mark (0,0) → neighbours (0,1) and (1,0)
+    mark (0,1) → no unvisited land neighbours
+    mark (1,0) → none
+  → one island consumed
+
+outer loop continues, finds unvisited land at (2,2):
+    mark (2,2)
+  → second island
+
+answer: 2 islands  =  2 times we STARTED a fresh DFS
 ```
 
 ### Interview explanation
-"This is a Graph DFS problem. I'll pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity. That brings the complexity down to O(V + E) time and O(V) space — here's the template."
+"A graph differs from a tree in exactly one way that matters here: it can have cycles and multiple paths to the same node, so a plain recursive walk either loops forever or re-explores exponentially. The fix is a `visited` set checked before recursing, and marked the moment I enter a node rather than on the way out — otherwise a cycle can re-enter before the mark lands. Then every node and edge is processed once, giving O(V + E). For counting components I wrap it in an outer loop over all nodes, since the graph may be disconnected; the number of times I start a fresh DFS is the number of components. For a grid, the node is a cell and the neighbours are the in-bounds adjacent cells — same algorithm."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Graphs** family template. Adapt the comparison/condition to the specific problem.
+> The `visited` guard is the whole difference from a tree. Mark on entry.
 
 ```go
-// BFS shortest distance from src in an unweighted adjacency list.
-func bfs(adj map[int][]int, src, n int) []int {
-    dist := make([]int, n)
-    for i := range dist { dist[i] = -1 }
-    dist[src] = 0
-    queue := []int{src}
-    for len(queue) > 0 {
-        u := queue[0]; queue = queue[1:]
-        for _, v := range adj[u] {
-            if dist[v] == -1 {           // first visit = shortest in BFS
-                dist[v] = dist[u] + 1
-                queue = append(queue, v)
-            }
+// DFS explores everything reachable from start, marking on entry.
+func DFS(adjacency map[int][]int, start int, visited map[int]bool) []int {
+    order := []int{}
+
+    var walk func(int)
+    walk = func(node int) {
+        if visited[node] {
+            return // the guard: without it, cycles loop forever
+        }
+        visited[node] = true // mark IMMEDIATELY, before any recursion
+        order = append(order, node)
+
+        for _, next := range adjacency[node] {
+            walk(next)
         }
     }
-    return dist
+
+    walk(start)
+    return order
+}
+
+// CountComponents handles a possibly disconnected graph. Each fresh DFS
+// start is exactly one component.
+func CountComponents(n int, edges [][]int) int {
+    adjacency := make(map[int][]int, n)
+    for _, e := range edges {
+        adjacency[e[0]] = append(adjacency[e[0]], e[1])
+        adjacency[e[1]] = append(adjacency[e[1]], e[0]) // undirected
+    }
+
+    visited := make(map[int]bool, n)
+    components := 0
+
+    for node := 0; node < n; node++ {
+        if !visited[node] {
+            components++ // starting a new DFS means a new component
+            DFS(adjacency, node, visited)
+        }
+    }
+    return components
+}
+
+// DFSGrid is the same idea where a node is a cell.
+func DFSGrid(grid [][]byte, row, col int, target byte, visited [][]bool) int {
+    // Out of bounds, wrong value, or already seen → stop.
+    if row < 0 || row >= len(grid) || col < 0 || col >= len(grid[0]) {
+        return 0
+    }
+    if visited[row][col] || grid[row][col] != target {
+        return 0
+    }
+
+    visited[row][col] = true // mark on entry
+    size := 1
+
+    // The four orthogonal neighbours.
+    size += DFSGrid(grid, row-1, col, target, visited)
+    size += DFSGrid(grid, row+1, col, target, visited)
+    size += DFSGrid(grid, row, col-1, target, visited)
+    size += DFSGrid(grid, row, col+1, target, visited)
+
+    return size
 }
 ```
 
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+def dfs(adjacency, start, visited):
+    """Everything reachable from start. Marks on entry."""
+    order = []
+
+    def walk(node):
+        if node in visited:
+            return                      # the guard: cycles would loop forever
+        visited.add(node)               # mark IMMEDIATELY
+        order.append(node)
+        for nxt in adjacency.get(node, ()):
+            walk(nxt)
+
+    walk(start)
+    return order
+
+def count_components(n, edges):
+    """Each fresh DFS start is exactly one component."""
+    adjacency = {}
+    for a, b in edges:
+        adjacency.setdefault(a, []).append(b)
+        adjacency.setdefault(b, []).append(a)      # undirected
+
+    visited, components = set(), 0
+    for node in range(n):
+        if node not in visited:
+            components += 1
+            dfs(adjacency, node, visited)
+    return components
+
+def dfs_grid(grid, row, col, target, visited):
+    """Same idea where a node is a cell."""
+    if not (0 <= row < len(grid) and 0 <= col < len(grid[0])):
+        return 0
+    if visited[row][col] or grid[row][col] != target:
+        return 0
+
+    visited[row][col] = True            # mark on entry
+    size = 1
+    for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+        size += dfs_grid(grid, row + dr, col + dc, target, visited)
+    return size
 ```
 
 ```java
-int[] bfs(List<List<Integer>> adj, int src, int n) {
-    int[] dist = new int[n];
-    Arrays.fill(dist, -1);
-    dist[src] = 0;
-    Queue<Integer> q = new ArrayDeque<>();
-    q.add(src);
-    while (!q.isEmpty()) {
-        int u = q.poll();
-        for (int v : adj.get(u)) if (dist[v] == -1) {
-            dist[v] = dist[u] + 1; q.add(v);
-        }
+import java.util.*;
+
+public class GraphDFS {
+    public static List<Integer> dfs(Map<Integer, List<Integer>> adjacency,
+                                    int start, Set<Integer> visited) {
+        List<Integer> order = new ArrayList<>();
+        walk(adjacency, start, visited, order);
+        return order;
     }
-    return dist;
+
+    private static void walk(Map<Integer, List<Integer>> adjacency, int node,
+                             Set<Integer> visited, List<Integer> order) {
+        if (!visited.add(node)) return;         // add returns false if present
+        order.add(node);
+        for (int next : adjacency.getOrDefault(node, List.of()))
+            walk(adjacency, next, visited, order);
+    }
+
+    // Each fresh DFS start is exactly one component.
+    public static int countComponents(int n, int[][] edges) {
+        Map<Integer, List<Integer>> adjacency = new HashMap<>();
+        for (int[] e : edges) {
+            adjacency.computeIfAbsent(e[0], k -> new ArrayList<>()).add(e[1]);
+            adjacency.computeIfAbsent(e[1], k -> new ArrayList<>()).add(e[0]);
+        }
+
+        Set<Integer> visited = new HashSet<>();
+        int components = 0;
+        for (int node = 0; node < n; node++) {
+            if (!visited.contains(node)) {
+                components++;
+                dfs(adjacency, node, visited);
+            }
+        }
+        return components;
+    }
 }
 ```
 
 ```cpp
-vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
-    vector<int> dist(n, -1);
-    dist[src] = 0;
-    queue<int> q; q.push(src);
-    while (!q.empty()) {
-        int u = q.front(); q.pop();
-        for (int v : adj[u]) if (dist[v] == -1) {
-            dist[v] = dist[u] + 1; q.push(v);
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+using namespace std;
+
+void walk(const unordered_map<int, vector<int>>& adjacency, int node,
+          unordered_set<int>& visited, vector<int>& order) {
+    if (visited.count(node)) return;            // the guard
+    visited.insert(node);                        // mark on entry
+    order.push_back(node);
+
+    auto it = adjacency.find(node);
+    if (it == adjacency.end()) return;
+    for (int next : it->second) walk(adjacency, next, visited, order);
+}
+
+// Each fresh DFS start is exactly one component.
+int countComponents(int n, const vector<vector<int>>& edges) {
+    unordered_map<int, vector<int>> adjacency;
+    for (const auto& e : edges) {
+        adjacency[e[0]].push_back(e[1]);
+        adjacency[e[1]].push_back(e[0]);         // undirected
+    }
+
+    unordered_set<int> visited;
+    int components = 0;
+    for (int node = 0; node < n; ++node) {
+        if (!visited.count(node)) {
+            ++components;
+            vector<int> order;
+            walk(adjacency, node, visited, order);
         }
     }
-    return dist;
+    return components;
 }
 ```
 
@@ -254,146 +512,362 @@ vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
 
 ## 9. Solved Example 1
 
-### Problem — Num Islands (LeetCode 200)
-A representative **Graph DFS** problem. The signal: recursive/stack exploration for connectivity, components, and cycles.
+### Problem — Number of Islands (LeetCode 200)
+Given a grid of `'1'` (land) and `'0'` (water), count the islands. An island is land connected horizontally or vertically.
 
 ### Thought Process
-1. Scan the grid; each unvisited `'1'` cell is the start of a new island, so increment the count and launch a DFS from it.
-2. The DFS floods the whole connected land mass, sinking every reachable `'1'` to `'0'` so it is never counted again — this marks the component visited in place.
-3. When the scan finishes, the number of DFS launches equals the number of islands.
+1. This is a graph in disguise: each land cell is a node, and edges join orthogonally adjacent land cells.
+2. Counting islands is counting **connected components**, so scan every cell and start a DFS whenever an unvisited land cell appears.
+3. Each DFS floods one entire island, marking every cell it reaches so the outer scan never restarts inside the same island.
+4. The count is simply **how many times we started a DFS**.
+5. Mark on entry, and let the bounds check live at the top of the recursion so callers never need to test before recursing.
 
 ### Dry Run
-grid `[[1,1,0],[0,1,0],[0,0,1]]`.
-- (0,0)=='1' → count=1, DFS sinks (0,0),(0,1),(1,1) → those become '0'.
-- continue scan: (2,2)=='1' → count=2, DFS sinks (2,2).
-- no more '1' cells → answer **2**.
+
+Input:
+
+```text
+     col: 0 1 2 3 4
+row 0:    1 1 0 0 0
+row 1:    1 1 0 0 0
+row 2:    0 0 1 0 0
+row 3:    0 0 0 1 1
+```
+
+Outer scan, row by row:
+
+| cell | value | already visited? | action | islands |
+|------|-------|------------------|--------|---------|
+| (0,0) | `1` | no | **start DFS** → floods (0,0), (0,1), (1,0), (1,1) | **1** |
+| (0,1) | `1` | yes (flooded) | skip | 1 |
+| (1,0), (1,1) | `1` | yes | skip | 1 |
+| (2,2) | `1` | no | **start DFS** → floods (2,2) alone | **2** |
+| (3,3) | `1` | no | **start DFS** → floods (3,3), (3,4) | **3** |
+| all others | `0` | — | skip | 3 |
+
+Output: **3** ✓
+
+The first DFS is worth tracing: from (0,0) it reaches (0,1) and (1,0); from (1,0) it reaches (1,1); from (1,1) it tries (0,1), which is already marked, and stops. Without the visited guard that last step would bounce between (0,1) and (1,1) forever.
 
 ### Visualization
-```
-input  ──▶ [ apply Graph DFS step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+    1 1 0 0 0        ┌───┐
+    1 1 0 0 0        │ A │ A            island A: 4 cells
+    0 0 1 0 0        └───┘   B          island B: 1 cell
+    0 0 0 1 1                  C C      island C: 2 cells
+
+3 fresh DFS starts  →  3 islands
 ```
 
 ### Code
+
+```go
+func numIslands(grid [][]byte) int {
+    if len(grid) == 0 || len(grid[0]) == 0 {
+        return 0
+    }
+
+    rows, cols := len(grid), len(grid[0])
+    visited := make([][]bool, rows)
+    for i := range visited {
+        visited[i] = make([]bool, cols)
+    }
+
+    var flood func(row, col int)
+    flood = func(row, col int) {
+        // Bounds check lives here, so callers never need to pre-test.
+        if row < 0 || row >= rows || col < 0 || col >= cols {
+            return
+        }
+        if visited[row][col] || grid[row][col] != '1' {
+            return
+        }
+
+        visited[row][col] = true // mark ON ENTRY, before recursing
+
+        flood(row-1, col)
+        flood(row+1, col)
+        flood(row, col-1)
+        flood(row, col+1)
+    }
+
+    islands := 0
+    for row := 0; row < rows; row++ {
+        for col := 0; col < cols; col++ {
+            if grid[row][col] == '1' && !visited[row][col] {
+                islands++ // each fresh start is one island
+                flood(row, col)
+            }
+        }
+    }
+    return islands
+}
+```
+
 ```python
 def numIslands(grid):
+    if not grid or not grid[0]:
+        return 0
+
     rows, cols = len(grid), len(grid[0])
+    visited = [[False] * cols for _ in range(rows)]
 
-    def dfs(r, c):
-        if r < 0 or r >= rows or c < 0 or c >= cols or grid[r][c] != '1':
+    def flood(row, col):
+        if not (0 <= row < rows and 0 <= col < cols):
             return
-        grid[r][c] = '0'               # sink visited land
-        dfs(r + 1, c)
-        dfs(r - 1, c)
-        dfs(r, c + 1)
-        dfs(r, c - 1)
+        if visited[row][col] or grid[row][col] != "1":
+            return
 
-    count = 0
-    for r in range(rows):
-        for c in range(cols):
-            if grid[r][c] == '1':
-                count += 1
-                dfs(r, c)
-    return count
+        visited[row][col] = True        # mark ON ENTRY
+        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            flood(row + dr, col + dc)
+
+    islands = 0
+    for row in range(rows):
+        for col in range(cols):
+            if grid[row][col] == "1" and not visited[row][col]:
+                islands += 1            # each fresh start is one island
+                flood(row, col)
+    return islands
 ```
 
 ### Complexity
-Time O(R·C), Space O(R·C) worst-case recursion depth on a full-land grid.
+Time **O(rows × cols)** — every cell is examined a constant number of times. Space **O(rows × cols)** for the visited grid, plus the recursion stack, which is O(rows × cols) in the worst case of a grid that is entirely land.
+
+> Overwriting `grid[row][col] = '0'` instead of keeping a `visited` grid saves that space, at the cost of destroying the caller's input. Worth offering as a trade-off, not as a default.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Clone Graph (LeetCode 133)
-A representative **Graph DFS** problem. The signal: recursive/stack exploration for connectivity, components, and cycles.
+Given a reference to a node in a connected undirected graph, return a **deep copy** of the whole graph.
 
 ### Thought Process
-1. Keep a hash map from each original node to its freshly-made copy; this map doubles as the visited set that breaks cycles.
-2. DFS from the entry node: if a node is already in the map, return its clone immediately; otherwise create the clone, record it, then recurse into every neighbour and attach the returned clones.
-3. Returning the entry node's clone yields a deep copy with identical structure.
+1. Two things must happen at once: traverse the graph, and build a copy as we go.
+2. Cycles make this delicate. Copying a neighbour may lead back to a node we are still in the middle of copying.
+3. The insight: make the visited structure a **map from original node → its copy**. It then does two jobs at once — it is the cycle guard *and* the lookup that lets us wire up neighbours.
+4. Create the copy and put it in the map **before** recursing into neighbours. If we recursed first, a cycle would find nothing in the map and create a second copy of the same node.
+5. Each node is copied once, and each edge is wired once from each side.
 
 ### Dry Run
-Graph: 1—2, 1—3, 2—3 (undirected), start at node 1.
-- dfs(1): create 1'; recurse neighbour 2.
-- dfs(2): create 2'; neighbour 1 already mapped → attach 1'; neighbour 3 → dfs(3).
-- dfs(3): create 3'; neighbours 1',2' attached. Unwind → 1'.neighbors=[2',3'].
-- return **1'** (full clone).
+
+Input: `adjList = [[2,4], [1,3], [2,4], [1,3]]` — a 4-cycle:
+
+```text
+    1 —— 2
+    |    |
+    4 —— 3
+```
+
+| step | node | in map? | action | map (original → copy) |
+|------|------|---------|--------|------------------------|
+| 1 | `1` | no | create copy `1'`, store, then recurse | `{1: 1'}` |
+| 2 | `2` | no | create `2'`, store, recurse | `{1:1', 2:2'}` |
+| 3 | `1` (from 2) | **yes** | return `1'` — no new copy, no infinite loop | unchanged |
+| 4 | `3` | no | create `3'`, store, recurse | `{1:1', 2:2', 3:3'}` |
+| 5 | `2` (from 3) | yes | return `2'` | unchanged |
+| 6 | `4` | no | create `4'`, store, recurse | `{1:1', 2:2', 3:3', 4:4'}` |
+| 7 | `1` (from 4) | yes | return `1'` | unchanged |
+| 8 | `3` (from 4) | yes | return `3'` | unchanged |
+| 9 | `4` (from 1) | yes | return `4'` | unchanged |
+
+Output: a copy where `1'—2'—3'—4'—1'` mirrors the original exactly. ✓
+
+Step 3 is the crux. We reached node `1` again while still inside its own recursive call. Because `1'` was placed in the map **before** recursing, the lookup succeeds and we return the existing copy instead of spiralling.
 
 ### Visualization
-```
-input  ──▶ [ apply Graph DFS step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+original            copy
+
+  1 —— 2            1' —— 2'
+  |    |     ──▶    |     |
+  4 —— 3            4' —— 3'
+
+map: {1→1', 2→2', 3→3', 4→4'}
+
+the map is BOTH the visited set AND the original→copy lookup;
+the copy is registered BEFORE recursing, so cycles resolve
 ```
 
 ### Code
+
+```go
+// GraphNode is an undirected graph node with an adjacency list.
+type GraphNode struct {
+    Val       int
+    Neighbors []*GraphNode
+}
+
+func cloneGraph(node *GraphNode) *GraphNode {
+    if node == nil {
+        return nil
+    }
+
+    // One map, two jobs: cycle guard AND original → copy lookup.
+    copies := make(map[*GraphNode]*GraphNode)
+
+    var clone func(*GraphNode) *GraphNode
+    clone = func(original *GraphNode) *GraphNode {
+        if existing, ok := copies[original]; ok {
+            return existing // already copied: this is the cycle guard
+        }
+
+        // Register the copy BEFORE recursing, so a cycle coming back
+        // here finds it instead of creating a duplicate.
+        duplicate := &GraphNode{Val: original.Val}
+        copies[original] = duplicate
+
+        for _, neighbor := range original.Neighbors {
+            duplicate.Neighbors = append(duplicate.Neighbors, clone(neighbor))
+        }
+        return duplicate
+    }
+
+    return clone(node)
+}
+```
+
 ```python
-# class Node: def __init__(self, val=0, neighbors=None): ...
-
 def cloneGraph(node):
-    clones = {}
+    if node is None:
+        return None
 
-    def dfs(cur):
-        if cur in clones:
-            return clones[cur]
-        copy = Node(cur.val)
-        clones[cur] = copy             # record before recursing (breaks cycles)
-        for nei in cur.neighbors:
-            copy.neighbors.append(dfs(nei))
-        return copy
+    copies = {}                         # original → copy; also the cycle guard
 
-    return dfs(node) if node else None
+    def clone(original):
+        if original in copies:
+            return copies[original]     # already copied
+
+        # Register BEFORE recursing so cycles find it.
+        duplicate = Node(original.val)
+        copies[original] = duplicate
+
+        for neighbor in original.neighbors:
+            duplicate.neighbors.append(clone(neighbor))
+        return duplicate
+
+    return clone(node)
 ```
 
 ### Complexity
-Time O(V + E), Space O(V) for the map plus recursion stack.
+Time **O(V + E)** — each node is copied once and each edge traversed once from each endpoint. Space **O(V)** for the map plus O(V) recursion depth.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Provinces (LeetCode 547)
-A representative **Graph DFS** problem. The signal: recursive/stack exploration for connectivity, components, and cycles.
+### Problem — Number of Provinces (LeetCode 547)
+`isConnected[i][j] == 1` means cities `i` and `j` are directly connected. A province is a group of directly or indirectly connected cities. Count the provinces.
 
 ### Thought Process
-1. The `isConnected` matrix is an adjacency matrix over n cities; a province is one connected component, so the answer is the number of components.
-2. Loop over cities; each unvisited city starts a new province — increment the counter and DFS to every city reachable through direct/indirect connections, marking them visited.
-3. The count of DFS launches is the number of provinces.
+1. Same connected-components count as Example 1, but the graph arrives as an **adjacency matrix** instead of a grid.
+2. So the neighbour lookup changes and nothing else: city `i`'s neighbours are all `j` with `isConnected[i][j] == 1`.
+3. Scan every city; if unvisited, start a DFS and increment the count.
+4. The DFS marks every city in that province, so the outer loop never restarts inside one.
+5. The matrix is symmetric (`isConnected[i][j] == isConnected[j][i]`), which is what makes this an undirected graph.
 
 ### Dry Run
-`isConnected = [[1,1,0],[1,1,0],[0,0,1]]`, n=3.
-- city 0 unvisited → provinces=1; DFS visits 0, then 1 (edge 0-1). visited={0,1}.
-- city 1 already visited → skip.
-- city 2 unvisited → provinces=2; DFS visits 2. → answer **2**.
+
+Input:
+
+```text
+isConnected = [[1, 1, 0],
+               [1, 1, 0],
+               [0, 0, 1]]
+```
+
+Reading it: city 0 ↔ city 1 are connected; city 2 is isolated. (The diagonal is always 1 — a city is connected to itself.)
+
+| city | visited? | action | visits made | provinces |
+|------|----------|--------|-------------|-----------|
+| 0 | no | **start DFS**: mark 0, neighbour 1 is connected → mark 1; from 1, neighbour 0 already marked → stop | `{0, 1}` | **1** |
+| 1 | yes | skip | — | 1 |
+| 2 | no | **start DFS**: mark 2; no connections to 0 or 1 | `{0, 1, 2}` | **2** |
+
+Output: **2** ✓
+
+Note the self-connection on the diagonal is harmless: when DFS at city 0 considers neighbour `0`, the visited check rejects it immediately.
 
 ### Visualization
-```
-input  ──▶ [ apply Graph DFS step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+      0 —— 1        2
+
+  isConnected:
+        0  1  2
+     0 [1  1  0]
+     1 [1  1  0]
+     2 [0  0  1]
+         ↑
+    diagonal is self-connection, ignored by the visited guard
+
+2 fresh DFS starts  →  2 provinces
 ```
 
 ### Code
+
+```go
+func findCircleNum(isConnected [][]int) int {
+    n := len(isConnected)
+    visited := make([]bool, n)
+
+    var explore func(city int)
+    explore = func(city int) {
+        if visited[city] {
+            return
+        }
+        visited[city] = true // mark on entry
+
+        // Neighbours come from the matrix row rather than a grid or list.
+        for other := 0; other < n; other++ {
+            if isConnected[city][other] == 1 && !visited[other] {
+                explore(other)
+            }
+        }
+    }
+
+    provinces := 0
+    for city := 0; city < n; city++ {
+        if !visited[city] {
+            provinces++ // each fresh start is one province
+            explore(city)
+        }
+    }
+    return provinces
+}
+```
+
 ```python
 def findCircleNum(isConnected):
     n = len(isConnected)
     visited = [False] * n
 
-    def dfs(i):
-        for j in range(n):
-            if isConnected[i][j] == 1 and not visited[j]:
-                visited[j] = True
-                dfs(j)
+    def explore(city):
+        if visited[city]:
+            return
+        visited[city] = True            # mark on entry
+        # Neighbours come from the matrix row.
+        for other in range(n):
+            if isConnected[city][other] == 1 and not visited[other]:
+                explore(other)
 
     provinces = 0
-    for i in range(n):
-        if not visited[i]:
-            provinces += 1
-            visited[i] = True
-            dfs(i)
+    for city in range(n):
+        if not visited[city]:
+            provinces += 1              # each fresh start is one province
+            explore(city)
     return provinces
 ```
 
 ### Complexity
-Time O(N²) to scan the matrix, Space O(N) for the visited array and stack.
+Time **O(n²)** — the adjacency matrix forces scanning every row fully. Space O(n) for `visited` plus recursion depth.
 
+> With an adjacency **list** the same algorithm is O(V + E). The matrix representation is what costs the extra factor here, not the algorithm — a useful thing to point out, since it shows you can separate the two.
+
+---
 
 ## 12. LeetCode Practice Set
 

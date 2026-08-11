@@ -41,32 +41,144 @@ union find, disjoint set, dsu, connectivity, path compression.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Are these two things in the same group?"* — asked repeatedly, while groups keep **merging**.
+
 ### Intuition
-Naive reachability/path checks rescan the graph repeatedly — exponential or O(V*E^2).
+Store each group as an explicit list of members. To merge two groups, copy one list into the other.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Give every element its own list.
+2. To test "same group?", scan the lists for both elements.
+3. To merge, append one list to the other and update every moved element's group pointer.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- "Same group?" — O(n) per query with a scan, or O(1) with a group-id array.
+- **Merge — O(n)**, because every element of the absorbed group must be relabelled.
+- Over `m` merges that is **O(m · n)**.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Union Find pattern is built to use.
+- A DFS or BFS could recompute all components in O(V + E) — but only for a **static** graph. Here edges arrive one at a time, and re-running a full traversal after each new edge is O(m · (V + E)).
+- The real waste is relabelling: after merging, every member of the smaller group gets rewritten, even though nothing about *them* changed — only which group they belong to.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Union Find invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Don't store groups as lists. Give each group a single representative, and let every element just point toward it — merging is then one pointer change.**
+
+Each element points at a parent; following parents leads to the group's **root**. Two elements are in the same group exactly when they reach the same root.
+
+```text
+group A          group B                 after union(A, B)
+
+   1                 4                        1
+  / \                |                       /|\
+ 2   3               5                      2 3 4
+                                                |
+                                                5
+
+merging = making one root point at the other: ONE write
+```
+
+### The thought process
+
+```text
+We need    : "same group?" queries while groups keep merging.
+Obvious way: keep member lists; merge by copying.
+Too slow   : every merge relabels a whole group → O(m·n).
+Notice     : we never need to enumerate a group. We only need to
+             ANSWER whether two elements share one.
+             That needs a single identity per group, not a list.
+Therefore  : point every element toward a representative. Merging two
+             groups is just pointing one root at the other.
+Now        : both operations are effectively O(1).
+```
+
+### The two optimisations, and why each is needed
+
+The naive version degenerates badly: unioning in a bad order builds a long chain, and `find` walks it in O(n). Two fixes together fix that completely.
+
+**1. Union by size (or rank) — keeps trees shallow.**
+
+Always attach the **smaller** tree under the larger root. An element's depth only increases when its tree is absorbed by a bigger one, which at least doubles the size it lives in. A size can double at most `log n` times, so depth is bounded by `O(log n)`.
+
+```text
+BAD: always attach root A under root B      GOOD: smaller under larger
+     1 → 2 → 3 → 4 → 5   (depth 5)               depth stays ≤ log n
+```
+
+**2. Path compression — flattens as you go.**
+
+While walking up in `find`, re-point every node visited **directly at the root**. The walk was going to happen anyway; pointing nodes at the root as you return costs nothing extra and makes every future query on them O(1).
+
+```text
+before find(5):   1 → 2 → 3 → 4 → 5      walking up costs 4 hops
+after  find(5):   1 ← 2, 3, 4, 5         all now point straight at 1
+```
+
+Together these give an amortised cost of **α(n)** — the inverse Ackermann function, which is below 5 for any input that fits in the universe. Treat it as O(1), but call it "effectively constant" rather than actually constant.
+
+### Steps
+
+```text
+find(x):
+  Step 1 → while parent[x] != x:
+  Step 2 →     parent[x] = parent[parent[x]]   ← path compression
+  Step 3 →     x = parent[x]
+  Step 4 → return x
+
+union(a, b):
+  Step 5 → rootA = find(a); rootB = find(b)
+  Step 6 → if rootA == rootB: return false     ← already together
+  Step 7 → attach the smaller tree under the larger
+  Step 8 → add the sizes; decrement the component count
+  Step 9 → return true
+```
+
+### The return value of `union` is the useful part
+
+Have `union` return **whether it actually merged anything**. That single boolean answers a surprising number of problems directly:
+
+| It returned… | Meaning | Used for |
+|---|---|---|
+| `false` | they were already connected | **a cycle was just closed** → Redundant Connection |
+| `true` | two groups became one | decrement the component count → count islands/provinces |
+
+Counting components needs no extra pass: start the count at `n` and decrement on every successful union.
+
+### Union-Find or DFS?
+
+Both count connected components in roughly linear time. The distinction is *when the edges arrive*:
+
+| | Union-Find | DFS / BFS |
+|---|---|---|
+| Edges known up front (static) | works | **simpler** |
+| Edges arrive one at a time (dynamic) | **the only good option** | must re-run per edge |
+| "Did this edge create a cycle?" | one `union` call | needs a traversal |
+| Need the actual path or the members | awkward | **natural** |
+
+Union-Find answers *connectivity*; it does not give you paths. And it does **not** handle deletions — removing an edge can split a group, which the structure cannot undo.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "connected components", "provinces", "friend circles", "islands"
+  "does adding this edge create a cycle", "redundant connection"
+  "accounts merge", "equations satisfiable"
+  edges arriving incrementally
+        ↓
+Think about...
+  "Do I need to KNOW the group, or only whether two things share one?"
+        ↓
+Use...
+  union-find with union by size AND path compression
+  count components by decrementing on each successful union
+```
 
 ### Visual explanation
 
@@ -91,85 +203,205 @@ Pick the traversal by structure: BFS for unweighted shortest paths, DFS for conn
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Union Find        : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+union(1,2), union(3,4), union(2,3)
+
+start:   1   2   3   4        components = 4
+
+union(1,2):   1        3   4      components = 3
+              |
+              2
+
+union(3,4):   1        3          components = 2
+              |        |
+              2        4
+
+union(2,3):  find(2)=1, find(3)=3, different → merge
+             attach the smaller under the larger
+
+              1
+             / \
+            2   3
+                |
+                4              components = 1
 ```
 
 ### Interview explanation
-"This is a Union Find problem. I'll pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity. That brings the complexity down to O(V + E) time and O(V) space — here's the template."
+"I'll use union-find. Each element points at a parent, and following parents reaches the group's root — two elements are together exactly when they share a root. Merging is one pointer write instead of relabelling a whole group. Two optimisations keep it fast: union by size, which attaches the smaller tree under the larger so depth stays logarithmic, and path compression, which re-points every node visited during a `find` straight at the root. Together they give amortised inverse-Ackermann, effectively constant. I'll have `union` return whether it actually merged — `false` means the two were already connected, which is exactly a cycle, and counting successful unions gives the component count without a second pass. The reason to prefer this over DFS is that edges arrive incrementally; DFS would have to re-traverse after every edge."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Graphs** family template. Adapt the comparison/condition to the specific problem.
+> Union by size, path compression, and a `union` that reports whether it merged.
 
 ```go
-// BFS shortest distance from src in an unweighted adjacency list.
-func bfs(adj map[int][]int, src, n int) []int {
-    dist := make([]int, n)
-    for i := range dist { dist[i] = -1 }
-    dist[src] = 0
-    queue := []int{src}
-    for len(queue) > 0 {
-        u := queue[0]; queue = queue[1:]
-        for _, v := range adj[u] {
-            if dist[v] == -1 {           // first visit = shortest in BFS
-                dist[v] = dist[u] + 1
-                queue = append(queue, v)
-            }
-        }
+// UnionFind maintains disjoint sets with near-constant find and union.
+type UnionFind struct {
+    parent     []int
+    size       []int
+    Components int // how many disjoint sets remain
+}
+
+func NewUnionFind(n int) *UnionFind {
+    parent := make([]int, n)
+    size := make([]int, n)
+    for i := range parent {
+        parent[i] = i // every element starts as its own root
+        size[i] = 1
     }
-    return dist
+    return &UnionFind{parent: parent, size: size, Components: n}
+}
+
+// Find returns x's root, compressing the path on the way up.
+func (u *UnionFind) Find(x int) int {
+    for u.parent[x] != x {
+        // Path compression: point x at its grandparent, halving the
+        // chain on every step. The walk was happening anyway.
+        u.parent[x] = u.parent[u.parent[x]]
+        x = u.parent[x]
+    }
+    return x
+}
+
+// Union merges the sets containing a and b.
+// It returns false if they were ALREADY together — which means this
+// edge closes a cycle.
+func (u *UnionFind) Union(a, b int) bool {
+    rootA, rootB := u.Find(a), u.Find(b)
+    if rootA == rootB {
+        return false // already connected
+    }
+
+    // Union by size: attach the smaller tree under the larger one,
+    // so depth grows at most logarithmically.
+    if u.size[rootA] < u.size[rootB] {
+        rootA, rootB = rootB, rootA
+    }
+    u.parent[rootB] = rootA
+    u.size[rootA] += u.size[rootB]
+    u.Components--
+
+    return true
+}
+
+// Connected reports whether a and b are in the same set.
+func (u *UnionFind) Connected(a, b int) bool {
+    return u.Find(a) == u.Find(b)
 }
 ```
 
 ```python
-from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+class UnionFind:
+    """Disjoint sets with union by size and path compression."""
+
+    def __init__(self, n):
+        self.parent = list(range(n))     # every element is its own root
+        self.size = [1] * n
+        self.components = n
+
+    def find(self, x):
+        while self.parent[x] != x:
+            # Path compression: point x at its grandparent.
+            self.parent[x] = self.parent[self.parent[x]]
+            x = self.parent[x]
+        return x
+
+    def union(self, a, b):
+        """Returns False if a and b were ALREADY connected (a cycle)."""
+        root_a, root_b = self.find(a), self.find(b)
+        if root_a == root_b:
+            return False
+
+        # Union by size: smaller tree goes under the larger.
+        if self.size[root_a] < self.size[root_b]:
+            root_a, root_b = root_b, root_a
+        self.parent[root_b] = root_a
+        self.size[root_a] += self.size[root_b]
+        self.components -= 1
+        return True
+
+    def connected(self, a, b):
+        return self.find(a) == self.find(b)
 ```
 
 ```java
-int[] bfs(List<List<Integer>> adj, int src, int n) {
-    int[] dist = new int[n];
-    Arrays.fill(dist, -1);
-    dist[src] = 0;
-    Queue<Integer> q = new ArrayDeque<>();
-    q.add(src);
-    while (!q.isEmpty()) {
-        int u = q.poll();
-        for (int v : adj.get(u)) if (dist[v] == -1) {
-            dist[v] = dist[u] + 1; q.add(v);
-        }
+public class UnionFind {
+    private final int[] parent;
+    private final int[] size;
+    private int components;
+
+    public UnionFind(int n) {
+        parent = new int[n];
+        size = new int[n];
+        for (int i = 0; i < n; i++) { parent[i] = i; size[i] = 1; }
+        components = n;
     }
-    return dist;
+
+    public int find(int x) {
+        while (parent[x] != x) {
+            parent[x] = parent[parent[x]];      // path compression
+            x = parent[x];
+        }
+        return x;
+    }
+
+    // Returns false if a and b were ALREADY connected (a cycle).
+    public boolean union(int a, int b) {
+        int rootA = find(a), rootB = find(b);
+        if (rootA == rootB) return false;
+
+        if (size[rootA] < size[rootB]) {        // union by size
+            int t = rootA; rootA = rootB; rootB = t;
+        }
+        parent[rootB] = rootA;
+        size[rootA] += size[rootB];
+        components--;
+        return true;
+    }
+
+    public boolean connected(int a, int b) { return find(a) == find(b); }
+    public int getComponents() { return components; }
 }
 ```
 
 ```cpp
-vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
-    vector<int> dist(n, -1);
-    dist[src] = 0;
-    queue<int> q; q.push(src);
-    while (!q.empty()) {
-        int u = q.front(); q.pop();
-        for (int v : adj[u]) if (dist[v] == -1) {
-            dist[v] = dist[u] + 1; q.push(v);
-        }
+#include <numeric>
+#include <vector>
+using namespace std;
+
+class UnionFind {
+    vector<int> parent, size;
+    int components;
+
+public:
+    explicit UnionFind(int n) : parent(n), size(n, 1), components(n) {
+        iota(parent.begin(), parent.end(), 0);   // every element its own root
     }
-    return dist;
-}
+
+    int find(int x) {
+        while (parent[x] != x) {
+            parent[x] = parent[parent[x]];       // path compression
+            x = parent[x];
+        }
+        return x;
+    }
+
+    // Returns false if a and b were ALREADY connected (a cycle).
+    bool unite(int a, int b) {
+        int rootA = find(a), rootB = find(b);
+        if (rootA == rootB) return false;
+
+        if (size[rootA] < size[rootB]) swap(rootA, rootB);   // union by size
+        parent[rootB] = rootA;
+        size[rootA] += size[rootB];
+        --components;
+        return true;
+    }
+
+    bool connected(int a, int b) { return find(a) == find(b); }
+    int getComponents() const { return components; }
+};
 ```
 
 ---
@@ -254,159 +486,425 @@ vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
 ## 9. Solved Example 1
 
 ### Problem — Number of Provinces (LeetCode 547)
-Given an `n x n` adjacency matrix `isConnected` where `isConnected[i][j] = 1` means cities i and j are directly connected, return the number of provinces (connected components).
+`isConnected[i][j] == 1` means cities `i` and `j` are directly connected. Count the provinces (groups of directly or indirectly connected cities).
 
 ### Thought Process
-1. Each city is its own set initially, so there are `n` provinces to start.
-2. Scan the upper triangle of the matrix; whenever `isConnected[i][j] == 1`, union i and j.
-3. Every successful union (two different roots merged) reduces the province count by one.
-4. Return the remaining count.
+1. A province is a connected component, and union-find counts components without any traversal.
+2. Start with `n` components — every city alone.
+3. Walk the upper triangle of the matrix (it is symmetric, so `j > i` suffices) and union each connected pair.
+4. Every **successful** union merges two groups into one, so decrement the count.
+5. The remaining count is the answer — no second pass, no visited array.
 
 ### Dry Run
-Input: `isConnected=[[1,1,0],[1,1,0],[0,0,1]]`, count=3.
-- i=0,j=1 → 1: union(0,1), roots differ → count=2.
-- i=0,j=2 → 0: skip. i=1,j=2 → 0: skip.
-- No more edges → return 2.
+
+Input:
+
+```text
+isConnected = [[1, 1, 0],
+               [1, 1, 0],
+               [0, 0, 1]]
+```
+
+Start: `parent = [0, 1, 2]`, `components = 3`
+
+| pair (i,j) | connected? | find(i), find(j) | union merged? | components |
+|------------|-----------|-------------------|---------------|------------|
+| (0,1) | yes | 0, 1 — different | **yes** → `parent[1] = 0` | 3 → **2** |
+| (0,2) | no | — | — | 2 |
+| (1,2) | no | — | — | 2 |
+
+Output: **2** ✓
+
+Only the upper triangle is scanned, and the diagonal is skipped entirely — a city connected to itself would be a no-op union anyway, since `find(i) == find(i)`.
 
 ### Visualization
-```
-input  ──▶ [ apply Union Find step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+      0 —— 1        2
+
+start:  {0} {1} {2}          components = 3
+union(0,1) succeeds:
+        {0,1}  {2}           components = 2
+
+           0
+           |
+           1        2
 ```
 
 ### Code
+
+```go
+func findCircleNum(isConnected [][]int) int {
+    n := len(isConnected)
+    uf := NewUnionFind(n)
+
+    // The matrix is symmetric, so the upper triangle is enough.
+    for i := 0; i < n; i++ {
+        for j := i + 1; j < n; j++ {
+            if isConnected[i][j] == 1 {
+                uf.Union(i, j) // decrements Components on a real merge
+            }
+        }
+    }
+
+    return uf.Components
+}
+
+// UnionFind maintains disjoint sets with near-constant find and union.
+type UnionFind struct {
+    parent     []int
+    size       []int
+    Components int
+}
+
+func NewUnionFind(n int) *UnionFind {
+    parent := make([]int, n)
+    size := make([]int, n)
+    for i := range parent {
+        parent[i] = i
+        size[i] = 1
+    }
+    return &UnionFind{parent: parent, size: size, Components: n}
+}
+
+func (u *UnionFind) Find(x int) int {
+    for u.parent[x] != x {
+        u.parent[x] = u.parent[u.parent[x]] // path compression
+        x = u.parent[x]
+    }
+    return x
+}
+
+// Union returns false if a and b were already connected.
+func (u *UnionFind) Union(a, b int) bool {
+    rootA, rootB := u.Find(a), u.Find(b)
+    if rootA == rootB {
+        return false
+    }
+    if u.size[rootA] < u.size[rootB] { // union by size
+        rootA, rootB = rootB, rootA
+    }
+    u.parent[rootB] = rootA
+    u.size[rootA] += u.size[rootB]
+    u.Components--
+    return true
+}
+```
+
 ```python
 def findCircleNum(isConnected):
     n = len(isConnected)
-    parent = list(range(n))
+    uf = UnionFind(n)
 
-    def find(x):
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]   # path compression
-            x = parent[x]
-        return x
-
-    count = n
+    # The matrix is symmetric, so the upper triangle is enough.
     for i in range(n):
         for j in range(i + 1, n):
-            if isConnected[i][j]:
-                ri, rj = find(i), find(j)
-                if ri != rj:
-                    parent[ri] = rj
-                    count -= 1
-    return count
+            if isConnected[i][j] == 1:
+                uf.union(i, j)          # decrements components on a real merge
+
+    return uf.components
 ```
 
 ### Complexity
-Time O(n^2 · α(n)) to scan the matrix; Space O(n) for the parent array.
+Time **O(n² · α(n))** — the matrix scan dominates; each union is effectively constant. Space O(n).
+
+> The Graph DFS chapter solves this same problem with a traversal. Both are fine here because the graph is static. Union-find becomes the *only* good option once edges arrive one at a time — which is exactly the next example.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Redundant Connection (LeetCode 684)
-A tree of `n` nodes had one extra edge added, making exactly one cycle. Given the `edges` in order, return the edge that can be removed — the last one that closes a cycle.
+A tree of `n` nodes had one extra edge added, creating exactly one cycle. Return the edge that can be removed — if several qualify, the one appearing last in the input.
 
 ### Thought Process
-1. Start with every node in its own set (nodes are 1-indexed).
-2. Process edges in input order; for `[u, v]` find the roots of u and v.
-3. If the roots already match, u and v are connected, so this edge closes the cycle → it is the answer.
-4. Otherwise union them and continue.
+1. A tree on `n` nodes has exactly `n − 1` edges and no cycles. Adding one more must close exactly one cycle.
+2. Process edges in order, unioning each pair.
+3. If `union(a, b)` returns **`false`**, then `a` and `b` were already connected — so this edge closes a cycle. That is the redundant one.
+4. Because we scan in input order, the **first** such failure is the last edge that could be removed... and since exactly one cycle exists, it is the answer.
+5. This is the payoff of having `union` return a boolean: cycle detection is one function call, no traversal.
 
 ### Dry Run
-Input: `edges=[[1,2],[1,3],[2,3]]`.
-- [1,2]: roots 1,2 differ → union → {1,2}.
-- [1,3]: roots 1,3 differ → union → {1,2,3}.
-- [2,3]: find(2)=find(3)=same root → cycle → return `[2,3]`.
+
+Input: `edges = [[1,2], [1,3], [2,3]]` (nodes are 1-indexed)
+
+Start: every node its own root, `components = 3` (ignoring the unused index 0)
+
+| edge | find(a) | find(b) | same root? | action |
+|------|---------|---------|------------|--------|
+| `[1,2]` | 1 | 2 | no | merge → `{1,2}` |
+| `[1,3]` | 1 | 3 | no | merge → `{1,2,3}` |
+| `[2,3]` | **1** | **1** | **yes** | `union` returns `false` → **return `[2,3]`** |
+
+Output: **`[2, 3]`** ✓
+
+Verify: without `[2,3]`, the edges `[1,2]` and `[1,3]` form a valid tree on 3 nodes. Adding `[2,3]` creates the cycle `1–2–3–1`. ✓
+
+**A longer case**, `edges = [[1,2], [2,3], [3,4], [1,4], [1,5]]`:
+
+| edge | same root? | action |
+|------|------------|--------|
+| `[1,2]` | no | merge → `{1,2}` |
+| `[2,3]` | no | merge → `{1,2,3}` |
+| `[3,4]` | no | merge → `{1,2,3,4}` |
+| `[1,4]` | **yes** — both reach root 1 | **return `[1,4]`** |
+| `[1,5]` | not reached | — |
+
+Output: **`[1, 4]`** ✓ — the cycle is `1–2–3–4–1`.
 
 ### Visualization
-```
-input  ──▶ [ apply Union Find step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+edges: [1,2]  [1,3]  [2,3]
+
+    1        1          1
+    |       / \        / \
+    2      2   3      2   3
+                       \_/   ← [2,3] joins two already-connected nodes
+
+  union(2,3) → find(2) == find(3) == 1 → returns false → redundant
 ```
 
 ### Code
+
+```go
+func findRedundantConnection(edges [][]int) []int {
+    // Nodes are 1..n, so size the structure n+1 and ignore index 0.
+    uf := NewRedundantUF(len(edges) + 1)
+
+    for _, edge := range edges {
+        // union returns false when the two ends were ALREADY connected,
+        // which means this edge closes a cycle.
+        if !uf.Union(edge[0], edge[1]) {
+            return edge
+        }
+    }
+    return nil // the problem guarantees exactly one redundant edge
+}
+
+type RedundantUF struct {
+    parent []int
+    size   []int
+}
+
+func NewRedundantUF(n int) *RedundantUF {
+    parent := make([]int, n)
+    size := make([]int, n)
+    for i := range parent {
+        parent[i] = i
+        size[i] = 1
+    }
+    return &RedundantUF{parent: parent, size: size}
+}
+
+func (u *RedundantUF) Find(x int) int {
+    for u.parent[x] != x {
+        u.parent[x] = u.parent[u.parent[x]] // path compression
+        x = u.parent[x]
+    }
+    return x
+}
+
+func (u *RedundantUF) Union(a, b int) bool {
+    rootA, rootB := u.Find(a), u.Find(b)
+    if rootA == rootB {
+        return false // already connected: this edge is redundant
+    }
+    if u.size[rootA] < u.size[rootB] {
+        rootA, rootB = rootB, rootA
+    }
+    u.parent[rootB] = rootA
+    u.size[rootA] += u.size[rootB]
+    return true
+}
+```
+
 ```python
 def findRedundantConnection(edges):
-    parent = list(range(len(edges) + 1))   # nodes are 1..n
+    # Nodes are 1..n, so size the structure n+1 and ignore index 0.
+    uf = UnionFind(len(edges) + 1)
 
-    def find(x):
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]   # path compression
-            x = parent[x]
-        return x
-
-    for u, v in edges:
-        ru, rv = find(u), find(v)
-        if ru == rv:
-            return [u, v]                    # this edge closes a cycle
-        parent[ru] = rv
+    for a, b in edges:
+        # union returns False when a and b were ALREADY connected.
+        if not uf.union(a, b):
+            return [a, b]
     return []
 ```
 
 ### Complexity
-Time O(n · α(n)) over the edges; Space O(n) for the parent array.
+Time **O(n · α(n))** — effectively linear. Space O(n).
+
+> DFS could also find the cycle, but it would need a fresh traversal after each edge to know *when* the cycle appeared — O(n²). Union-find answers it incrementally, which is exactly the situation it exists for.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Number of Islands (LeetCode 200)
-Given a grid of `'1'` (land) and `'0'` (water), count the islands (groups of land connected horizontally/vertically). Solve it with union-find here.
+Count islands in a grid of `'1'` (land) and `'0'` (water), where land connects horizontally and vertically.
 
 ### Thought Process
-1. Give each land cell a linear id `r * cols + c`; count starts as the number of land cells.
-2. Scan the grid; for each land cell, union it with its right and down land neighbors (covers all adjacencies without double counting).
-3. Each successful union of two distinct components decrements the island count.
-4. Return the remaining count.
+1. Map each cell `(row, col)` to a single integer id: `row * cols + col`. Union-find works on integers, so this flattening is what makes a grid usable.
+2. Count the land cells and start `islands` at that number — every land cell is initially its own island.
+3. For each land cell, union it with its **right** and **down** neighbours only. Left and up are covered when those cells are processed, so checking all four would just do the work twice.
+4. Every successful union merges two islands, so decrement.
+5. Water cells are never unioned and never counted.
 
 ### Dry Run
-Grid `[["1","1","0"],["0","1","0"],["0","0","1"]]`, land cells = 4 → count=4.
-- (0,0)-(0,1): union → count=3. (0,1)-(1,1): union → count=2.
-- (1,1) down is (2,1)="0": skip. (2,2) has no land right/down neighbor.
-- Remaining components: {(0,0),(0,1),(1,1)} and {(2,2)} → return 2.
+
+Input:
+
+```text
+     col: 0 1 2
+row 0:    1 1 0
+row 1:    1 0 0
+row 2:    0 0 1
+```
+
+Cell ids: `(r,c) → r*3 + c`. Land cells: `(0,0)=0`, `(0,1)=1`, `(1,0)=3`, `(2,2)=8` → **4 land cells**, so `islands` starts at 4.
+
+| cell | id | right neighbour | down neighbour | unions attempted | merged? | islands |
+|------|-----|-----------------|----------------|-------------------|---------|---------|
+| (0,0) | 0 | (0,1) is land, id 1 | (1,0) is land, id 3 | union(0,1), union(0,3) | both **yes** | 4 → 3 → **2** |
+| (0,1) | 1 | (0,2) is water | (1,1) is water | none | — | 2 |
+| (1,0) | 3 | (1,1) is water | (2,0) is water | none | — | 2 |
+| (2,2) | 8 | out of bounds | out of bounds | none | — | **2** |
+
+Output: **2** ✓
+
+The two islands are `{(0,0), (0,1), (1,0)}` and `{(2,2)}`. ✓
+
+Note that we never union `(0,1)` with `(0,0)` a second time: `(0,1)` only looks right and down, and `(0,0)` already handled the leftward link. That halves the union calls with no loss of coverage.
 
 ### Visualization
-```
-input  ──▶ [ apply Union Find step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+    1 1 0        ids:  0 1 ·
+    1 0 0              3 · ·
+    0 0 1              · · 8
+
+start: 4 land cells → islands = 4
+
+  (0,0) unions right (id 1)  →  merged, islands = 3
+  (0,0) unions down  (id 3)  →  merged, islands = 2
+  (2,2) has no land neighbours
+
+    {0, 1, 3}      {8}       →  2 islands
 ```
 
 ### Code
+
+```go
+func numIslands(grid [][]byte) int {
+    if len(grid) == 0 || len(grid[0]) == 0 {
+        return 0
+    }
+    rows, cols := len(grid), len(grid[0])
+
+    // Flatten (row, col) into a single id so union-find can hold it.
+    uf := NewIslandUF(rows * cols)
+
+    islands := 0
+    for row := 0; row < rows; row++ {
+        for col := 0; col < cols; col++ {
+            if grid[row][col] == '1' {
+                islands++ // every land cell starts as its own island
+            }
+        }
+    }
+
+    for row := 0; row < rows; row++ {
+        for col := 0; col < cols; col++ {
+            if grid[row][col] != '1' {
+                continue
+            }
+            id := row*cols + col
+
+            // Only right and down: left and up are handled by those cells.
+            if col+1 < cols && grid[row][col+1] == '1' {
+                if uf.Union(id, row*cols+col+1) {
+                    islands-- // two islands became one
+                }
+            }
+            if row+1 < rows && grid[row+1][col] == '1' {
+                if uf.Union(id, (row+1)*cols+col) {
+                    islands--
+                }
+            }
+        }
+    }
+
+    return islands
+}
+
+type IslandUF struct {
+    parent []int
+    size   []int
+}
+
+func NewIslandUF(n int) *IslandUF {
+    parent := make([]int, n)
+    size := make([]int, n)
+    for i := range parent {
+        parent[i] = i
+        size[i] = 1
+    }
+    return &IslandUF{parent: parent, size: size}
+}
+
+func (u *IslandUF) Find(x int) int {
+    for u.parent[x] != x {
+        u.parent[x] = u.parent[u.parent[x]]
+        x = u.parent[x]
+    }
+    return x
+}
+
+func (u *IslandUF) Union(a, b int) bool {
+    rootA, rootB := u.Find(a), u.Find(b)
+    if rootA == rootB {
+        return false
+    }
+    if u.size[rootA] < u.size[rootB] {
+        rootA, rootB = rootB, rootA
+    }
+    u.parent[rootB] = rootA
+    u.size[rootA] += u.size[rootB]
+    return true
+}
+```
+
 ```python
 def numIslands(grid):
     if not grid or not grid[0]:
         return 0
     rows, cols = len(grid), len(grid[0])
-    parent = list(range(rows * cols))
 
-    def find(x):
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]   # path compression
-            x = parent[x]
-        return x
+    uf = UnionFind(rows * cols)         # flatten (row, col) → row*cols + col
+    islands = sum(row.count("1") for row in grid)   # each land cell starts alone
 
-    count = sum(grid[r][c] == '1' for r in range(rows) for c in range(cols))
+    for row in range(rows):
+        for col in range(cols):
+            if grid[row][col] != "1":
+                continue
+            cell = row * cols + col
+            # Only right and down: left and up are handled by those cells.
+            if col + 1 < cols and grid[row][col + 1] == "1":
+                if uf.union(cell, row * cols + col + 1):
+                    islands -= 1
+            if row + 1 < rows and grid[row + 1][col] == "1":
+                if uf.union(cell, (row + 1) * cols + col):
+                    islands -= 1
 
-    def union(a, b):
-        nonlocal count
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            parent[ra] = rb
-            count -= 1
-
-    for r in range(rows):
-        for c in range(cols):
-            if grid[r][c] == '1':
-                if r + 1 < rows and grid[r + 1][c] == '1':
-                    union(r * cols + c, (r + 1) * cols + c)
-                if c + 1 < cols and grid[r][c + 1] == '1':
-                    union(r * cols + c, r * cols + c + 1)
-    return count
+    return islands
 ```
 
 ### Complexity
-Time O(rows · cols · α) for the grid scan and unions; Space O(rows · cols) for the parent array.
+Time **O(rows × cols × α)** — effectively linear in the number of cells. Space O(rows × cols).
 
+> DFS solves this in the same complexity and with less code (see the Graph DFS chapter). Union-find earns its place when the grid **changes** — LeetCode 305, "Number of Islands II", adds land one cell at a time, and re-running DFS after each addition would be quadratic. Union-find just calls `union`.
+
+---
 
 ## 12. LeetCode Practice Set
 

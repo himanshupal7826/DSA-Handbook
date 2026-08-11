@@ -41,32 +41,132 @@ topological sort, kahn, dag, ordering, prerequisites, indegree.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"In what order can I do these tasks, when some must come before others?"*
+
 ### Intuition
-Naive reachability/path checks rescan the graph repeatedly — exponential or O(V*E^2).
+Guess an order, then check whether it respects every constraint.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Generate a permutation of the `n` tasks.
+2. For each prerequisite pair `(a before b)`, check that `a` appears before `b`.
+3. If every pair holds, that permutation is a valid order.
+4. Otherwise try the next permutation.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n! · E)** — factorially many permutations, each validated against every edge.
+- Space: O(n).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Topological Sort pattern is built to use.
+- `n = 12` already gives half a billion permutations. Real inputs have thousands of tasks.
+- And it discards the structure completely. The constraints don't merely *filter* orders — they **construct** one, if you read them the right way.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Topological Sort invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Repeatedly take any task that has no unmet prerequisites, and remove it — the order you take them in *is* the answer.**
+
+That "no unmet prerequisites" test is just a counter per task: how many prerequisites are still outstanding. Finishing a task decrements its dependents' counters, which may free them in turn.
+
+### The thought process
+
+```text
+We need    : an order respecting all "a before b" constraints.
+Obvious way: try every permutation and validate.
+Hopeless   : O(n!).
+Notice     : at any moment, a task with ZERO unmet prerequisites can
+             be done immediately — and doing it can only ever HELP
+             other tasks, never hurt them.
+             So there is no need to guess: take any such task.
+Therefore  : count prerequisites per task (its in-degree). Keep a queue
+             of the zero-count ones. Pop, output, decrement dependents,
+             enqueue anything that just reached zero.
+Now        : O(V + E), one pass.
+```
+
+This is **Kahn's algorithm**, and the greedy choice is safe for a simple reason: taking an available task never removes an edge that some other task needed. Removals only ever reduce counters.
+
+### Steps
+
+```text
+Step 1 → Build the adjacency list: prerequisite → the tasks that need it.
+Step 2 → Compute inDegree[task] = how many prerequisites it has.
+Step 3 → Queue every task with inDegree == 0.
+Step 4 → While the queue is not empty:
+Step 5 →     task = dequeue; append it to the order
+Step 6 →     for each dependent of task:
+Step 7 →         inDegree[dependent]--
+Step 8 →         if it hit 0, enqueue it
+Step 9 → If len(order) == n, that is a valid order.
+          Otherwise a CYCLE exists and no order is possible.
+```
+
+### The cycle check is free — and it is the whole point of half these problems
+
+Step 9 deserves its own paragraph, because it is where most of the value lives.
+
+If the graph has a cycle, every task on that cycle permanently waits for another task on the same cycle. None of their in-degrees ever reaches zero, so none is ever enqueued. The loop simply ends early:
+
+```text
+processed all n tasks   →  no cycle, and `order` is a valid schedule
+processed fewer than n  →  a cycle exists, no valid order at all
+```
+
+So "can I finish all courses?" (a yes/no question) and "give me the order" (a construction) are **the same algorithm**, differing only in what you return. You never need a separate cycle-detection pass.
+
+### Which direction do the edges point?
+
+The single most common bug. `[a, b]` in LeetCode's course problems means *"to take `a`, you must first take `b`"* — so the dependency runs `b → a`:
+
+```text
+prerequisite  ──edge──▶  the course that needs it
+      b       ──────▶          a
+
+inDegree[a] counts how many prerequisites a still has
+```
+
+Draw one arrow before you write the loop. Getting this backwards produces a reversed but plausible-looking answer that passes small tests and fails larger ones.
+
+### The DFS alternative
+
+There is a second construction: run DFS, and **prepend** each node to the result when its recursion finishes (postorder, reversed).
+
+```text
+Kahn (BFS)                    DFS + reverse postorder
+──────────────────────────    ──────────────────────────
+iterative, no stack limit     recursive, can overflow
+cycle check is free (count)   needs 3-colour marking to spot cycles
+natural for "levels"          natural when you already have a DFS
+```
+
+For cycle detection with DFS you need three states — unvisited / **in progress** / done — because meeting an *in-progress* node means you've looped back onto your own path. A plain two-state `visited` set cannot tell that apart from a legitimate re-visit via a different branch.
+
+Kahn's is usually the better interview answer: iterative, and the cycle check comes for free.
+
+### Ordering is not unique
+
+Any task with in-degree 0 may be taken. Different queue orders give different valid answers, and problems that ask for *the* order normally accept any of them. If a specific tie-break is required (say, lexicographically smallest), swap the queue for a **min-heap** — same algorithm, O(V log V + E).
+
+### How should I recognize this?
+
+```text
+If you see...
+  "prerequisites", "dependencies", "build order", "course schedule"
+  "can all tasks be finished", "is there a cycle in a DIRECTED graph"
+  "alien dictionary", any "X must come before Y"
+        ↓
+Think about...
+  "What has nothing waiting on it right now?"
+        ↓
+Use...
+  Kahn: in-degree counts + a queue of the zeros
+  order shorter than n  ⇒  a cycle  ⇒  impossible
+  need a specific tie-break?  →  min-heap instead of a queue
+```
 
 ### Visual explanation
 
@@ -94,84 +194,248 @@ Pick the traversal by structure: BFS for unweighted shortest paths, DFS for conn
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Topological Sort  : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+courses 0..3, prerequisites [[1,0],[2,0],[3,1],[3,2]]
+(edges point prerequisite → dependent)
+
+        0
+       / \
+      ▼   ▼
+      1   2
+       \ /
+        ▼
+        3
+
+inDegree:  0→0   1→1   2→1   3→2
+
+queue [0]      pop 0 → order [0]        1 and 2 drop to 0 → queue [1,2]
+queue [1,2]    pop 1 → order [0,1]      3 drops to 1
+queue [2]      pop 2 → order [0,1,2]    3 drops to 0 → queue [3]
+queue [3]      pop 3 → order [0,1,2,3]
+
+4 of 4 processed → no cycle → valid order
 ```
 
 ### Interview explanation
-"This is a Topological Sort problem. I'll pick the traversal by structure: BFS for unweighted shortest paths, DFS for connectivity/cycles, Dijkstra for non-negative weights, union-find for dynamic connectivity. That brings the complexity down to O(V + E) time and O(V) space — here's the template."
+"I'll use Kahn's algorithm. I build an adjacency list pointing from each prerequisite to the courses that need it, and count in-degrees — how many prerequisites each course still has. Everything with in-degree zero goes in a queue. I pop one, append it to the order, and decrement its dependents' counters, enqueueing any that reach zero. The greedy choice is safe because completing an available task can only reduce other tasks' counters, never increase them. The cycle check comes for free: if I finish having processed fewer than `n` courses, the remaining ones are all waiting on each other, so no valid order exists. That's O(V + E) time and space. The DFS alternative is reverse postorder, but it needs three-colour marking to detect cycles, so Kahn's is usually cleaner."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Graphs** family template. Adapt the comparison/condition to the specific problem.
+> In-degrees plus a queue of the zeros. A short result means a cycle.
 
 ```go
-// BFS shortest distance from src in an unweighted adjacency list.
-func bfs(adj map[int][]int, src, n int) []int {
-    dist := make([]int, n)
-    for i := range dist { dist[i] = -1 }
-    dist[src] = 0
-    queue := []int{src}
+// TopologicalSort returns a valid ordering, or nil if the graph has a cycle.
+// edges are (from → to), meaning `from` must come before `to`.
+func TopologicalSort(n int, edges [][]int) []int {
+    dependents := make([][]int, n) // prerequisite → tasks needing it
+    inDegree := make([]int, n)     // how many prerequisites remain
+
+    for _, e := range edges {
+        from, to := e[0], e[1]
+        dependents[from] = append(dependents[from], to)
+        inDegree[to]++
+    }
+
+    // Everything with nothing waiting on it can start immediately.
+    queue := []int{}
+    for task := 0; task < n; task++ {
+        if inDegree[task] == 0 {
+            queue = append(queue, task)
+        }
+    }
+
+    order := make([]int, 0, n)
     for len(queue) > 0 {
-        u := queue[0]; queue = queue[1:]
-        for _, v := range adj[u] {
-            if dist[v] == -1 {           // first visit = shortest in BFS
-                dist[v] = dist[u] + 1
-                queue = append(queue, v)
+        task := queue[0]
+        queue = queue[1:]
+        order = append(order, task)
+
+        for _, next := range dependents[task] {
+            inDegree[next]-- // one prerequisite satisfied
+            if inDegree[next] == 0 {
+                queue = append(queue, next)
             }
         }
     }
-    return dist
+
+    if len(order) != n {
+        return nil // a cycle: some tasks never reached in-degree 0
+    }
+    return order
+}
+
+// HasCycle reuses the exact same machinery — only the return type differs.
+func HasCycle(n int, edges [][]int) bool {
+    return TopologicalSort(n, edges) == nil
+}
+
+// TopologicalSortSmallest breaks ties toward the smallest task id by
+// swapping the queue for a min-heap.
+func TopologicalSortSmallest(n int, edges [][]int) []int {
+    dependents := make([][]int, n)
+    inDegree := make([]int, n)
+    for _, e := range edges {
+        dependents[e[0]] = append(dependents[e[0]], e[1])
+        inDegree[e[1]]++
+    }
+
+    available := &intMinHeap{}
+    for task := 0; task < n; task++ {
+        if inDegree[task] == 0 {
+            *available = append(*available, task)
+        }
+    }
+    heap.Init(available)
+
+    order := make([]int, 0, n)
+    for available.Len() > 0 {
+        task := heap.Pop(available).(int)
+        order = append(order, task)
+        for _, next := range dependents[task] {
+            inDegree[next]--
+            if inDegree[next] == 0 {
+                heap.Push(available, next)
+            }
+        }
+    }
+
+    if len(order) != n {
+        return nil
+    }
+    return order
+}
+
+type intMinHeap []int
+
+func (h intMinHeap) Len() int           { return len(h) }
+func (h intMinHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h intMinHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *intMinHeap) Push(x any)        { *h = append(*h, x.(int)) }
+func (h *intMinHeap) Pop() any {
+    old := *h
+    last := old[len(old)-1]
+    *h = old[:len(old)-1]
+    return last
 }
 ```
 
 ```python
 from collections import deque
-def bfs(adj, src, n):
-    dist = [-1] * n
-    dist[src] = 0
-    q = deque([src])
-    while q:
-        u = q.popleft()
-        for v in adj[u]:
-            if dist[v] == -1:           # unvisited
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+
+def topological_sort(n, edges):
+    """Valid ordering, or None if there is a cycle. edges are (from, to)."""
+    dependents = [[] for _ in range(n)]
+    in_degree = [0] * n
+
+    for frm, to in edges:
+        dependents[frm].append(to)
+        in_degree[to] += 1
+
+    queue = deque(task for task in range(n) if in_degree[task] == 0)
+
+    order = []
+    while queue:
+        task = queue.popleft()
+        order.append(task)
+        for nxt in dependents[task]:
+            in_degree[nxt] -= 1          # one prerequisite satisfied
+            if in_degree[nxt] == 0:
+                queue.append(nxt)
+
+    return order if len(order) == n else None   # short result ⇒ cycle
+
+def has_cycle(n, edges):
+    """Same machinery, different return type."""
+    return topological_sort(n, edges) is None
+
+def topological_sort_smallest(n, edges):
+    """Lexicographically smallest order: min-heap instead of a queue."""
+    import heapq
+    dependents = [[] for _ in range(n)]
+    in_degree = [0] * n
+    for frm, to in edges:
+        dependents[frm].append(to)
+        in_degree[to] += 1
+
+    available = [t for t in range(n) if in_degree[t] == 0]
+    heapq.heapify(available)
+
+    order = []
+    while available:
+        task = heapq.heappop(available)
+        order.append(task)
+        for nxt in dependents[task]:
+            in_degree[nxt] -= 1
+            if in_degree[nxt] == 0:
+                heapq.heappush(available, nxt)
+
+    return order if len(order) == n else None
 ```
 
 ```java
-int[] bfs(List<List<Integer>> adj, int src, int n) {
-    int[] dist = new int[n];
-    Arrays.fill(dist, -1);
-    dist[src] = 0;
-    Queue<Integer> q = new ArrayDeque<>();
-    q.add(src);
-    while (!q.isEmpty()) {
-        int u = q.poll();
-        for (int v : adj.get(u)) if (dist[v] == -1) {
-            dist[v] = dist[u] + 1; q.add(v);
+import java.util.*;
+
+public class TopologicalSort {
+    // Valid ordering, or null if the graph has a cycle.
+    public static List<Integer> sort(int n, int[][] edges) {
+        List<List<Integer>> dependents = new ArrayList<>();
+        for (int i = 0; i < n; i++) dependents.add(new ArrayList<>());
+        int[] inDegree = new int[n];
+
+        for (int[] e : edges) {
+            dependents.get(e[0]).add(e[1]);
+            inDegree[e[1]]++;
         }
+
+        Queue<Integer> queue = new ArrayDeque<>();
+        for (int t = 0; t < n; t++) if (inDegree[t] == 0) queue.add(t);
+
+        List<Integer> order = new ArrayList<>();
+        while (!queue.isEmpty()) {
+            int task = queue.poll();
+            order.add(task);
+            for (int next : dependents.get(task)) {
+                if (--inDegree[next] == 0) queue.add(next);
+            }
+        }
+
+        return order.size() == n ? order : null;   // short result ⇒ cycle
     }
-    return dist;
 }
 ```
 
 ```cpp
-vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
-    vector<int> dist(n, -1);
-    dist[src] = 0;
-    queue<int> q; q.push(src);
-    while (!q.empty()) {
-        int u = q.front(); q.pop();
-        for (int v : adj[u]) if (dist[v] == -1) {
-            dist[v] = dist[u] + 1; q.push(v);
-        }
+#include <queue>
+#include <vector>
+using namespace std;
+
+// Valid ordering, or an empty vector if the graph has a cycle.
+vector<int> topologicalSort(int n, const vector<vector<int>>& edges) {
+    vector<vector<int>> dependents(n);
+    vector<int> inDegree(n, 0);
+
+    for (const auto& e : edges) {
+        dependents[e[0]].push_back(e[1]);
+        ++inDegree[e[1]];
     }
-    return dist;
+
+    queue<int> q;
+    for (int t = 0; t < n; ++t) if (inDegree[t] == 0) q.push(t);
+
+    vector<int> order;
+    order.reserve(n);
+    while (!q.empty()) {
+        int task = q.front();
+        q.pop();
+        order.push_back(task);
+        for (int next : dependents[task])
+            if (--inDegree[next] == 0) q.push(next);
+    }
+
+    if ((int)order.size() != n) return {};        // short result ⇒ cycle
+    return order;
 }
 ```
 
@@ -257,164 +521,425 @@ vector<int> bfs(vector<vector<int>>& adj, int src, int n) {
 ## 9. Solved Example 1
 
 ### Problem — Course Schedule (LeetCode 207)
-Given `numCourses` and `prerequisites[i] = [a, b]` meaning "take b before a", return `True` if you can finish all courses (i.e. the prerequisite graph is a DAG with no cycle).
+`prerequisites[i] = [a, b]` means you must take course `b` before course `a`. Return `true` if all courses can be finished.
 
 ### Thought Process
-1. Build a directed graph `b → a` and count each course's indegree.
-2. Kahn's BFS: push every indegree-0 course into a queue and pop them one at a time.
-3. Each time you pop a course, decrement its neighbors' indegrees; any that hit 0 join the queue.
-4. If the number of courses popped equals `numCourses`, there was no cycle → return `True`.
+1. "Can all courses be finished?" is exactly "does this directed graph have no cycle?"
+2. Kahn's algorithm answers it for free: run the topological sort and check how many courses came out.
+3. Edge direction matters — `[a, b]` means `b → a`, so `inDegree[a]` counts `a`'s prerequisites.
+4. Process courses with in-degree 0, decrementing dependents as they complete.
+5. If fewer than `n` courses were processed, the rest are waiting on each other — a cycle.
 
-### Dry Run
-Input: `numCourses=2`, `prerequisites=[[1,0]]` (need 0 before 1).
-- indegree = [0, 1]; queue starts with course 0.
-- Pop 0 → decrement indegree[1] to 0 → push 1. taken=1.
-- Pop 1. taken=2.
-- taken (2) == numCourses (2) → return `True`.
+### Dry Run — a schedulable case
+
+Input: `numCourses = 2`, `prerequisites = [[1, 0]]` (take 0 before 1)
+
+Edges: `0 → 1`. In-degrees: `0 → 0`, `1 → 1`.
+
+| step | queue | popped | processed | decrements | new zeros |
+|------|-------|--------|-----------|------------|-----------|
+| init | `[0]` | — | 0 | — | — |
+| 1 | `[0]` | `0` | **1** | `inDegree[1]: 1 → 0` | `1` |
+| 2 | `[1]` | `1` | **2** | none | — |
+| 3 | `[]` | — | 2 | — | stop |
+
+Processed 2 of 2 → **`true`** ✓
+
+### Dry Run — a cyclic case
+
+Input: `numCourses = 2`, `prerequisites = [[1, 0], [0, 1]]`
+
+Edges: `0 → 1` and `1 → 0`. In-degrees: `0 → 1`, `1 → 1`.
+
+| step | queue | note |
+|------|-------|------|
+| init | `[]` | **nothing** has in-degree 0 — every course waits on the other |
+| 1 | `[]` | loop never runs; processed = 0 |
+
+Processed 0 of 2 → **`false`** ✓
+
+That empty initial queue is the cycle announcing itself. No separate detection pass is needed.
 
 ### Visualization
-```
-input  ──▶ [ apply Topological Sort step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+schedulable:   0 ──▶ 1          inDegree: 0→0, 1→1
+               start at 0, then 1     →  2 of 2  →  true
+
+cyclic:        0 ──▶ 1
+               ▲     │          inDegree: 0→1, 1→1
+               └─────┘          nothing starts at 0  →  0 of 2  →  false
 ```
 
 ### Code
+
+```go
+func canFinish(numCourses int, prerequisites [][]int) bool {
+    dependents := make([][]int, numCourses) // prerequisite → courses needing it
+    inDegree := make([]int, numCourses)
+
+    for _, p := range prerequisites {
+        course, prerequisite := p[0], p[1]
+        // [course, prerequisite] means prerequisite must come FIRST.
+        dependents[prerequisite] = append(dependents[prerequisite], course)
+        inDegree[course]++
+    }
+
+    queue := []int{}
+    for course := 0; course < numCourses; course++ {
+        if inDegree[course] == 0 {
+            queue = append(queue, course)
+        }
+    }
+
+    processed := 0
+    for len(queue) > 0 {
+        course := queue[0]
+        queue = queue[1:]
+        processed++
+
+        for _, next := range dependents[course] {
+            inDegree[next]--
+            if inDegree[next] == 0 {
+                queue = append(queue, next)
+            }
+        }
+    }
+
+    // Short of numCourses means the rest are waiting on each other.
+    return processed == numCourses
+}
+```
+
 ```python
 from collections import deque
 
 def canFinish(numCourses, prerequisites):
-    adj = [[] for _ in range(numCourses)]
-    indeg = [0] * numCourses
-    for a, b in prerequisites:      # must take b before a: edge b -> a
-        adj[b].append(a)
-        indeg[a] += 1
+    dependents = [[] for _ in range(numCourses)]
+    in_degree = [0] * numCourses
 
-    q = deque(c for c in range(numCourses) if indeg[c] == 0)
-    taken = 0
-    while q:
-        u = q.popleft()
-        taken += 1
-        for v in adj[u]:
-            indeg[v] -= 1
-            if indeg[v] == 0:
-                q.append(v)
-    return taken == numCourses
+    for course, prerequisite in prerequisites:
+        # [course, prerequisite] means prerequisite comes FIRST.
+        dependents[prerequisite].append(course)
+        in_degree[course] += 1
+
+    queue = deque(c for c in range(numCourses) if in_degree[c] == 0)
+
+    processed = 0
+    while queue:
+        course = queue.popleft()
+        processed += 1
+        for nxt in dependents[course]:
+            in_degree[nxt] -= 1
+            if in_degree[nxt] == 0:
+                queue.append(nxt)
+
+    return processed == numCourses      # short ⇒ cycle
 ```
 
 ### Complexity
-Time O(V + E), Space O(V + E) for the adjacency list and queue.
+Time **O(V + E)** — each course is enqueued once and each edge relaxed once. Space O(V + E).
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Course Schedule II (LeetCode 210)
-Same prerequisite graph as 207, but return a valid ordering of all courses. If it is impossible (a cycle exists), return an empty list.
+Same input, but return **an actual valid order**, or an empty array if none exists.
 
 ### Thought Process
-1. Build the graph `b → a` and indegree array exactly as in Course Schedule.
-2. Run Kahn's BFS, but this time append each popped course to an `order` list.
-3. The order in which indegree-0 courses are removed is a valid topological order.
-4. If `order` contains every course, return it; otherwise a cycle blocked some courses → return `[]`.
+1. Identical algorithm — the only change is that we collect the popped courses instead of just counting them.
+2. That is the useful realisation: the yes/no question and the construction question are one algorithm.
+3. If the collected order is shorter than `numCourses`, a cycle exists and we return an empty array.
+4. Any valid order is accepted; different queue orders give different correct answers.
+5. To force a specific tie-break (lexicographically smallest, say), swap the queue for a min-heap.
 
 ### Dry Run
-Input: `numCourses=4`, `prerequisites=[[1,0],[2,0],[3,1],[3,2]]`.
-- indegree = [0,1,1,2]; queue = [0].
-- Pop 0 → order=[0]; indeg[1]=0, indeg[2]=0 → queue=[1,2].
-- Pop 1 → order=[0,1]; indeg[3]=1. Pop 2 → order=[0,1,2]; indeg[3]=0 → queue=[3].
-- Pop 3 → order=[0,1,2,3]. len==4 → return `[0,1,2,3]`.
+
+Input: `numCourses = 4`, `prerequisites = [[1,0], [2,0], [3,1], [3,2]]`
+
+Edges: `0 → 1`, `0 → 2`, `1 → 3`, `2 → 3`.
+In-degrees: `0 → 0`, `1 → 1`, `2 → 1`, `3 → 2`.
+
+```text
+        0
+       / \
+      ▼   ▼
+      1   2
+       \ /
+        ▼
+        3
+```
+
+| step | queue before | pop | order so far | decrements | enqueued |
+|------|--------------|-----|--------------|------------|----------|
+| 1 | `[0]` | `0` | `[0]` | `1: 1→0`, `2: 1→0` | `1`, `2` |
+| 2 | `[1, 2]` | `1` | `[0, 1]` | `3: 2→1` | — |
+| 3 | `[2]` | `2` | `[0, 1, 2]` | `3: 1→0` | `3` |
+| 4 | `[3]` | `3` | `[0, 1, 2, 3]` | none | — |
+
+Output: **`[0, 1, 2, 3]`** ✓
+
+Note step 2: course `3` had **two** prerequisites, so finishing `1` alone was not enough. It only became available after `2` finished too — which is precisely what the in-degree counter tracks.
+
+`[0, 2, 1, 3]` is equally valid; it is what you would get by enqueueing `2` before `1`.
 
 ### Visualization
-```
-input  ──▶ [ apply Topological Sort step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+inDegree:  0:0   1:1   2:1   3:2
+
+pop 0  →  order [0]           1→0, 2→0        queue [1,2]
+pop 1  →  order [0,1]         3→1             queue [2]
+pop 2  →  order [0,1,2]       3→0             queue [3]
+pop 3  →  order [0,1,2,3]                     queue []
+
+4 of 4 processed → valid order
 ```
 
 ### Code
+
+```go
+func findOrder(numCourses int, prerequisites [][]int) []int {
+    dependents := make([][]int, numCourses)
+    inDegree := make([]int, numCourses)
+
+    for _, p := range prerequisites {
+        course, prerequisite := p[0], p[1]
+        dependents[prerequisite] = append(dependents[prerequisite], course)
+        inDegree[course]++
+    }
+
+    queue := []int{}
+    for course := 0; course < numCourses; course++ {
+        if inDegree[course] == 0 {
+            queue = append(queue, course)
+        }
+    }
+
+    // Same loop as Example 1 — we just keep the courses instead of counting.
+    order := make([]int, 0, numCourses)
+    for len(queue) > 0 {
+        course := queue[0]
+        queue = queue[1:]
+        order = append(order, course)
+
+        for _, next := range dependents[course] {
+            inDegree[next]--
+            if inDegree[next] == 0 {
+                queue = append(queue, next)
+            }
+        }
+    }
+
+    if len(order) != numCourses {
+        return []int{} // a cycle: no valid order exists
+    }
+    return order
+}
+```
+
 ```python
 from collections import deque
 
 def findOrder(numCourses, prerequisites):
-    adj = [[] for _ in range(numCourses)]
-    indeg = [0] * numCourses
-    for a, b in prerequisites:      # edge b -> a
-        adj[b].append(a)
-        indeg[a] += 1
+    dependents = [[] for _ in range(numCourses)]
+    in_degree = [0] * numCourses
 
-    q = deque(c for c in range(numCourses) if indeg[c] == 0)
-    order = []
-    while q:
-        u = q.popleft()
-        order.append(u)
-        for v in adj[u]:
-            indeg[v] -= 1
-            if indeg[v] == 0:
-                q.append(v)
+    for course, prerequisite in prerequisites:
+        dependents[prerequisite].append(course)
+        in_degree[course] += 1
+
+    queue = deque(c for c in range(numCourses) if in_degree[c] == 0)
+
+    order = []                          # keep them, don't just count
+    while queue:
+        course = queue.popleft()
+        order.append(course)
+        for nxt in dependents[course]:
+            in_degree[nxt] -= 1
+            if in_degree[nxt] == 0:
+                queue.append(nxt)
+
     return order if len(order) == numCourses else []
 ```
 
 ### Complexity
-Time O(V + E), Space O(V + E) for the adjacency list, indegrees, and output.
+Time **O(V + E)**, Space O(V + E).
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Alien Dict (LeetCode 269)
-Given a list of `words` sorted lexicographically by an unknown alien alphabet, derive a valid ordering of its letters. Return `""` if the ordering is invalid.
+### Problem — Alien Dictionary (LeetCode 269)
+Given words sorted according to an unknown alphabet, return a possible letter order, or `""` if the input is inconsistent.
 
 ### Thought Process
-1. Every letter that appears is a node; seed indegree 0 for each.
-2. Compare each adjacent word pair; the first differing character gives an edge `c1 → c2`.
-3. Guard the prefix case: if the longer word comes before its own prefix (e.g. "abc" before "ab"), the input is invalid → return `""`.
-4. Kahn's topological sort over the letter graph; if the result uses every letter, join it, else a cycle exists → return `""`.
+1. The sortedness of the word list is the *only* source of information, and it constrains **adjacent pairs** only.
+2. For each adjacent pair, walk both words together to the **first differing character**. That single pair gives one ordering edge; everything after it tells you nothing.
+3. Collect every letter that appears — even letters with no constraints must be in the output.
+4. Run the standard topological sort over those edges.
+5. Two failure modes: a cycle (contradictory constraints) and an **invalid prefix**.
+
+**The invalid-prefix case** is the edge case interviewers look for. If `word1` is longer than `word2` and `word2` is a prefix of it — like `["abc", "ab"]` — then no alphabet makes that ordering valid, because a prefix always sorts first. Return `""` immediately.
 
 ### Dry Run
-Input: `words=["wrt","wrf","er","ett","rftt"]`.
-- Pairs give edges: t→f, w→e, r→t, e→r. Letters = {w,r,t,f,e}.
-- indegree: w0, e1, r1, t1, f1; queue starts with w.
-- Pop w→e(0); pop e→r(0); pop r→t(0); pop t→f(0); pop f.
-- order = "wertf", uses all 5 letters → return `"wertf"`.
+
+Input: `words = ["wrt", "wrf", "er", "ett", "rftt"]`
+
+**Step 1 — derive edges from adjacent pairs:**
+
+| pair | first difference | edge |
+|------|------------------|------|
+| `"wrt"`, `"wrf"` | index 2: `t` vs `f` | **t → f** |
+| `"wrf"`, `"er"`  | index 0: `w` vs `e` | **w → e** |
+| `"er"`, `"ett"`  | index 1: `r` vs `t` | **r → t** |
+| `"ett"`, `"rftt"`| index 0: `e` vs `r` | **e → r** |
+
+Letters present: `w, r, t, f, e`
+
+**Step 2 — in-degrees:**
+
+| letter | w | e | r | t | f |
+|--------|---|---|---|---|---|
+| in-degree | 0 | 1 (from w) | 1 (from e) | 1 (from r) | 1 (from t) |
+
+**Step 3 — Kahn's:**
+
+| queue | pop | order | decrements |
+|-------|-----|-------|------------|
+| `[w]` | `w` | `w` | `e: 1→0` |
+| `[e]` | `e` | `we` | `r: 1→0` |
+| `[r]` | `r` | `wer` | `t: 1→0` |
+| `[t]` | `t` | `wert` | `f: 1→0` |
+| `[f]` | `f` | `wertf` | — |
+
+Output: **`"wertf"`** ✓
+
+All 5 letters emitted, so there is no cycle. Note the chain was forced here — every step had exactly one available letter — so this input has a unique answer.
 
 ### Visualization
-```
-input  ──▶ [ apply Topological Sort step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+"wrt"           t before f
+"wrf"    ──▶    w before e
+"er"            r before t
+"ett"           e before r
+"rftt"
+
+  w ──▶ e ──▶ r ──▶ t ──▶ f
+
+only the FIRST differing character of each adjacent pair matters
 ```
 
 ### Code
+
+```go
+func alienOrder(words []string) string {
+    // Every letter that appears must show up in the answer, even if
+    // no constraint mentions it.
+    dependents := make(map[byte][]byte)
+    inDegree := make(map[byte]int)
+    for _, word := range words {
+        for i := 0; i < len(word); i++ {
+            if _, seen := inDegree[word[i]]; !seen {
+                inDegree[word[i]] = 0
+            }
+        }
+    }
+
+    // Each adjacent pair gives at most one ordering edge.
+    for i := 0; i+1 < len(words); i++ {
+        first, second := words[i], words[i+1]
+
+        minLen := len(first)
+        if len(second) < minLen {
+            minLen = len(second)
+        }
+
+        foundDifference := false
+        for j := 0; j < minLen; j++ {
+            if first[j] != second[j] {
+                dependents[first[j]] = append(dependents[first[j]], second[j])
+                inDegree[second[j]]++
+                foundDifference = true
+                break // only the FIRST difference carries information
+            }
+        }
+
+        // "abc" before "ab" is impossible: a prefix always sorts first.
+        if !foundDifference && len(first) > len(second) {
+            return ""
+        }
+    }
+
+    queue := []byte{}
+    for letter, degree := range inDegree {
+        if degree == 0 {
+            queue = append(queue, letter)
+        }
+    }
+    // Sort the initial queue so the output is deterministic.
+    sort.Slice(queue, func(a, b int) bool { return queue[a] < queue[b] })
+
+    order := make([]byte, 0, len(inDegree))
+    for len(queue) > 0 {
+        letter := queue[0]
+        queue = queue[1:]
+        order = append(order, letter)
+
+        for _, next := range dependents[letter] {
+            inDegree[next]--
+            if inDegree[next] == 0 {
+                queue = append(queue, next)
+            }
+        }
+    }
+
+    if len(order) != len(inDegree) {
+        return "" // a cycle: the constraints contradict each other
+    }
+    return string(order)
+}
+```
+
 ```python
-from collections import deque, defaultdict
+from collections import deque
 
 def alienOrder(words):
-    adj = defaultdict(set)
-    indeg = {c: 0 for w in words for c in w}
+    dependents = {}
+    in_degree = {ch: 0 for word in words for ch in word}   # every letter appears
 
     for first, second in zip(words, words[1:]):
+        found = False
         for a, b in zip(first, second):
             if a != b:
-                if b not in adj[a]:
-                    adj[a].add(b)
-                    indeg[b] += 1
-                break
-        else:                       # no differing char in the overlap
-            if len(first) > len(second):
-                return ""           # prefix appears after longer word
+                dependents.setdefault(a, []).append(b)
+                in_degree[b] += 1
+                found = True
+                break                    # only the FIRST difference matters
+        # "abc" before "ab" is impossible: a prefix always sorts first.
+        if not found and len(first) > len(second):
+            return ""
 
-    q = deque(c for c in indeg if indeg[c] == 0)
+    queue = deque(sorted(ch for ch, d in in_degree.items() if d == 0))
+
     order = []
-    while q:
-        c = q.popleft()
-        order.append(c)
-        for nxt in adj[c]:
-            indeg[nxt] -= 1
-            if indeg[nxt] == 0:
-                q.append(nxt)
-    return "".join(order) if len(order) == len(indeg) else ""
+    while queue:
+        ch = queue.popleft()
+        order.append(ch)
+        for nxt in dependents.get(ch, ()):
+            in_degree[nxt] -= 1
+            if in_degree[nxt] == 0:
+                queue.append(nxt)
+
+    return "".join(order) if len(order) == len(in_degree) else ""
 ```
 
 ### Complexity
-Time O(C) where C is the total number of characters across all words; Space O(1) (bounded by the 26-letter alphabet).
+Time **O(C)** where `C` is the total number of characters across all words — building the graph dominates, and the sort is over at most 26 letters. Space O(1) in the alphabet size, or O(U + E) for `U` distinct letters.
 
+---
 
 ## 12. LeetCode Practice Set
 
