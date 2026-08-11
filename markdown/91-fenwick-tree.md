@@ -188,6 +188,25 @@ Values are usually huge or negative, so first **coordinate-compress**: sort the 
 
 Fenwick needs the operation to be *invertible* (so `prefix(r) − prefix(l−1)` works). Sums qualify; minima do not. Reach for Fenwick when sums or counts suffice — it is far quicker to write correctly.
 
+### Steps
+
+```text
+Query — prefix sum of 1..i (walk DOWN, stripping the lowest set bit):
+  Step 1 → sum = 0
+  Step 2 → while i > 0:  sum += tree[i];  i -= i & -i
+  Step 3 → return sum
+
+Update — add delta at position i (walk UP, adding the lowest set bit):
+  Step 4 → while i <= n:  tree[i] += delta;  i += i & -i
+
+Range — sum of l..r:
+  Step 5 → prefix(r) - prefix(l - 1)     (needs an INVERTIBLE operation)
+
+Counting — index the tree by VALUE, not position:
+  Step 6 → coordinate-compress the values to dense 1-based ranks
+  Step 7 → prefix(rank) then answers "how many values so far are <= this"
+```
+
 ### How should I recognize this?
 
 ```text

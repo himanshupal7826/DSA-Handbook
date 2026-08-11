@@ -153,6 +153,24 @@ n >  25                             find another approach
 
 Seeing `n ≤ 20` in the constraints is itself the hint. It is unusual enough that it almost always means "the exponent is intended".
 
+### Steps
+
+```text
+Step 1 → Decide the state: (mask of used items) plus ONLY what the mask
+          cannot tell you — a current position, a row index, and so on.
+Step 2 → Size the table as 1 << n (times the extra dimension, if any).
+Step 3 → Seed the base case: usually mask 0, or every single-item mask.
+Step 4 → Iterate masks in INCREASING order, so every submask is final
+          before it is read.
+Step 5 → For each mask, for each item i not yet in it:
+             next = mask | (1 << i)
+             relax next from mask using the problem's cost/feasibility rule
+Step 6 → Read the answer at the full mask (1 << n) - 1, or take the best
+          over the masks with the required popcount.
+Step 7 → If every transition costs the same, run a BFS over states instead
+          and stop at the first arrival.
+```
+
 ### How should I recognize this?
 
 ```text
