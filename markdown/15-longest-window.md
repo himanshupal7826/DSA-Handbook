@@ -41,32 +41,112 @@ longest, maximum window, at most k, substring, distinct.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"What is the **longest** contiguous stretch I can take before some budget runs out?"*
+
+The budget varies — *no repeated characters*, *at most `k` replacements*, *at most `k` zeros flipped* — but the shape never does.
+
 ### Intuition
-Enumerate all subarrays/substrings and evaluate each — O(n^2) or O(n^3).
+Check every stretch and keep the longest valid one.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each start `left`:
+2. &nbsp;&nbsp;For each end `right >= left`:
+3. &nbsp;&nbsp;&nbsp;&nbsp;Verify the stretch `[left..right]` obeys the budget.
+4. &nbsp;&nbsp;&nbsp;&nbsp;If it does, update the best length.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n²)** with an incrementally maintained check, **O(n³)** with a naive rescan.
+- Space: O(1) to O(k).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Longest Window pattern is built to use.
+- Once `[left..right]` blows the budget, so does every longer stretch from the same `left` — but the brute force keeps testing them.
+- Every restart from a new `left` recomputes counts the previous pass already knew.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Longest Window invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Grow the window greedily; the moment the budget is blown, shrink from the left just enough to get back inside it — then measure.**
+
+This is the *longest* variant of the sliding window, and it has a fixed shape you can write from memory:
+
+```text
+for right in 0..n-1:
+    add nums[right] to the window
+    while the window is INVALID:
+        remove nums[left]; left++
+    best = max(best, right - left + 1)      ← window is valid HERE
+```
+
+The placement of that last line is the whole pattern. Because the `while` loop only exits when the window is valid again, measuring afterwards is always safe.
+
+### The thought process
+
+```text
+We need    : the longest window obeying some budget.
+Obvious way: test every (left, right) pair.
+Too slow   : O(n^2), and it restarts from scratch each time.
+Notice     : if a window is already over budget, extending it can only
+             make things worse. So `right` never needs to back up.
+Notice too : shrinking from the left always helps, and we only need to
+             shrink until we're legal again — not one step further.
+Therefore  : grow right always, shrink left minimally, measure after.
+Now        : both pointers move forward only → O(n).
+```
+
+### Why "shrink the *minimum* amount" is what makes it *longest*
+
+If you over-shrink, you throw away a valid window that might have been the longest. The `while` loop's exit condition is precisely "we are legal again", so it stops at the largest window that starts at or after the old `left`. Combined with growing `right` as far as possible, you measure the longest window ending at each `right` — and the best of those is the global answer.
+
+### The universal budget trick
+
+Most "longest window" problems reduce to counting a single quantity and comparing it against `k`:
+
+| Problem | The window state | Invalid when |
+|---|---|---|
+| Longest substring, no repeats | count of each character | any count > 1 |
+| Longest with at most K distinct | map of character → count | `len(map) > K` |
+| Max consecutive ones after k flips | number of zeros inside | `zeros > k` |
+| Longest repeating char replacement | counts + the most frequent count | `length − maxCount > k` |
+
+That last row is worth its own sentence, because it is the least obvious:
+
+> **To make a window all one character, you must replace every character that isn't the most frequent one. So the cost is `windowLength − maxCount`, and the window is valid while that cost is ≤ `k`.**
+
+You never have to decide *which* character to keep — the most frequent one is always the cheapest choice.
+
+### Steps
+
+```text
+Step 1 → left = 0, best = 0, empty window state.
+Step 2 → For right = 0 .. n-1:
+Step 3 →     add nums[right] to the state
+Step 4 →     while the state violates the budget:
+Step 5 →         remove nums[left] from the state; left++
+Step 6 →     best = max(best, right - left + 1)
+Step 7 → Return best.
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "longest / maximum length" + "substring / subarray"
+  "at most K ...", "you may change up to k ...", "without repeating"
+  contiguous, and you get a budget you must not exceed
+        ↓
+Think about...
+  "What single number measures how far over budget I am?"
+        ↓
+Use...
+  grow right → while over budget, shrink left → measure AFTER
+```
+
+> **Contrast with the shortest-window variant:** there you shrink *while valid* and measure *inside* the loop. Getting these backwards is the classic bug. Longest = measure after; shortest = measure inside.
 
 ### Visual explanation
 
@@ -90,81 +170,164 @@ A window with incrementally maintained aggregates means each element enters and 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Longest Window    : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+"AABABBA", k = 1 replacement allowed
+
+A A B A B B A
+└─────┘              window "AABA": length 4, maxCount(A) = 3
+  ↑   ↑              cost = 4 - 3 = 1 replacement  ≤ k  ✓
+ left right
+
+A A B A B B A
+└───────┘            window "AABAB": length 5, maxCount(A) = 3
+  ↑     ↑            cost = 5 - 3 = 2  > k  ✗  → shrink left
+ left  right
+
+answer: 4
 ```
 
 ### Interview explanation
-"This is a Longest Window problem. I'll a window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n). That brings the complexity down to O(n) time and O(k) space — here's the template."
+"This is the *longest* variable-window shape. I grow `right` one element at a time and keep the window's state incrementally. Whenever the state breaks the budget, I shrink from the left — but only until it's legal again, since over-shrinking would discard a potentially longer answer. Then I measure, which is safe because the loop only exits on a valid window. Both pointers move forward only, so it's O(n) time. For the replacement problem, the state I track is the count of the most frequent character, because `windowLength − maxCount` is exactly how many replacements the window needs."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Sliding Window** family template. Adapt the comparison/condition to the specific problem.
+> Grow right, shrink while invalid, measure after. Only the state and the invalid-test change.
 
 ```go
-// Variable-size window: longest subarray satisfying a constraint.
-func longestWindow(s string) int {
-    count := map[byte]int{}
+// LongestWindow is the reusable skeleton. `add` and `remove` maintain the
+// window state; `invalid` reports whether the budget is currently blown.
+func LongestWindow(n int, add, remove func(i int), invalid func(left, right int) bool) int {
     left, best := 0, 0
-    for right := 0; right < len(s); right++ {
-        count[s[right]]++
-        for windowInvalid(count) { // shrink until valid
-            count[s[left]]--
-            if count[s[left]] == 0 { delete(count, s[left]) }
+    for right := 0; right < n; right++ {
+        add(right)
+
+        for invalid(left, right) {
+            remove(left)
             left++
         }
-        if right-left+1 > best { best = right - left + 1 }
+
+        if size := right - left + 1; size > best {
+            best = size // the window is guaranteed valid here
+        }
+    }
+    return best
+}
+
+// LongestAtMostKDistinct: window state is a map; invalid when it holds > k keys.
+func LongestAtMostKDistinct(s string, k int) int {
+    window := make(map[byte]int)
+    left, best := 0, 0
+
+    for right := 0; right < len(s); right++ {
+        window[s[right]]++
+
+        for len(window) > k {
+            window[s[left]]--
+            if window[s[left]] == 0 {
+                delete(window, s[left]) // len(window) must mean "distinct"
+            }
+            left++
+        }
+
+        if size := right - left + 1; size > best {
+            best = size
+        }
     }
     return best
 }
 ```
 
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
+def longest_window(n, add, remove, invalid):
+    """Skeleton: add/remove maintain state, invalid reports a blown budget."""
     left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
+    for right in range(n):
+        add(right)
+
+        while invalid(left, right):
+            remove(left)
             left += 1
+
+        best = max(best, right - left + 1)   # valid here
+    return best
+
+def longest_at_most_k_distinct(s, k):
+    window = {}
+    left = best = 0
+
+    for right, ch in enumerate(s):
+        window[ch] = window.get(ch, 0) + 1
+
+        while len(window) > k:
+            window[s[left]] -= 1
+            if window[s[left]] == 0:
+                del window[s[left]]          # keep len() meaning "distinct"
+            left += 1
+
         best = max(best, right - left + 1)
     return best
 ```
 
 ```java
-int longestWindow(String s) {
-    Map<Character,Integer> count = new HashMap<>();
-    int left = 0, best = 0;
-    for (int right = 0; right < s.length(); right++) {
-        count.merge(s.charAt(right), 1, Integer::sum);
-        while (windowInvalid(count)) {
-            char c = s.charAt(left++);
-            if (count.merge(c, -1, Integer::sum) == 0) count.remove(c);
+import java.util.*;
+import java.util.function.*;
+
+public class LongestWindow {
+    // Skeleton: add/remove maintain state, invalid reports a blown budget.
+    public static int longestWindow(int n, IntConsumer add, IntConsumer remove,
+                                    BiPredicate<Integer, Integer> invalid) {
+        int left = 0, best = 0;
+        for (int right = 0; right < n; right++) {
+            add.accept(right);
+            while (invalid.test(left, right)) {
+                remove.accept(left);
+                left++;
+            }
+            best = Math.max(best, right - left + 1);   // valid here
         }
-        best = Math.max(best, right - left + 1);
+        return best;
     }
-    return best;
+
+    public static int longestAtMostKDistinct(String s, int k) {
+        Map<Character, Integer> window = new HashMap<>();
+        int left = 0, best = 0;
+
+        for (int right = 0; right < s.length(); right++) {
+            window.merge(s.charAt(right), 1, Integer::sum);
+
+            while (window.size() > k) {
+                if (window.merge(s.charAt(left), -1, Integer::sum) == 0)
+                    window.remove(s.charAt(left));
+                left++;
+            }
+
+            best = Math.max(best, right - left + 1);
+        }
+        return best;
+    }
 }
 ```
 
 ```cpp
-int longestWindow(const string& s) {
-    unordered_map<char,int> count;
+#include <string>
+#include <unordered_map>
+using namespace std;
+
+int longestAtMostKDistinct(const string& s, int k) {
+    unordered_map<char, int> window;
     int left = 0, best = 0;
+
     for (int right = 0; right < (int)s.size(); ++right) {
-        ++count[s[right]];
-        while (windowInvalid(count)) {
-            if (--count[s[left]] == 0) count.erase(s[left]);
+        ++window[s[right]];
+
+        while ((int)window.size() > k) {
+            if (--window[s[left]] == 0) window.erase(s[left]);  // keep size() honest
             ++left;
         }
-        best = max(best, right - left + 1);
+
+        best = max(best, right - left + 1);                     // valid here
     }
     return best;
 }
@@ -251,121 +414,308 @@ int longestWindow(const string& s) {
 
 ## 9. Solved Example 1
 
-### Problem — Longest Substring (LeetCode 3)
-A representative **Longest Window** problem. The signal: maximize window length; shrink only when the window becomes invalid.
+### Problem — Longest Substring Without Repeating Characters (LeetCode 3)
+Return the length of the longest substring with no repeated characters.
 
 ### Thought Process
-1. Keep a variable window `[left, right]` that must contain no repeated character.
-2. Store the last-seen index of each character. When `s[right]` was seen inside the current window, jump `left` to one past its previous position.
-3. After every expansion the window is valid again, so record `right - left + 1` as a candidate answer.
+1. Budget: **every character may appear at most once** inside the window.
+2. State: a count per character. The window is invalid exactly when the character we just added now has a count of 2.
+3. Grow `right`; while invalid, remove `s[left]` and advance `left`.
+4. Measure after the shrink loop, where the window is guaranteed valid.
+5. Only one character can be over-counted at a time (the one just added), so the loop stops as soon as we pass its earlier copy.
 
 ### Dry Run
-Input `s = "abcabcbb"`:
-- r=0 'a' → window "a", best=1
-- r=1 'b' → "ab", best=2
-- r=2 'c' → "abc", best=3
-- r=3 'a' (last seen at 0, ≥ left) → left=1, window "bca", best=3
-- r=4 'b' (last seen 1, ≥ left) → left=2, window "cab", best still 3 → answer **3**
+
+Input: `s = "abcabcbb"`
+
+| right | ch | count[ch] after add | invalid? | shrink steps | window | length | best |
+|-------|----|--------------------|----------|--------------|--------|--------|------|
+| 0 | a | a:1 | no  | — | `"a"` | 1 | 1 |
+| 1 | b | b:1 | no  | — | `"ab"` | 2 | 2 |
+| 2 | c | c:1 | no  | — | `"abc"` | 3 | **3** |
+| 3 | a | a:2 | yes | remove `a` (left 0→1) → a:1 | `"bca"` | 3 | 3 |
+| 4 | b | b:2 | yes | remove `b` (left 1→2) → b:1 | `"cab"` | 3 | 3 |
+| 5 | c | c:2 | yes | remove `c` (left 2→3) → c:1 | `"abc"` | 3 | 3 |
+| 6 | b | b:2 | yes | remove `a` (3→4), remove `b` (4→5) → b:1 | `"cb"` | 2 | 3 |
+| 7 | b | b:2 | yes | remove `c` (5→6), remove `b` (6→7) → b:1 | `"b"` | 1 | 3 |
+
+Output: **3** — from `"abc"`.
+
+Row 6 shows the shrink loop running **twice**: it removes characters one at a time until the duplicate `b` is gone. That is slower per step than jumping straight past the old index, but `left` still only moves forward `n` times in total, so the overall cost is unchanged.
 
 ### Visualization
-```
-"abcabcbb": window "abc" is longest; repeat 'a' pushes left forward → best = 3
+
+```text
+s = a  b  c  a  b  c  b  b
+    0  1  2  3  4  5  6  7
+
+    ┌────────┐
+    a  b  c              valid, length 3  ★
+    ↑     ↑
+   left right
+
+    ┌───────────┐
+    a  b  c  a           'a' now appears twice → INVALID
+    ↑        ↑
+   left    right
+       shrink until the duplicate leaves:
+       ┌────────┐
+       b  c  a           valid again, length 3
 ```
 
 ### Code
+
+```go
+func lengthOfLongestSubstring(s string) int {
+    var count [128]int // ASCII
+    left, best := 0, 0
+
+    for right := 0; right < len(s); right++ {
+        count[s[right]]++
+
+        // Only the character just added can be over its budget of 1.
+        for count[s[right]] > 1 {
+            count[s[left]]--
+            left++
+        }
+
+        if size := right - left + 1; size > best {
+            best = size // valid here
+        }
+    }
+    return best
+}
+```
+
 ```python
-def length_of_longest_substring(s):
-    last_seen = {}
+def lengthOfLongestSubstring(s):
+    count = {}
     left = best = 0
+
     for right, ch in enumerate(s):
-        if ch in last_seen and last_seen[ch] >= left:
-            left = last_seen[ch] + 1
-        last_seen[ch] = right
-        best = max(best, right - left + 1)
+        count[ch] = count.get(ch, 0) + 1
+
+        while count[ch] > 1:              # only ch can be over budget
+            count[s[left]] -= 1
+            left += 1
+
+        best = max(best, right - left + 1)   # valid here
     return best
 ```
 
 ### Complexity
-Time O(n) — each index visited once; Space O(min(n, alphabet)) for the last-seen map.
+Time O(n) — `left` advances at most `n` times in total across all shrink loops. Space O(alphabet).
+
+> The Variable Window chapter shows the `lastSeen` variant, which jumps `left` directly instead of stepping. Same O(n), fewer iterations; this version is easier to fit into the universal skeleton.
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Char Replacement (LeetCode 424)
-A representative **Longest Window** problem. The signal: maximize window length; shrink only when the window becomes invalid.
+### Problem — Longest Repeating Character Replacement (LeetCode 424)
+You may change at most `k` characters of `s` to any other uppercase letter. Return the length of the longest substring that can be made of a single repeated character.
 
 ### Thought Process
-1. A window is valid if we can make every char equal by replacing at most `k` of them: `window_len - max_freq <= k`.
-2. Track counts of each letter in the window and the running `max_freq` (the most common letter's count).
-3. When the window becomes invalid, slide `left` forward by one (dropping one char) — never shrinking more than needed keeps it O(n). Record the best window length.
+1. Budget: at most `k` replacements inside the window.
+2. **Key insight:** to make a window uniform you keep the most frequent character and replace everything else. So the cost is exactly:
+   `cost = windowLength − maxCount`, where `maxCount` is the highest count in the window.
+3. You never have to *choose* which letter to keep — the most frequent one is always cheapest.
+4. Grow `right`; while `cost > k`, shrink from the left.
+5. Measure after the shrink loop.
 
 ### Dry Run
-Input `s = "AABABBA", k = 1`:
-- Expand to "AABA" (r=3): counts A=3,B=1, max_freq=3, len=4, need 4-3=1 ≤ 1 → best=4
-- r=4 'B' → "AABAB" len=5, max_freq=3, need 5-3=2 > 1 → invalid, left++ → "ABAB"
-- Window stays length 4 thereafter → answer **4**
+
+Input: `s = "AABABBA"`, `k = 1`
+
+| right | ch | counts (A,B) | len | maxCount | cost = len − maxCount | over budget? | after shrinking | best |
+|-------|----|--------------|-----|----------|------------------------|--------------|-----------------|------|
+| 0 | A | 1,0 | 1 | 1 | 0 | no | `"A"` | 1 |
+| 1 | A | 2,0 | 2 | 2 | 0 | no | `"AA"` | 2 |
+| 2 | B | 2,1 | 3 | 2 | 1 | no | `"AAB"` | 3 |
+| 3 | A | 3,1 | 4 | 3 | 1 | no | `"AABA"` | **4** |
+| 4 | B | 3,2 | 5 | 3 | **2** | yes | drop `A` → 2,2 len 4 cost 2 → still over; drop `A` → 1,2 len 3 cost 1 ✓ → `"BAB"` | 4 |
+| 5 | B | 1,3 | 4 | 3 | 1 | no | `"BABB"` | 4 |
+| 6 | A | 2,3 | 5 | 3 | 2 | yes | drop `B` → 2,2 len 4 cost 2 → still over; drop `A` → 1,2 len 3 cost 1 ✓ → `"BBA"` | 4 |
+
+Output: **4** — the window `"AABA"`: replace its single `B` with `A` to get `"AAAA"`. ✓
+
+Check the cost formula on row 3: window `"AABA"` has length 4 and three `A`s, so one character (`B`) must change — exactly `4 − 3 = 1`, within the budget of `k = 1`.
 
 ### Visualization
-```
-"AABABBA", k=1: best window length 4 ("AABA" → replace one B) → answer 4
+
+```text
+s = A  A  B  A  B  B  A
+    0  1  2  3  4  5  6
+
+    ┌───────────┐
+    A  A  B  A              length 4, maxCount(A) = 3
+                            replacements needed = 4 - 3 = 1  ≤ k  ✓
+                            → replace B with A → "AAAA"       ★
+
+    ┌──────────────┐
+    A  A  B  A  B           length 5, maxCount(A) = 3
+                            replacements needed = 5 - 3 = 2  > k  ✗
+                            → shrink from the left
 ```
 
 ### Code
+
+```go
+func characterReplacement(s string, k int) int {
+    var count [26]int
+    left, best := 0, 0
+
+    for right := 0; right < len(s); right++ {
+        count[s[right]-'A']++
+
+        // Cost of making this window uniform: keep the most frequent
+        // character, replace all the others.
+        for (right-left+1)-maxCount(count) > k {
+            count[s[left]-'A']--
+            left++
+        }
+
+        if size := right - left + 1; size > best {
+            best = size // valid here
+        }
+    }
+    return best
+}
+
+func maxCount(count [26]int) int {
+    best := 0
+    for _, c := range count {
+        if c > best {
+            best = c
+        }
+    }
+    return best
+}
+```
+
 ```python
-def character_replacement(s, k):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = max_freq = 0
+def characterReplacement(s, k):
+    count = [0] * 26
+    left = best = 0
+
     for right, ch in enumerate(s):
-        count[ch] += 1
-        max_freq = max(max_freq, count[ch])
-        if (right - left + 1) - max_freq > k:   # too many to replace
-            count[s[left]] -= 1
+        count[ord(ch) - 65] += 1
+
+        # Cost = window length minus the most frequent character's count.
+        while (right - left + 1) - max(count) > k:
+            count[ord(s[left]) - 65] -= 1
             left += 1
-        best = max(best, right - left + 1)
+
+        best = max(best, right - left + 1)     # valid here
     return best
 ```
 
 ### Complexity
-Time O(n) — single pass, `left` never moves backward; Space O(26) for the count map.
+Time O(26·n) = **O(n)** — recomputing `maxCount` scans a fixed 26-slot array. Space O(1).
+
+> A common refinement never lowers `maxCount` and uses `if` instead of `while`, giving a true O(n) with no inner scan. It works because the answer only ever needs to grow, but the version above is easier to justify — reach for the refinement only after the straightforward one is on the board.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Max Consecutive Ones (LeetCode 1004)
-A representative **Longest Window** problem. The signal: maximize window length; shrink only when the window becomes invalid.
+### Problem — Max Consecutive Ones III (LeetCode 1004)
+Given a binary array and an integer `k`, return the length of the longest run of `1`s obtainable by flipping at most `k` zeros.
 
 ### Thought Process
-1. We may flip up to `k` zeros to ones, so a window is valid while it holds at most `k` zeros.
-2. Expand `right` and count zeros inside the window; when the zero count exceeds `k`, advance `left`, decrementing the count as zeros leave.
-3. The longest window ever seen is the answer — the largest run of ones achievable with `k` flips.
+1. Reframe the question. "Flip at most `k` zeros" is just: **the longest window containing at most `k` zeros**. Once you see that, no flipping is ever simulated.
+2. Budget: `zeros <= k`. State: a single integer counting zeros inside the window.
+3. Grow `right`, incrementing `zeros` when a `0` enters.
+4. While `zeros > k`, shrink from the left, decrementing `zeros` when a `0` leaves.
+5. Measure after the shrink loop.
+
+This is the cleanest member of the family — the entire window state is one counter.
 
 ### Dry Run
-Input `nums = [1,1,1,0,0,0,1,1,1,1,0], k = 2`:
-- Grow to index 5 → window [1,1,1,0,0,0] has 3 zeros > 2 → shrink left until 2 zeros
-- Best stretch is indices 5..10 `[0,1,1,1,1,0]` with 2 zeros flipped → length **6**
+
+Input: `nums = [1,1,1,0,0,0,1,1,1,1,0]`, `k = 2`
+
+| right | nums[right] | zeros | > k? | shrink steps | left | window length | best |
+|-------|-------------|-------|------|--------------|------|---------------|------|
+| 0 | 1 | 0 | no | — | 0 | 1 | 1 |
+| 1 | 1 | 0 | no | — | 0 | 2 | 2 |
+| 2 | 1 | 0 | no | — | 0 | 3 | 3 |
+| 3 | 0 | 1 | no | — | 0 | 4 | 4 |
+| 4 | 0 | 2 | no | — | 0 | 5 | **5** |
+| 5 | 0 | 3 | **yes** | drop `1`,`1`,`1` (zeros stays 3), drop `0` → zeros 2 | 4 | 2 | 5 |
+| 6 | 1 | 2 | no | — | 4 | 3 | 5 |
+| 7 | 1 | 2 | no | — | 4 | 4 | 5 |
+| 8 | 1 | 2 | no | — | 4 | 5 | 5 |
+| 9 | 1 | 2 | no | — | 4 | **6** | **6** |
+| 10| 0 | 3 | **yes** | drop `0` at index 4 → zeros 2 | 5 | 6 | 6 |
+
+Output: **6** — the window at indices 4..9 (`[0,0,1,1,1,1]`): flip the two zeros to get six consecutive ones. ✓
 
 ### Visualization
-```
-[1,1,1,0,0,0,1,1,1,1,0], k=2: window "0,1,1,1,1,0" holds ≤2 zeros → answer 6
+
+```text
+nums:  1  1  1  0  0  0  1  1  1  1  0
+       0  1  2  3  4  5  6  7  8  9 10
+
+                   └────────────────┘
+                   4  5  6  7  8  9        zeros inside = 2 ≤ k  ✓
+                   0  0  1  1  1  1        length 6  ★
+                   ↑                ↑
+                  left            right
+
+       flip the two zeros → 1 1 1 1 1 1
 ```
 
 ### Code
+
+```go
+func longestOnes(nums []int, k int) int {
+    left, zeros, best := 0, 0, 0
+
+    for right := 0; right < len(nums); right++ {
+        if nums[right] == 0 {
+            zeros++
+        }
+
+        // Too many zeros to flip: shrink until we are back within budget.
+        for zeros > k {
+            if nums[left] == 0 {
+                zeros--
+            }
+            left++
+        }
+
+        if size := right - left + 1; size > best {
+            best = size // valid here
+        }
+    }
+    return best
+}
+```
+
 ```python
-def longest_ones(nums, k):
-    left = best = zeros = 0
-    for right, val in enumerate(nums):
-        if val == 0:
+def longestOnes(nums, k):
+    left = zeros = best = 0
+
+    for right, x in enumerate(nums):
+        if x == 0:
             zeros += 1
-        while zeros > k:                 # too many zeros to flip
+
+        while zeros > k:            # too many zeros: shrink back into budget
             if nums[left] == 0:
                 zeros -= 1
             left += 1
-        best = max(best, right - left + 1)
+
+        best = max(best, right - left + 1)   # valid here
     return best
 ```
 
 ### Complexity
-Time O(n) — each index enters and leaves the window once; Space O(1).
+Time O(n) — each index enters and leaves the window once. Space O(1) — a single counter.
 
+> The same code solves "Max Consecutive Ones II" (at most one flip) with `k = 1`, and "longest subarray of 1s after deleting one element" with `k = 1` and the answer reduced by one.
+
+---
 
 ## 12. LeetCode Practice Set
 

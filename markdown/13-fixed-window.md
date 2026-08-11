@@ -41,32 +41,122 @@ sliding window, fixed size, k elements, subarray of size k, average.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Look at every block of exactly `k` consecutive elements — which one is best?"*
+
 ### Intuition
-Enumerate all subarrays/substrings and evaluate each — O(n^2) or O(n^3).
+Go to each starting position and add up the `k` elements from there.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each start `i` from `0` to `n−k`:
+2. &nbsp;&nbsp;Set `sum = 0`.
+3. &nbsp;&nbsp;For `j` from `i` to `i+k−1`: `sum += nums[j]`.
+4. &nbsp;&nbsp;Compare `sum` against the best so far.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n·k)**.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Fixed Size Window pattern is built to use.
+- Consider two neighbouring windows on `[1, 12, -5, -6, 50, 3]` with `k = 4`:
+
+```text
+window at 0:  1 + 12 + (-5) + (-6)
+window at 1:      12 + (-5) + (-6) + 50
+                  └──── identical ────┘
+```
+
+Three of the four additions are **exactly the same work**. We redo them for every position. With `k = 10⁴` and `n = 10⁵`, that's 10⁹ pointless additions.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Fixed Size Window invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Don't rebuild the window — slide it. Add the element entering on the right, remove the element leaving on the left.**
+
+The window has a fixed size, so moving it one step changes exactly **two** things. Everything else is untouched, so it doesn't need to be recomputed.
+
+```text
+       ┌─────────────┐
+[1,   12,  -5,  -6,] 50,   3
+       └─────────────┘
+        subtract 1        add 50
+        (leaves)          (enters)
+```
+
+### The thought process
+
+```text
+We need    : a statistic over every block of k consecutive elements.
+Obvious way: recompute each block from scratch.
+Too slow   : O(n·k), and neighbouring blocks overlap in k-1 elements.
+Notice     : sliding one step removes ONE element and adds ONE element.
+             The k-1 in the middle don't change at all.
+Therefore  : maintain the running statistic incrementally.
+Now        : O(1) per step → O(n) total.
+```
+
+### Steps
+
+```text
+Step 1 → Build the first window: sum nums[0..k-1].
+Step 2 → Record it as the current best.
+Step 3 → For i = k .. n-1:
+Step 4 →     sum += nums[i]        ← the element entering on the right
+Step 5 →     sum -= nums[i-k]      ← the element leaving on the left
+Step 6 →     update the best
+Step 7 → Return the best.
+```
+
+### Why `i - k` is the element that leaves
+
+When `i` enters, the window covers `[i−k+1 … i]`, which is `k` elements. The element that just fell out is the one immediately before that range: `i − k`.
+
+Check it on `k = 3`, `i = 3`: the window is `[1..3]` and the departing index is `3 − 3 = 0`. ✓
+
+This single expression is where most fixed-window bugs live. Sanity-check it with tiny numbers every time.
+
+### Fixed vs variable windows
+
+This chapter is the **fixed** case: `k` is given, so the window size never changes and both ends move in lockstep. Its sibling — the variable window — grows the right end and shrinks the left end only when a condition is violated. Recognising which one you have is most of the battle:
+
+| Signal | Window type |
+|---|---|
+| "of size k", "every k consecutive", "k-length substring" | **fixed** |
+| "longest / shortest such that…", "at most K distinct" | variable |
+
+### When the statistic isn't a sum
+
+Adding and subtracting works because sums are **reversible** — you can undo an element's contribution. Not every statistic is:
+
+| Statistic | Slide in O(1)? | Tool |
+|---|---|---|
+| sum, average, count of a value | yes | add/subtract |
+| character frequencies | yes | increment/decrement a table |
+| **maximum / minimum** | **no** | monotonic deque — O(1) amortised |
+| median | no | two heaps |
+
+You can't "subtract" a maximum: if the departing element *was* the max, the new max is unknown. That gap is exactly what the Monotonic Queue pattern exists to fill.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "subarray/substring of size k", "every k consecutive"
+  "maximum average", "k-length window", a fixed k in the constraints
+        ↓
+Think about...
+  "What changes when the window slides by one?
+   Exactly one element in, exactly one element out."
+        ↓
+Use...
+  sum/count  → add the entering, subtract the leaving
+  max/min    → monotonic deque
+  frequencies→ a count table plus a "how many are matched" counter
+```
 
 ### Visual explanation
 
@@ -90,83 +180,195 @@ A window with incrementally maintained aggregates means each element enters and 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Fixed Size Window : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [1, 12, -5, -6, 50, 3]   k = 4
+
+window [0..3] :  1 + 12 - 5 - 6 = 2        avg = 0.5
+                 └── slide right ──┘
+window [1..4] :  2 - nums[0] + nums[4]
+              =  2 -    1    +   50  = 51   avg = 12.75   ★
+window [2..5] : 51 - nums[1] + nums[5]
+              = 51 -   12    +    3  = 42   avg = 10.5
+
+only two operations per slide, never four
 ```
 
 ### Interview explanation
-"This is a Fixed Size Window problem. I'll a window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n). That brings the complexity down to O(n) time and O(k) space — here's the template."
+"Neighbouring windows of size `k` overlap in `k−1` elements, so recomputing each one from scratch repeats almost all the work. I'll build the first window in O(k), then slide: each step adds `nums[i]` and subtracts `nums[i-k]`, which is O(1). That makes the whole scan O(n) instead of O(n·k), with O(1) space. If the statistic were a maximum rather than a sum I couldn't just subtract, so I'd maintain a monotonic deque instead."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Sliding Window** family template. Adapt the comparison/condition to the specific problem.
+> Build the first window, then add-one / remove-one for each step.
 
 ```go
-// Variable-size window: longest subarray satisfying a constraint.
-func longestWindow(s string) int {
-    count := map[byte]int{}
-    left, best := 0, 0
-    for right := 0; right < len(s); right++ {
-        count[s[right]]++
-        for windowInvalid(count) { // shrink until valid
-            count[s[left]]--
-            if count[s[left]] == 0 { delete(count, s[left]) }
-            left++
+// FixedWindowSum returns the maximum sum over all windows of size k.
+func FixedWindowSum(nums []int, k int) int {
+    if len(nums) < k || k <= 0 {
+        return 0
+    }
+
+    // Build the first window.
+    sum := 0
+    for i := 0; i < k; i++ {
+        sum += nums[i]
+    }
+    best := sum
+
+    // Slide: one in on the right, one out on the left.
+    for i := k; i < len(nums); i++ {
+        sum += nums[i]   // entering
+        sum -= nums[i-k] // leaving
+        if sum > best {
+            best = sum
         }
-        if right-left+1 > best { best = right - left + 1 }
     }
     return best
+}
+
+// FixedWindowCounts is the frequency-table variant: it keeps a live count
+// of each byte inside the window as it slides.
+func FixedWindowCounts(s string, k int) []map[byte]int {
+    snapshots := []map[byte]int{}
+    if len(s) < k || k <= 0 {
+        return snapshots
+    }
+
+    window := make(map[byte]int, k)
+    for i := 0; i < len(s); i++ {
+        window[s[i]]++ // entering
+
+        if i >= k {
+            left := s[i-k]
+            window[left]--
+            if window[left] == 0 {
+                delete(window, left) // keep the map size meaningful
+            }
+        }
+
+        if i >= k-1 {
+            snapshot := make(map[byte]int, len(window))
+            for ch, c := range window {
+                snapshot[ch] = c
+            }
+            snapshots = append(snapshots, snapshot)
+        }
+    }
+    return snapshots
 }
 ```
 
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
-        best = max(best, right - left + 1)
+def fixed_window_sum(nums, k):
+    """Maximum sum over all windows of size k."""
+    if len(nums) < k or k <= 0:
+        return 0
+
+    total = sum(nums[:k])          # build the first window
+    best = total
+    for i in range(k, len(nums)):
+        total += nums[i]           # entering
+        total -= nums[i - k]       # leaving
+        best = max(best, total)
     return best
+
+def fixed_window_counts(s, k):
+    """Live frequency table for every window of size k."""
+    from collections import Counter
+    snapshots = []
+    if len(s) < k or k <= 0:
+        return snapshots
+
+    window = Counter()
+    for i, ch in enumerate(s):
+        window[ch] += 1                    # entering
+        if i >= k:
+            left = s[i - k]
+            window[left] -= 1
+            if window[left] == 0:
+                del window[left]           # keep the map size meaningful
+        if i >= k - 1:
+            snapshots.append(dict(window))
+    return snapshots
 ```
 
 ```java
-int longestWindow(String s) {
-    Map<Character,Integer> count = new HashMap<>();
-    int left = 0, best = 0;
-    for (int right = 0; right < s.length(); right++) {
-        count.merge(s.charAt(right), 1, Integer::sum);
-        while (windowInvalid(count)) {
-            char c = s.charAt(left++);
-            if (count.merge(c, -1, Integer::sum) == 0) count.remove(c);
+import java.util.*;
+
+public class FixedWindow {
+    // Maximum sum over all windows of size k.
+    public static long fixedWindowSum(int[] nums, int k) {
+        if (nums.length < k || k <= 0) return 0;
+
+        long sum = 0;
+        for (int i = 0; i < k; i++) sum += nums[i];   // first window
+        long best = sum;
+
+        for (int i = k; i < nums.length; i++) {
+            sum += nums[i];        // entering
+            sum -= nums[i - k];    // leaving
+            best = Math.max(best, sum);
         }
-        best = Math.max(best, right - left + 1);
+        return best;
     }
-    return best;
+
+    // Live frequency table for every window of size k.
+    public static List<Map<Character, Integer>> fixedWindowCounts(String s, int k) {
+        List<Map<Character, Integer>> snapshots = new ArrayList<>();
+        if (s.length() < k || k <= 0) return snapshots;
+
+        Map<Character, Integer> window = new HashMap<>();
+        for (int i = 0; i < s.length(); i++) {
+            window.merge(s.charAt(i), 1, Integer::sum);           // entering
+            if (i >= k) {
+                char left = s.charAt(i - k);
+                if (window.merge(left, -1, Integer::sum) == 0) window.remove(left);
+            }
+            if (i >= k - 1) snapshots.add(new HashMap<>(window));
+        }
+        return snapshots;
+    }
 }
 ```
 
 ```cpp
-int longestWindow(const string& s) {
-    unordered_map<char,int> count;
-    int left = 0, best = 0;
-    for (int right = 0; right < (int)s.size(); ++right) {
-        ++count[s[right]];
-        while (windowInvalid(count)) {
-            if (--count[s[left]] == 0) count.erase(s[left]);
-            ++left;
-        }
-        best = max(best, right - left + 1);
+#include <string>
+#include <unordered_map>
+#include <vector>
+using namespace std;
+
+// Maximum sum over all windows of size k.
+long long fixedWindowSum(const vector<int>& nums, int k) {
+    if ((int)nums.size() < k || k <= 0) return 0;
+
+    long long sum = 0;
+    for (int i = 0; i < k; ++i) sum += nums[i];       // first window
+    long long best = sum;
+
+    for (int i = k; i < (int)nums.size(); ++i) {
+        sum += nums[i];        // entering
+        sum -= nums[i - k];    // leaving
+        best = max(best, sum);
     }
     return best;
+}
+
+// Live frequency table for every window of size k.
+vector<unordered_map<char, int>> fixedWindowCounts(const string& s, int k) {
+    vector<unordered_map<char, int>> snapshots;
+    if ((int)s.size() < k || k <= 0) return snapshots;
+
+    unordered_map<char, int> window;
+    for (int i = 0; i < (int)s.size(); ++i) {
+        ++window[s[i]];                                // entering
+        if (i >= k) {
+            char left = s[i - k];
+            if (--window[left] == 0) window.erase(left);
+        }
+        if (i >= k - 1) snapshots.push_back(window);
+    }
+    return snapshots;
 }
 ```
 
@@ -251,127 +453,334 @@ int longestWindow(const string& s) {
 
 ## 9. Solved Example 1
 
-### Problem — Max Average (LeetCode 643)
-Given `nums` and an integer `k`, find the contiguous subarray of length exactly `k` with the largest average, and return that maximum average.
+### Problem — Maximum Average Subarray I (LeetCode 643)
+Find the contiguous subarray of length exactly `k` with the maximum average, and return that average.
 
 ### Thought Process
-1. The subarray length is fixed at `k`, so maximizing the average is the same as maximizing the window sum — divide by `k` at the end.
-2. Seed the sum of the first `k` elements as the initial `window_sum` and best.
-3. Slide one step at a time: add `nums[right]`, subtract `nums[right - k]`, and track the max sum in O(1) per step.
+1. The window size is fixed, so maximising the **average** is the same as maximising the **sum** — every window is divided by the same `k`.
+2. Working with sums avoids floating-point arithmetic until the very last line.
+3. Build the first window in O(k), then slide: add `nums[i]`, subtract `nums[i-k]`.
+4. Track the maximum sum, then divide once at the end.
 
 ### Dry Run
-`nums = [1, 12, -5, -6, 50, 3], k = 4`
-- Seed sum of first 4 = `1+12-5-6 = 2` → best = 2
-- Slide to index 4: `2 + 50 - 1 = 51` → best = 51
-- Slide to index 5: `51 + 3 - 12 = 42` → best stays 51
-- Answer = `51 / 4 = 12.75`
+
+Input: `nums = [1, 12, -5, -6, 50, 3]`, `k = 4`
+
+**Build the first window** `[0..3]`: `1 + 12 + (−5) + (−6) = 2` → `best = 2`
+
+**Slide:**
+
+| i | entering `nums[i]` | leaving `nums[i−k]` | sum | best |
+|---|--------------------|---------------------|-----|------|
+| 4 | `nums[4] = 50` | `nums[0] = 1`  | `2 + 50 − 1 = 51` | **51** |
+| 5 | `nums[5] = 3`  | `nums[1] = 12` | `51 + 3 − 12 = 42` | 51 |
+
+Best sum = **51**, over the window `[12, −5, −6, 50]`.
+
+Output: **`51 / 4 = 12.75`**
+
+Verify by hand: the three windows are `[1,12,−5,−6] = 2`, `[12,−5,−6,50] = 51`, `[−5,−6,50,3] = 42`. ✓
 
 ### Visualization
-```
-window sum slides by +nums[right] -nums[right-k]; answer = best_sum / k
+
+```text
+nums:  1   12   -5   -6   50    3
+      ┌──────────────────┐
+sum=2 │ 1   12   -5   -6 │            avg  0.50
+      └──────────────────┘
+           ┌──────────────────┐
+sum=51     │12   -5   -6   50 │       avg 12.75  ★
+           └──────────────────┘
+                ┌──────────────────┐
+sum=42          │-5   -6   50    3 │  avg 10.50
+                └──────────────────┘
+
+each slide = one subtraction + one addition
 ```
 
 ### Code
+
+```go
+func findMaxAverage(nums []int, k int) float64 {
+    // Build the first window.
+    sum := 0
+    for i := 0; i < k; i++ {
+        sum += nums[i]
+    }
+    best := sum
+
+    // Slide: one element in, one element out.
+    for i := k; i < len(nums); i++ {
+        sum += nums[i]   // entering on the right
+        sum -= nums[i-k] // leaving on the left
+        if sum > best {
+            best = sum
+        }
+    }
+
+    // Divide once, at the end: all windows share the same k.
+    return float64(best) / float64(k)
+}
+```
+
 ```python
 def findMaxAverage(nums, k):
-    window_sum = sum(nums[:k])
-    best = window_sum
-    for right in range(k, len(nums)):
-        window_sum += nums[right] - nums[right - k]
-        best = max(best, window_sum)
-    return best / k
+    total = sum(nums[:k])              # build the first window
+    best = total
+    for i in range(k, len(nums)):
+        total += nums[i]               # entering on the right
+        total -= nums[i - k]           # leaving on the left
+        best = max(best, total)
+    return best / k                    # divide once, at the end
 ```
 
 ### Complexity
-Time O(n), Space O(1). One pass with a rolling sum; no extra storage beyond scalars.
+Time O(n) — O(k) to build plus O(1) per slide. Space O(1).
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Sliding Window Max (LeetCode 239)
-Given `nums` and window size `k`, return a list containing the maximum of each contiguous window of size `k` as it slides left to right.
+### Problem — Sliding Window Maximum (LeetCode 239)
+Return the maximum of every window of size `k`.
 
 ### Thought Process
-1. Keep a deque of *indices* whose values are in decreasing order — the front always holds the index of the current window's maximum.
-2. Before pushing `i`, pop from the back every index whose value is `<= nums[i]`; those can never be the max again.
-3. Pop the front when it falls outside the window (`front <= i - k`); once `i >= k-1`, record `nums[deque[0]]`.
+1. The window size is fixed, so we slide — but the statistic is a **maximum**, and a maximum cannot be "subtracted".
+2. When the departing element happens to *be* the current maximum, the new maximum is unknown and rescanning costs O(k).
+3. Fix: keep a **deque of indices whose values are in decreasing order**. The front is always the window's maximum.
+4. Two rules maintain that order:
+   - **Before pushing `i`**: pop from the back every index whose value is `<= nums[i]`. They can never be the maximum again — `nums[i]` is both bigger and stays in the window longer.
+   - **After pushing**: if the front index has slid out of the window (`front <= i − k`), pop it from the front.
+5. Each index is pushed once and popped once → O(n) overall.
 
 ### Dry Run
-`nums = [1, 3, -1, -3, 5], k = 3`
-- i=0 push0 dq=[0]; i=1 3>1 pop0 push1 dq=[1]; i=2 dq=[1,2] → max nums[1]=3
-- i=3 dq=[1,2,3] front 1<=3-3=0? no → max nums[1]=3
-- i=4 5 pops all, dq=[4] → max 5 → result `[3, 3, 5]`
+
+Input: `nums = [1, 3, -1, -3, 5, 3, 6, 7]`, `k = 3`
+
+The deque holds **indices**; the values are shown for readability.
+
+| i | nums[i] | pop from back (value ≤ nums[i]) | push | drop stale front | deque (values) | window complete? | max |
+|---|---------|--------------------------------|------|------------------|----------------|------------------|-----|
+| 0 | 1  | —                | 0 | — | `[1]`        | no  | — |
+| 1 | 3  | pop 0 (`1 ≤ 3`)  | 1 | — | `[3]`        | no  | — |
+| 2 | −1 | —                | 2 | — | `[3, −1]`    | yes | **3** |
+| 3 | −3 | —                | 3 | — | `[3, −1, −3]`| yes | **3** |
+| 4 | 5  | pop 3, 2, 1 (all ≤ 5) | 4 | — | `[5]`   | yes | **5** |
+| 5 | 3  | —                | 5 | — | `[5, 3]`     | yes | **5** |
+| 6 | 6  | pop 5, 4 (both ≤ 6) | 6 | — | `[6]`     | yes | **6** |
+| 7 | 7  | pop 6 (`6 ≤ 7`)  | 7 | — | `[7]`        | yes | **7** |
+
+Output: **`[3, 3, 5, 5, 6, 7]`**
+
+Row `i = 4` is the whole idea: when `5` arrives it evicts `−3`, `−1` and `3` in one go. Those three can never win again — `5` is larger *and* outlives all of them.
 
 ### Visualization
-```
-deque holds indices with decreasing values; front = window max
+
+```text
+nums:  1   3  -1  -3   5   3   6   7
+                       ↑
+        arriving 5 evicts everything smaller behind it:
+
+        deque before:  [3, -1, -3]      (decreasing)
+        5 >= -3 → pop     5 >= -1 → pop     5 >= 3 → pop
+        deque after :  [5]
+
+        front of the deque is ALWAYS the window maximum
 ```
 
 ### Code
+
+```go
+func maxSlidingWindow(nums []int, k int) []int {
+    if len(nums) == 0 || k <= 0 {
+        return nil
+    }
+
+    deque := []int{} // indices, values strictly decreasing front → back
+    result := make([]int, 0, len(nums)-k+1)
+
+    for i := 0; i < len(nums); i++ {
+        // Smaller values behind us can never be the maximum again.
+        for len(deque) > 0 && nums[deque[len(deque)-1]] <= nums[i] {
+            deque = deque[:len(deque)-1]
+        }
+        deque = append(deque, i)
+
+        // Drop the front if it has slid out of the window.
+        if deque[0] <= i-k {
+            deque = deque[1:]
+        }
+
+        // Record once the first full window exists.
+        if i >= k-1 {
+            result = append(result, nums[deque[0]])
+        }
+    }
+    return result
+}
+```
+
 ```python
 from collections import deque
 
 def maxSlidingWindow(nums, k):
-    dq = deque()          # indices, values decreasing
+    if not nums or k <= 0:
+        return []
+
+    dq = deque()                       # indices, values decreasing
     result = []
+
     for i, x in enumerate(nums):
-        while dq and nums[dq[-1]] <= x:
+        while dq and nums[dq[-1]] <= x:    # smaller values can never win again
             dq.pop()
         dq.append(i)
-        if dq[0] <= i - k:      # front slid out of window
+
+        if dq[0] <= i - k:                 # front slid out of the window
             dq.popleft()
-        if i >= k - 1:
+
+        if i >= k - 1:                     # first full window exists
             result.append(nums[dq[0]])
     return result
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is pushed and popped at most once; deque holds at most k indices.
+Time **O(n)** — each index is pushed once and popped at most once, so the inner `while` is O(1) amortised. Space O(k) for the deque.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Permutation in String (LeetCode 567)
-Return `True` if `s2` contains any permutation of `s1` as a contiguous substring — i.e. some window of length `len(s1)` in `s2` has the exact same character counts as `s1`.
+Return `true` if `s2` contains a substring that is a permutation of `s1`.
 
 ### Thought Process
-1. A permutation match means equal character frequencies, so use a fixed window of width `len(s1)` over `s2`.
-2. Build the target count for `s1` and a rolling count for the current window; compare them.
-3. Slide the window one char at a time: add the incoming char, drop the outgoing char, and return `True` the moment the counts match.
+1. A permutation of `s1` has exactly `len(s1)` characters with exactly `s1`'s letter counts — so this is a **fixed** window of size `len(s1)`.
+2. Comparing two 26-slot tables at every position costs O(26) per step. Acceptable, but we can do better.
+3. Keep a single `need` table (`+1` for `s1`, `−1` for each window character) plus a counter `matched` = how many letters currently have count zero.
+4. When `matched == 26`, every letter's count agrees → the window is a permutation.
+5. Update `matched` only for the two letters that actually change on each slide, making every step O(1).
 
 ### Dry Run
-`s1 = "ab", s2 = "eidbaooo"` → need = {a:1, b:1}, window size 2
-- "ei" {e,i} ≠ need; "id" ≠; "db" ≠; "ba" {b:1,a:1} == need → return True
+
+Input: `s1 = "ab"`, `s2 = "eidbaooo"` → window size 2
+
+Only the letters `a`, `b`, `d`, `e`, `i`, `o` are shown; all others stay at 0 (and therefore stay matched).
+
+Initial `need` after loading `s1`: `a: 1, b: 1` → `matched = 24` (the 24 untouched letters).
+
+| i | entering | leaving | need changes | matched | window | permutation? |
+|---|----------|---------|--------------|---------|--------|--------------|
+| 0 | `e` | — | `e: −1` | 23 | `"e"` | window not full |
+| 1 | `i` | — | `i: −1` | 22 | `"ei"` | no (`matched ≠ 26`) |
+| 2 | `d` | `e` | `d: −1`, `e: 0` | 22 | `"id"` | no |
+| 3 | `b` | `i` | `b: 0`, `i: 0` | 24 | `"db"` | no |
+| 4 | `a` | `d` | `a: 0`, `d: 0` | **26** | `"ba"` | **yes → `true`** |
+
+Output: **`true`** — `"ba"` is a permutation of `"ab"`. ✓
 
 ### Visualization
-```
-fixed window len(s1) over s2; compare rolling counts to target counts
+
+```text
+s1 = "ab"        need:  a:+1  b:+1   (everything else 0)
+
+s2 = e  i  d  b  a  o  o  o
+              └──┘
+              window "ba"
+
+     a: +1 - 1 = 0  ✓
+     b: +1 - 1 = 0  ✓
+     all 26 letters at 0  →  matched = 26  →  permutation found
 ```
 
 ### Code
-```python
-from collections import Counter
 
+```go
+func checkInclusion(s1 string, s2 string) bool {
+    if len(s1) > len(s2) {
+        return false
+    }
+
+    // need[c] > 0 means we still need c; < 0 means the window has a surplus.
+    var need [26]int
+    for i := 0; i < len(s1); i++ {
+        need[s1[i]-'a']++
+    }
+
+    matched := 0 // how many of the 26 letters are currently balanced
+    for _, v := range need {
+        if v == 0 {
+            matched++
+        }
+    }
+
+    for i := 0; i < len(s2); i++ {
+        // The entering character consumes one unit of need.
+        in := s2[i] - 'a'
+        if need[in] == 0 {
+            matched--
+        }
+        need[in]--
+        if need[in] == 0 {
+            matched++
+        }
+
+        // Once the window is oversized, the leftmost character leaves.
+        if i >= len(s1) {
+            out := s2[i-len(s1)] - 'a'
+            if need[out] == 0 {
+                matched--
+            }
+            need[out]++
+            if need[out] == 0 {
+                matched++
+            }
+        }
+
+        if matched == 26 {
+            return true
+        }
+    }
+    return false
+}
+```
+
+```python
 def checkInclusion(s1, s2):
-    k = len(s1)
-    if k > len(s2):
+    if len(s1) > len(s2):
         return False
-    need = Counter(s1)
-    window = Counter(s2[:k])
-    if window == need:
-        return True
-    for i in range(k, len(s2)):
-        window[s2[i]] += 1
-        left = s2[i - k]
-        window[left] -= 1
-        if window[left] == 0:
-            del window[left]
-        if window == need:
+
+    need = [0] * 26                    # >0: still needed, <0: surplus
+    for ch in s1:
+        need[ord(ch) - 97] += 1
+    matched = sum(1 for v in need if v == 0)
+
+    for i, ch in enumerate(s2):
+        enter = ord(ch) - 97           # entering character consumes need
+        if need[enter] == 0:
+            matched -= 1
+        need[enter] -= 1
+        if need[enter] == 0:
+            matched += 1
+
+        if i >= len(s1):               # window oversized: leftmost leaves
+            leave = ord(s2[i - len(s1)]) - 97
+            if need[leave] == 0:
+                matched -= 1
+            need[leave] += 1
+            if need[leave] == 0:
+                matched += 1
+
+        if matched == 26:
             return True
     return False
 ```
 
 ### Complexity
-Time O(n), Space O(1). One pass over `s2`; the counts hold at most 26 distinct letters.
+Time **O(n)** where `n = len(s2)` — each step touches at most two letters. Space O(1) — a fixed 26-slot table.
 
+> The simpler version compares the two 26-arrays outright on each slide. That is O(26·n), which also passes; the `matched` counter is the refinement that gets it to a true O(n).
+
+---
 
 ## 12. LeetCode Practice Set
 

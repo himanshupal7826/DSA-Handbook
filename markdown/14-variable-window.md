@@ -41,32 +41,122 @@ sliding window, variable, expand shrink, constraint, at most.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"What is the longest (or shortest) contiguous stretch that satisfies some rule?"* — where the size is **not** given.
+
 ### Intuition
-Enumerate all subarrays/substrings and evaluate each — O(n^2) or O(n^3).
+Try every possible stretch. There are `n(n+1)/2` of them.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each start `left` from `0` to `n−1`:
+2. &nbsp;&nbsp;For each end `right` from `left` to `n−1`:
+3. &nbsp;&nbsp;&nbsp;&nbsp;Check whether `nums[left..right]` satisfies the rule.
+4. &nbsp;&nbsp;&nbsp;&nbsp;If it does, update the best length.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n²)** if the check is O(1), **O(n³)** if you re-scan the stretch to check it.
+- Space: O(1) to O(n).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Variable Size Window pattern is built to use.
+- Restarting from every `left` throws away everything learned about the previous stretch.
+- Worse, it checks stretches that cannot possibly be answers. If `nums[3..7]` already breaks the rule, then `nums[3..8]`, `nums[3..9]`, … all break it too (for the many rules that only get *harder* as the window grows). The brute force tests them anyway.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Variable Size Window invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Keep one window. Always grow it on the right; shrink it from the left only when you must.**
+
+Neither pointer ever moves backwards. Each travels from `0` to `n` at most once, so the total work is O(n) even though the window is constantly resizing.
+
+### The thought process
+
+```text
+We need    : the best window satisfying some rule, size unknown.
+Obvious way: test every (left, right) pair.
+Too slow   : O(n^2), and it restarts from scratch each time.
+Notice     : the rule is usually MONOTONE — a window that is already
+             broken stays broken as it grows, and shrinking can only
+             help. So we never need to move `right` backwards.
+Therefore  : advance `right` one step at a time, and advance `left`
+             just far enough to restore/leave the valid state.
+Now        : both pointers only move forward → O(n) total.
+```
+
+### The one thing to decide: when do I shrink?
+
+Every variable-window problem is one of two shapes, and picking the wrong one is the single biggest source of bugs.
+
+**Shape A — longest valid window** ("longest substring with at most K distinct")
+
+```text
+grow right → while the window is INVALID, shrink left
+           → record the answer AFTER the while loop (the window is now valid)
+```
+
+**Shape B — shortest valid window** ("smallest subarray with sum ≥ target")
+
+```text
+grow right → while the window is VALID, record the answer, then shrink left
+           → record INSIDE the while loop (that is where valid windows live)
+```
+
+Say it out loud before writing code:
+
+| Goal | Shrink while… | Record… |
+|---|---|---|
+| **Longest** valid | the window is **invalid** | **after** the shrink loop |
+| **Shortest** valid | the window is **valid** | **inside** the shrink loop |
+
+Both are the same skeleton. Only the condition and the placement of the update differ.
+
+### Steps (Shape A — longest)
+
+```text
+Step 1 → left = 0, best = 0, empty window state.
+Step 2 → For right = 0 .. n-1:
+Step 3 →     add nums[right] to the window state
+Step 4 →     while the window is invalid:
+Step 5 →         remove nums[left] from the state; left++
+Step 6 →     best = max(best, right - left + 1)   ← window is valid here
+Step 7 → Return best.
+```
+
+### Why this is O(n) even with a nested loop
+
+The inner `while` looks like it could make things quadratic, but `left` only ever **increases**, and it can never exceed `n`. So across the entire run the inner loop body executes at most `n` times in total — not `n` times per iteration. Adding the outer loop's `n` steps gives at most `2n` operations.
+
+This is *amortised* analysis: don't count the worst single step, count the total.
+
+### The prerequisite: the rule must be monotone
+
+Sliding windows need this property:
+
+> Growing the window can only make the rule **harder** to satisfy; shrinking can only make it **easier**.
+
+"At most K distinct characters", "no repeated characters", "sum ≥ target with all-positive numbers" all qualify.
+
+**Where it breaks:** `sum == k` with **negative numbers**. Adding an element might *decrease* the sum, so a too-large window isn't necessarily fixed by shrinking, and a broken window may become valid again later. For that, use prefix sums plus a hash map — see the Prefix Sum chapter.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "longest / shortest / maximum / minimum" + "substring / subarray"
+  "at most K ...", "containing all of ...", "without repeating ..."
+  contiguous, and the size is NOT given
+        ↓
+Think about...
+  "Does growing the window only ever make things worse?"
+  If yes → sliding window. If no (negatives!) → prefix sums.
+        ↓
+Use...
+  longest  → shrink while INVALID,  record after
+  shortest → shrink while VALID,    record inside
+```
 
 ### Visual explanation
 
@@ -93,83 +183,191 @@ A window with incrementally maintained aggregates means each element enters and 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Variable Size Wind: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+"abcabcbb", longest substring with no repeated characters
+
+a b c a b c b b
+└───┘              window "abc"  valid, length 3
+  ↑ ↑
+ left right
+
+a b c a b c b b        'a' arrives, but 'a' is already inside
+└─────┘                → shrink left past the old 'a'
+    ↑ ↑
+   left right          window "bca", still length 3
+
+left never moves backwards → O(n)
 ```
 
 ### Interview explanation
-"This is a Variable Size Window problem. I'll a window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n). That brings the complexity down to O(n) time and O(k) space — here's the template."
+"The window size isn't given, so I'll keep a variable window with two pointers that both only move forward. I expand `right` one element at a time and maintain the window's state incrementally. Because the rule is monotone — growing can only break it further — I can shrink from the left until the window is valid again instead of restarting. For a *longest* answer I record after the shrink loop, when the window is guaranteed valid; for a *shortest* answer I record inside it. Each pointer traverses the array once, so it's O(n) time."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Sliding Window** family template. Adapt the comparison/condition to the specific problem.
+> One skeleton, two variants. The difference is *when* you shrink and *where* you record.
 
 ```go
-// Variable-size window: longest subarray satisfying a constraint.
-func longestWindow(s string) int {
-    count := map[byte]int{}
+// LongestValidWindow — Shape A: shrink while INVALID, record after.
+// Here the rule is "at most k distinct values".
+func LongestValidWindow(nums []int, k int) int {
+    window := make(map[int]int) // value -> count inside the window
     left, best := 0, 0
-    for right := 0; right < len(s); right++ {
-        count[s[right]]++
-        for windowInvalid(count) { // shrink until valid
-            count[s[left]]--
-            if count[s[left]] == 0 { delete(count, s[left]) }
+
+    for right := 0; right < len(nums); right++ {
+        window[nums[right]]++ // grow
+
+        // Shrink until the window is valid again.
+        for len(window) > k {
+            window[nums[left]]--
+            if window[nums[left]] == 0 {
+                delete(window, nums[left]) // len(window) must mean "distinct"
+            }
             left++
         }
-        if right-left+1 > best { best = right - left + 1 }
+
+        // The window is valid here.
+        if size := right - left + 1; size > best {
+            best = size
+        }
+    }
+    return best
+}
+
+// ShortestValidWindow — Shape B: shrink while VALID, record inside.
+// Here the rule is "sum >= target", with non-negative numbers.
+func ShortestValidWindow(nums []int, target int) int {
+    left, sum := 0, 0
+    best := len(nums) + 1 // sentinel meaning "not found"
+
+    for right := 0; right < len(nums); right++ {
+        sum += nums[right] // grow
+
+        // While still valid, record and keep shrinking to look for smaller.
+        for sum >= target {
+            if size := right - left + 1; size < best {
+                best = size
+            }
+            sum -= nums[left]
+            left++
+        }
+    }
+
+    if best == len(nums)+1 {
+        return 0 // no valid window exists
     }
     return best
 }
 ```
 
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
+def longest_valid_window(nums, k):
+    """Shape A: shrink while INVALID, record after. Rule: at most k distinct."""
+    window = {}                        # value -> count
     left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
+
+    for right, x in enumerate(nums):
+        window[x] = window.get(x, 0) + 1          # grow
+
+        while len(window) > k:                    # shrink until valid
+            window[nums[left]] -= 1
+            if window[nums[left]] == 0:
+                del window[nums[left]]            # keep len() meaning "distinct"
             left += 1
-        best = max(best, right - left + 1)
+
+        best = max(best, right - left + 1)        # valid here
     return best
+
+def shortest_valid_window(nums, target):
+    """Shape B: shrink while VALID, record inside. Rule: sum >= target."""
+    left = total = 0
+    best = len(nums) + 1                          # sentinel: not found
+
+    for right, x in enumerate(nums):
+        total += x                                # grow
+        while total >= target:                    # still valid: record, shrink
+            best = min(best, right - left + 1)
+            total -= nums[left]
+            left += 1
+
+    return 0 if best == len(nums) + 1 else best
 ```
 
 ```java
-int longestWindow(String s) {
-    Map<Character,Integer> count = new HashMap<>();
-    int left = 0, best = 0;
-    for (int right = 0; right < s.length(); right++) {
-        count.merge(s.charAt(right), 1, Integer::sum);
-        while (windowInvalid(count)) {
-            char c = s.charAt(left++);
-            if (count.merge(c, -1, Integer::sum) == 0) count.remove(c);
+import java.util.*;
+
+public class VariableWindow {
+    // Shape A: shrink while INVALID, record after. Rule: at most k distinct.
+    public static int longestValidWindow(int[] nums, int k) {
+        Map<Integer, Integer> window = new HashMap<>();
+        int left = 0, best = 0;
+
+        for (int right = 0; right < nums.length; right++) {
+            window.merge(nums[right], 1, Integer::sum);           // grow
+
+            while (window.size() > k) {                           // shrink until valid
+                if (window.merge(nums[left], -1, Integer::sum) == 0)
+                    window.remove(nums[left]);
+                left++;
+            }
+
+            best = Math.max(best, right - left + 1);              // valid here
         }
-        best = Math.max(best, right - left + 1);
+        return best;
     }
-    return best;
+
+    // Shape B: shrink while VALID, record inside. Rule: sum >= target.
+    public static int shortestValidWindow(int[] nums, int target) {
+        int left = 0, sum = 0, best = nums.length + 1;
+
+        for (int right = 0; right < nums.length; right++) {
+            sum += nums[right];                                   // grow
+            while (sum >= target) {                               // record, then shrink
+                best = Math.min(best, right - left + 1);
+                sum -= nums[left++];
+            }
+        }
+        return best == nums.length + 1 ? 0 : best;
+    }
 }
 ```
 
 ```cpp
-int longestWindow(const string& s) {
-    unordered_map<char,int> count;
+#include <unordered_map>
+#include <vector>
+using namespace std;
+
+// Shape A: shrink while INVALID, record after. Rule: at most k distinct.
+int longestValidWindow(const vector<int>& nums, int k) {
+    unordered_map<int, int> window;
     int left = 0, best = 0;
-    for (int right = 0; right < (int)s.size(); ++right) {
-        ++count[s[right]];
-        while (windowInvalid(count)) {
-            if (--count[s[left]] == 0) count.erase(s[left]);
+
+    for (int right = 0; right < (int)nums.size(); ++right) {
+        ++window[nums[right]];                                  // grow
+
+        while ((int)window.size() > k) {                        // shrink until valid
+            if (--window[nums[left]] == 0) window.erase(nums[left]);
             ++left;
         }
-        best = max(best, right - left + 1);
+
+        best = max(best, right - left + 1);                     // valid here
     }
     return best;
+}
+
+// Shape B: shrink while VALID, record inside. Rule: sum >= target.
+int shortestValidWindow(const vector<int>& nums, int target) {
+    int left = 0, sum = 0, best = (int)nums.size() + 1;
+
+    for (int right = 0; right < (int)nums.size(); ++right) {
+        sum += nums[right];                                     // grow
+        while (sum >= target) {                                 // record, then shrink
+            best = min(best, right - left + 1);
+            sum -= nums[left++];
+        }
+    }
+    return best == (int)nums.size() + 1 ? 0 : best;
 }
 ```
 
@@ -254,130 +452,317 @@ int longestWindow(const string& s) {
 
 ## 9. Solved Example 1
 
-### Problem — Longest Substring (LeetCode 3)
-Given a string `s`, find the length of the longest substring without repeating characters.
+### Problem — Longest Substring Without Repeating Characters (LeetCode 3)
+Return the length of the longest substring of `s` with no repeated characters.
 
 ### Thought Process
-1. Keep a window `[left, right]` and a map from each character to its most recent index.
-2. Expand `right` one char at a time. If the current char was seen inside the window, jump `left` to just past its previous position so the window stays duplicate-free.
-3. After placing each char, update the answer with `right - left + 1`.
+1. This is **Shape A** — a *longest* window — so: shrink while invalid, record after.
+2. "Invalid" here means the window contains a duplicate.
+3. Instead of shrinking one step at a time, we can jump: remember the last index of each character, and when a repeat arrives, move `left` to just past the previous occurrence.
+4. The guard `lastSeen[ch] >= left` matters — a previous occurrence that already fell out of the window must be ignored, or `left` would move backwards.
 
 ### Dry Run
-`s = "abcabcbb"`:
-- r=0..2 "abc": no repeats, window grows, best = 3.
-- r=3 'a': last seen at 0, so left = 1; window "bca", best stays 3.
-- r=4 'b': last seen at 1, left = 2; window "cab", best 3.
-- Continues at length 3; answer = **3**.
+
+Input: `s = "abcabcbb"`
+
+`lastSeen` maps each character to the most recent index where it appeared.
+
+| right | ch | lastSeen[ch] | inside window (`>= left`)? | left | window | length | best |
+|-------|----|--------------|-----------------------------|------|--------|--------|------|
+| 0 | a | — | no | 0 | `"a"`   | 1 | 1 |
+| 1 | b | — | no | 0 | `"ab"`  | 2 | 2 |
+| 2 | c | — | no | 0 | `"abc"` | 3 | **3** |
+| 3 | a | 0 | yes (`0 >= 0`) | `0+1 = 1` | `"bca"` | 3 | 3 |
+| 4 | b | 1 | yes (`1 >= 1`) | `1+1 = 2` | `"cab"` | 3 | 3 |
+| 5 | c | 2 | yes (`2 >= 2`) | `2+1 = 3` | `"abc"` | 3 | 3 |
+| 6 | b | 4 | yes (`4 >= 3`) | `4+1 = 5` | `"cb"`  | 2 | 3 |
+| 7 | b | 6 | yes (`6 >= 5`) | `6+1 = 7` | `"b"`   | 1 | 3 |
+
+Output: **3** — from `"abc"`.
+
+**Why the `>= left` guard matters:** consider `s = "abba"`. At `right = 3` (`a`), `lastSeen['a'] = 0`, but `left` has already moved to `2`. Since `0 < 2`, that `a` is outside the window — we must *not* pull `left` back to `1`. Without the guard the window would be wrong and the answer would come out as 3 instead of 2.
 
 ### Visualization
-```
-a b c a b c b b   ─▶ on repeat 'a', left jumps past its old index
-    [c a b]        ─▶ longest duplicate-free window has length 3
+
+```text
+s = a  b  c  a  b  c  b  b
+    0  1  2  3  4  5  6  7
+
+    ┌────────┐
+    a  b  c              window "abc"  length 3  ★
+    ↑     ↑
+   left right
+
+       ┌────────┐
+    a  b  c  a           'a' repeats (last seen at 0, inside window)
+       ↑     ↑           → left jumps to 0+1 = 1
+      left right         window "bca", still length 3
 ```
 
 ### Code
+
+```go
+func lengthOfLongestSubstring(s string) int {
+    lastSeen := make(map[byte]int) // character -> most recent index
+    left, best := 0, 0
+
+    for right := 0; right < len(s); right++ {
+        ch := s[right]
+        // Only react to a repeat that is still INSIDE the window.
+        if prev, ok := lastSeen[ch]; ok && prev >= left {
+            left = prev + 1 // jump past the previous occurrence
+        }
+        lastSeen[ch] = right
+
+        if size := right - left + 1; size > best {
+            best = size
+        }
+    }
+    return best
+}
+```
+
 ```python
 def lengthOfLongestSubstring(s):
-    last_seen = {}
+    last_seen = {}                     # character -> most recent index
     left = best = 0
+
     for right, ch in enumerate(s):
+        # Only react to a repeat still INSIDE the window.
         if ch in last_seen and last_seen[ch] >= left:
-            left = last_seen[ch] + 1
+            left = last_seen[ch] + 1   # jump past the previous occurrence
         last_seen[ch] = right
         best = max(best, right - left + 1)
     return best
 ```
 
 ### Complexity
-Time O(n) — each index visited once; Space O(min(n, alphabet)) for the last-seen map.
+Time O(n) — `right` advances once per character and `left` never moves backwards. Space O(min(n, alphabet)).
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Min Window (LeetCode 76)
-Given strings `s` and `t`, return the smallest substring of `s` that contains every character of `t` including multiplicity, or `""` if none exists.
+### Problem — Minimum Window Substring (LeetCode 76)
+Return the shortest substring of `s` that contains every character of `t`, **including duplicates**. Return `""` if none exists.
 
 ### Thought Process
-1. Count how many of each char `t` needs; track `missing` = total chars still required.
-2. Expand `right`; whenever the added char is still needed (its window count hasn't overshot `t`'s need), decrement `missing`.
-3. When `missing == 0` the window is valid — contract `left` while it stays valid, recording the shortest span each time.
+1. This is **Shape B** — a *shortest* window — so: shrink while valid, record inside.
+2. Track `need[ch]` = how many of each character `t` requires.
+3. Track `formed` = how many **distinct required characters** currently have *enough* copies in the window. The window is valid when `formed == required`.
+4. Counting distinct-characters-satisfied (rather than total characters) keeps validity checking O(1) instead of comparing whole maps.
+5. Expand `right` until valid; then record the length and shrink `left` while still valid, looking for something smaller.
 
 ### Dry Run
-`s = "ADOBECODEBANC"`, `t = "ABC"`:
-- Expand until "ADOBEC" — all of A,B,C present, missing = 0. Length 6.
-- Shrink left past "A"; keep expanding to find "CODEBA"... eventually "BANC" (start index 9) is valid, length 4.
-- Best = **"BANC"**.
+
+Input: `s = "ADOBECODEBANC"`, `t = "ABC"` → `need = {A:1, B:1, C:1}`, `required = 3`
+
+Only the moments where validity changes are shown.
+
+| right | char | window | formed | valid? | action |
+|-------|------|--------|--------|--------|--------|
+| 0 | A | `"A"` | 1 | no | grow |
+| 3 | B | `"ADOB"` | 2 | no | grow |
+| 5 | C | `"ADOBEC"` | **3** | **yes** | record length **6**; shrink: drop `A` → `formed = 2`, `left = 1` |
+| 10 | A | `"DOBECODEBA"` | 3 | yes | length 10, no better; shrink `D`,`O`,`B`,`E` → window `"CODEBA"` (length 6, not smaller); dropping `C` makes `formed = 2`, `left = 6` |
+| 12 | C | `"ODEBANC"` | 3 | yes | length 7; shrink `O`,`D`,`E` → window **`"BANC"`** length **4** ★; dropping `B` makes `formed = 2`, `left = 10` |
+
+Output: **`"BANC"`**
+
+Note the shrink at `right = 10`: the window contained *two* `B`s, so dropping the first one kept `formed` at 3 — the window stayed valid and kept shrinking. That is why we count copies, not just presence.
 
 ### Visualization
-```
-A D O B E C O D E B A N C
-                  [B A N C]  ─▶ shortest window covering A,B,C
+
+```text
+s = A  D  O  B  E  C  O  D  E  B  A  N  C
+    0  1  2  3  4  5  6  7  8  9 10 11 12
+
+    └──────── "ADOBEC" ────┘        valid, length 6
+
+                          └──── "BANC" ────┘
+                           9 10 11 12       valid, length 4  ★
+
+grow right until valid → then shrink left while STILL valid
 ```
 
 ### Code
+
+```go
+func minWindow(s string, t string) string {
+    if len(s) < len(t) || len(t) == 0 {
+        return ""
+    }
+
+    need := make(map[byte]int) // character -> how many t requires
+    for i := 0; i < len(t); i++ {
+        need[t[i]]++
+    }
+    required := len(need) // distinct characters we must satisfy
+
+    window := make(map[byte]int)
+    formed := 0 // distinct characters currently satisfied
+    left := 0
+    bestLen, bestStart := len(s)+1, 0
+
+    for right := 0; right < len(s); right++ {
+        ch := s[right]
+        window[ch]++
+        // Only counts once, at the moment this character becomes satisfied.
+        if want, ok := need[ch]; ok && window[ch] == want {
+            formed++
+        }
+
+        // Valid: record, then shrink to look for something smaller.
+        for formed == required {
+            if size := right - left + 1; size < bestLen {
+                bestLen, bestStart = size, left
+            }
+
+            out := s[left]
+            window[out]--
+            if want, ok := need[out]; ok && window[out] < want {
+                formed-- // this character just became unsatisfied
+            }
+            left++
+        }
+    }
+
+    if bestLen == len(s)+1 {
+        return ""
+    }
+    return s[bestStart : bestStart+bestLen]
+}
+```
+
 ```python
+from collections import Counter
+
 def minWindow(s, t):
-    from collections import Counter
+    if not t or len(s) < len(t):
+        return ""
+
     need = Counter(t)
-    missing = len(t)
-    left = start = 0
-    end = float('inf')
+    required = len(need)               # distinct characters to satisfy
+
+    window = Counter()
+    formed = 0
+    left = 0
+    best_len, best_start = len(s) + 1, 0
+
     for right, ch in enumerate(s):
-        if need[ch] > 0:
-            missing -= 1
-        need[ch] -= 1
-        while missing == 0:              # window valid: try to shrink
-            if right - left < end - start:
-                start, end = left, right
-            need[s[left]] += 1
-            if need[s[left]] > 0:
-                missing += 1
+        window[ch] += 1
+        if ch in need and window[ch] == need[ch]:
+            formed += 1                # just became satisfied
+
+        while formed == required:      # valid: record, then shrink
+            if right - left + 1 < best_len:
+                best_len, best_start = right - left + 1, left
+
+            out = s[left]
+            window[out] -= 1
+            if out in need and window[out] < need[out]:
+                formed -= 1            # just became unsatisfied
             left += 1
-    return "" if end == float('inf') else s[start:end + 1]
+
+    return "" if best_len == len(s) + 1 else s[best_start:best_start + best_len]
 ```
 
 ### Complexity
-Time O(|s| + |t|) — each pointer advances once; Space O(|t|) for the need counter.
+Time O(|s| + |t|) — each character of `s` enters and leaves the window at most once. Space O(|s| + |t|) for the two maps.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Min Size Subarray (LeetCode 209)
-Given a positive-integer array `nums` and a `target`, return the minimal length of a contiguous subarray whose sum is `>= target`, or `0` if none exists.
+### Problem — Minimum Size Subarray Sum (LeetCode 209)
+Given **positive** integers and a `target`, return the length of the shortest contiguous subarray with sum ≥ `target`, or `0` if none exists.
 
 ### Thought Process
-1. Because all numbers are positive, growing the window only increases the sum and shrinking only decreases it — a clean shrink-while-valid window works.
-2. Add each `nums[right]` to a running `total`.
-3. While `total >= target`, record `right - left + 1` and shrink from the left, subtracting `nums[left]` — this finds the shortest valid window ending at each `right`.
+1. **Shape B** again — shortest valid window: shrink while valid, record inside.
+2. All values are positive, which is exactly what makes the window monotone: growing always increases the sum, shrinking always decreases it.
+3. Expand `right`, adding to the running sum.
+4. While `sum >= target`, record the length and shrink from the left — a smaller valid window may still exist.
+5. A sentinel `best = n+1` distinguishes "never found" from a real answer.
+
+**Why positivity is required:** with negatives, shrinking could *increase* the sum, so "the window is too big" would no longer be fixable by moving `left`. That version needs prefix sums instead.
 
 ### Dry Run
-`target = 7`, `nums = [2,3,1,2,4,3]`:
-- Grow to [2,3,1,2] total 8 >= 7 → best 4; shrink drops 2 → total 6.
-- Add 4 → [3,1,2,4] total 10 → best 4; shrink to [1,2,4]=7 best 3, [2,4]=6 stop.
-- Add 3 → [2,4,3]=9 best 3; shrink to [4,3]=7 best 2. Answer = **2**.
+
+Input: `nums = [2, 3, 1, 2, 4, 3]`, `target = 7`
+
+| right | nums[right] | sum after add | shrink steps (while `sum >= 7`) | window | best |
+|-------|-------------|---------------|----------------------------------|--------|------|
+| 0 | 2 | 2  | — | `[2]` | — |
+| 1 | 3 | 5  | — | `[2,3]` | — |
+| 2 | 1 | 6  | — | `[2,3,1]` | — |
+| 3 | 2 | 8  | record len **4**; drop `2` → sum 6, `left=1` | `[3,1,2]` | 4 |
+| 4 | 4 | 10 | record len **4**; drop `3` → sum 7, `left=2`<br>record len **3**; drop `1` → sum 6, `left=3` | `[2,4]` | 3 |
+| 5 | 3 | 9  | record len **3**; drop `2` → sum 7, `left=4`<br>record len **2**; drop `4` → sum 3, `left=5` | `[3]` | **2** |
+
+Output: **2** — the subarray `[4, 3]`. ✓
 
 ### Visualization
-```
-2 3 1 2 4 3   target = 7
-        [4 3]  ─▶ shortest subarray with sum >= 7 has length 2
+
+```text
+nums:  2   3   1   2   4   3
+       0   1   2   3   4   5
+
+right=3:  └───────────┘         sum 8 >= 7, length 4
+          left      right
+
+right=5:              └───┘     sum 7 >= 7, length 2   ★
+                     left right
+
+each shrink is only taken while the window is still VALID,
+so the recorded length is always a real answer
 ```
 
 ### Code
+
+```go
+func minSubArrayLen(target int, nums []int) int {
+    left, sum := 0, 0
+    best := len(nums) + 1 // sentinel: larger than any real window
+
+    for right := 0; right < len(nums); right++ {
+        sum += nums[right]
+
+        // While the window is still valid, record it and try to shrink.
+        for sum >= target {
+            if size := right - left + 1; size < best {
+                best = size
+            }
+            sum -= nums[left]
+            left++
+        }
+    }
+
+    if best == len(nums)+1 {
+        return 0 // no window ever reached the target
+    }
+    return best
+}
+```
+
 ```python
 def minSubArrayLen(target, nums):
-    left = 0
-    total = 0
-    best = float('inf')
+    left = total = 0
+    best = len(nums) + 1               # sentinel: larger than any real window
+
     for right, x in enumerate(nums):
         total += x
-        while total >= target:           # shrink while still valid
+        while total >= target:         # still valid: record, then shrink
             best = min(best, right - left + 1)
             total -= nums[left]
             left += 1
-    return 0 if best == float('inf') else best
+
+    return 0 if best == len(nums) + 1 else best
 ```
 
 ### Complexity
-Time O(n) — left and right each advance at most n times; Space O(1).
+Time O(n) — `right` advances `n` times and `left` advances at most `n` times in total. Space O(1).
 
+---
 
 ## 12. LeetCode Practice Set
 
