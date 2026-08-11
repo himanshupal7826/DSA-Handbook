@@ -41,32 +41,171 @@ cycle, floyd, linked list, loop, fast slow.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Does walking this list ever bring me back somewhere I've already been?"*
+
+Running example: `3 → 2 → 0 → 4 → 2 → 1 → ` back to the node holding `0`.
+
+```text
+3 → 2 → 0 → 4
+            ↓
+        1 ← 2
+        ↓
+        └──▶ back to 0
+```
+
 ### Intuition
-Copy to an array, manipulate, rebuild — O(n) extra space.
+A cycle is just "I've been here before". So write down every node you visit; the first
+node you see twice proves the loop exists and marks where it starts.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Create an empty set of visited **node addresses** — not values. Values may legitimately
+   repeat (this list contains `2` twice) while addresses cannot.
+2. Walk one node at a time from the head.
+3. If the current node is already in the set → cycle found, and this node is the entrance.
+4. Otherwise insert it and continue.
+5. Reaching `nil` means no cycle.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: O(n) — one pass, O(1) set operations.
+- Space: **O(n)** — the set can hold every node in the list.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Cycle Detection pattern is built to use.
+- The **time** is already optimal; the **memory** is the problem. Answering a yes/no
+  question about a 10⁷-node list costs a 10⁷-entry hash set.
+- Concretely: to detect the loop in the 6-node example above, the set has to hold
+  `{3, 2, 0, 4, 2, 1}` — six pointers — before the seventh step repeats `0`. All that
+  storage exists only to notice a repeat.
+- It ignores the structural fact that makes lists special: **a cycle has a fixed length**,
+  so anything moving faster than you will lap you. That relationship needs no memory at all.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Cycle Detection invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Run two pointers at different speeds — in a loop the fast one must lap the slow one, and the size of their gap is the only thing you have to "remember".**
+
+Two runners on a circular track: the faster one inevitably catches the slower one from
+behind. On a straight track it never does — it just reaches the finish line and stops.
+That single difference is the entire cycle test, and it costs two variables.
+
+`slow` moves 1 node per step, `fast` moves 2.
+
+### The thought process
+
+```text
+We need    : detect a cycle in O(1) extra space.
+Obvious way: store every node visited.
+Too costly : O(n) memory for a yes/no answer.
+Notice     : inside a loop, a 2x-speed pointer closes on a 1x pointer.
+             Outside a loop, the fast pointer simply runs off the end.
+Therefore  : slow += 1, fast += 2.
+             fast reaches nil  →  no cycle
+             fast == slow      →  cycle
+Now        : two pointers, zero allocation.
+```
+
+### Why they *must* meet — the shrinking-gap invariant
+
+This is the one thing to be able to prove at a whiteboard.
+
+Once **both** pointers are inside the loop, measure the gap as "how many steps forward
+must `fast` take, going around the loop, to land on `slow`". Each step:
+
+```text
+fast advances 2, slow advances 1   →   gap changes by 2 − 1 = −1
+```
+
+The gap shrinks by **exactly one** every step. A quantity that decreases in steps of
+exactly 1 can never jump over 0 — it has to land on it. So they meet, in at most `C` steps
+once both are inside a cycle of length `C`.
+
+That is also why the speeds are 1 and 2, not 1 and 3. With `fast += 3` the gap shrinks by
+2 per step, and in an even-length loop a gap of 3 goes `3 → 1 → −1 (= C−1)` — it steps
+straight over zero and can circle forever without a meeting.
+
+`slow` also cannot lap the loop before `fast` catches it: `slow` needs `C` steps for a full
+lap and the gap starts below `C`, so the meeting always happens first.
+
+### Why the loop guard is `fast != nil && fast.Next != nil`
+
+`fast` takes two hops, so the node it stands on **and** the node after it must both exist
+before it moves. Checking only `fast != nil` panics on an even-length acyclic list, where
+`fast.Next` is `nil`. This one condition also covers the empty list and the single-node
+list without any extra `if`.
+
+### Finding where the cycle starts
+
+Detection lands you on *some* node inside the loop, which is usually not the entrance. The
+fix is famously short:
+
+> **Reset one pointer to `head`, leave the other at the meeting node, then advance both by 1. They meet exactly at the cycle entrance.**
+
+The reason is the identity **`L = m·C − k`** (with `L` = head→entrance, `C` = loop length,
+`k` = entrance→meeting point around the loop). Chapter 08 derives it line by line from
+"fast walked twice as far as slow"; the plain-English reading is all you need here:
+
+> the distance from the **head** to the entrance equals the distance from the **meeting
+> point** onward to the entrance, give or take whole extra laps — and whole laps don't
+> change where you land.
+
+So two one-step pointers, launched from those two places, arrive together.
+
+### The same two pointers, other jobs
+
+| Goal | Setup | Read the answer from |
+|---|---|---|
+| Is there a cycle? | slow +1, fast +2 | they met ⇒ yes |
+| Where does it start? | then reset one to head, both +1 | the node where they meet |
+| **How long is the cycle?** | from the meeting node, walk +1 counting until you return to it | the counter |
+| **Remove the cycle** | find the entrance, then walk the loop to the node whose `Next` is the entrance | set that node's `Next = nil` |
+| Middle of a list | slow +1, fast +2 | `slow`, when `fast` ends |
+| Duplicate in `nums[]` | treat `i → nums[i]` as a list | the cycle entrance |
+
+### Steps
+
+```text
+Phase 1 — detect
+  Step 1 → slow = head, fast = head
+  Step 2 → while fast != nil && fast.Next != nil:
+  Step 3 →     slow = slow.Next        (+1)
+  Step 4 →     fast = fast.Next.Next   (+2)
+  Step 5 →     if slow == fast → cycle; remember this node
+  Step 6 → fast fell off the end → no cycle
+
+Phase 2 — locate the entrance (only if phase 1 met)
+  Step 7 → p = head, q = meeting node
+  Step 8 → while p != q: p = p.Next, q = q.Next
+  Step 9 → p is the cycle entrance
+
+Phase 3 — measure the cycle (optional)
+  Step 10 → n = 1, q = meeting.Next
+  Step 11 → while q != meeting: q = q.Next, n++
+  Step 12 → n is the cycle length
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "linked list" + "O(1) extra space"
+  "cycle", "loop", "does it repeat forever", "where does the loop begin"
+  an array read as a function i → nums[i] (Find the Duplicate, Happy Number)
+  "middle node", "k-th from the end"
+        ↓
+Think about...
+  "Two speeds. Does the GAP between them encode what I'd otherwise store?"
+        ↓
+Use...
+  slow += 1, fast += 2, guarded by (fast != nil && fast.Next != nil)
+    · yes/no          → stop at the meeting
+    · entrance        → reset one pointer to head, both +1
+    · length          → lap the loop from the meeting node
+    · break the cycle → nil out the entrance's predecessor
+```
 
 ### Visual explanation
 
@@ -94,32 +233,83 @@ Most list problems are pointer-rewiring; a dummy sentinel removes head edge case
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Cycle Detection   : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+index :  0    1    2    3    4    5
+value :  3 →  2 →  0 →  4 →  2 →  1
+                   ↑                │
+                   └────────────────┘      (node 5 links back to node 2)
+
+L = 2 (head → entrance)      C = 4 (loop length)
+
+phase 1
+  step | slow (idx) | fast (idx) | met?
+  -----|------------|------------|-----
+  start|     0      |     0      |  -
+    1  |     1      |     2      |  no
+    2  |     2      |     4      |  no
+    3  |     3      |     2      |  no
+    4  |     4      |     4      |  YES  → meeting at index 4, k = 2
+
+check: L = m·C − k  →  2 = 1·4 − 2  ✓
+
+phase 2   p = idx0, q = idx4
+  step 1: p = idx1, q = idx5
+  step 2: p = idx2, q = idx2      → entrance = index 2 (value 0)
+
+phase 3   from idx4: 5, 2, 3, 4   → cycle length = 4
 ```
 
 ### Interview explanation
-"This is a Cycle Detection problem. I'll most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure. That brings the complexity down to O(n) time and O(1) space — here's the template."
+"I'll use Floyd's tortoise and hare instead of a hash set. `slow` moves one node per step,
+`fast` two, guarded by `fast != nil && fast.Next != nil`. If the list ends, `fast` hits nil
+and there's no cycle. If there is one, then once both pointers are inside it the gap between
+them shrinks by exactly one per step, so it can't skip past zero — they must land on the
+same node. To get the entrance I reset one pointer to the head and advance both by one:
+the head-to-entrance distance equals the meeting-point-to-entrance distance modulo full
+laps, so they meet at the start of the loop. O(n) time, O(1) space."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Linked Lists** family template. Adapt the comparison/condition to the specific problem.
+> `slow += 1`, `fast += 2`. Meet ⇒ cycle. Reset one to head ⇒ entrance. Lap it ⇒ length.
 
 ```go
-// Reverse a singly linked list in place.
-type ListNode struct { Val int; Next *ListNode }
-func reverseList(head *ListNode) *ListNode {
-    var prev *ListNode
-    for head != nil {
-        next := head.Next   // save
-        head.Next = prev    // reverse pointer
-        prev = head         // advance prev
-        head = next         // advance head
+type ListNode struct {
+    Val  int
+    Next *ListNode
+}
+
+// DetectCycle returns the cycle's entrance node and its length.
+// It returns (nil, 0) when the list is acyclic.
+func DetectCycle(head *ListNode) (*ListNode, int) {
+    slow, fast := head, head
+    for fast != nil && fast.Next != nil {
+        slow = slow.Next      // +1
+        fast = fast.Next.Next // +2
+        if slow == fast {     // pointer identity, never value equality
+            return cycleFacts(head, slow)
+        }
     }
-    return prev
+    return nil, 0 // fast ran off the end
+}
+
+// cycleFacts turns a meeting node into (entrance, length).
+func cycleFacts(head, meeting *ListNode) (*ListNode, int) {
+    // Entrance: head-to-entrance == meeting-to-entrance (mod full laps).
+    p, q := head, meeting
+    for p != q {
+        p, q = p.Next, q.Next
+    }
+    entrance := p
+
+    // Length: one full lap starting from the meeting node.
+    length, n := 1, meeting.Next
+    for n != meeting {
+        n = n.Next
+        length++
+    }
+    return entrance, length
 }
 ```
 
@@ -128,41 +318,79 @@ class ListNode:
     def __init__(self, val=0, nxt=None):
         self.val, self.next = val, nxt
 
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+
+def detect_cycle(head):
+    """Return (entrance, length), or (None, 0) if the list is acyclic."""
+    slow = fast = head
+    while fast and fast.next:
+        slow = slow.next            # +1
+        fast = fast.next.next       # +2
+        if slow is fast:            # identity, never value equality
+            return _cycle_facts(head, slow)
+    return None, 0                  # fast ran off the end
+
+
+def _cycle_facts(head, meeting):
+    p, q = head, meeting            # entrance: equal distances mod full laps
+    while p is not q:
+        p, q = p.next, q.next
+    length, n = 1, meeting.next     # length: one lap from the meeting node
+    while n is not meeting:
+        n, length = n.next, length + 1
+    return p, length
 ```
 
 ```java
-class ListNode { int val; ListNode next; ListNode(int v){val=v;} }
-ListNode reverseList(ListNode head) {
-    ListNode prev = null;
-    while (head != null) {
-        ListNode next = head.next;
-        head.next = prev;
-        prev = head;
-        head = next;
+class ListNode { int val; ListNode next; ListNode(int v) { val = v; } }
+
+// Returns the cycle entrance, or null when the list is acyclic.
+ListNode detectCycle(ListNode head) {
+    ListNode slow = head, fast = head;
+    while (fast != null && fast.next != null) {
+        slow = slow.next;           // +1
+        fast = fast.next.next;      // +2
+        if (slow == fast) {         // reference identity
+            ListNode p = head;
+            while (p != slow) { p = p.next; slow = slow.next; }
+            return p;               // entrance
+        }
     }
-    return prev;
+    return null;
+}
+
+int cycleLength(ListNode meeting) {
+    int len = 1;
+    for (ListNode n = meeting.next; n != meeting; n = n.next) len++;
+    return len;
 }
 ```
 
 ```cpp
-struct ListNode { int val; ListNode* next; ListNode(int v):val(v),next(nullptr){} };
-ListNode* reverseList(ListNode* head) {
-    ListNode* prev = nullptr;
-    while (head) {
-        ListNode* next = head->next;
-        head->next = prev;
-        prev = head;
-        head = next;
+struct ListNode {
+    int val;
+    ListNode* next;
+    ListNode(int v) : val(v), next(nullptr) {}
+};
+
+// Returns the cycle entrance, or nullptr when the list is acyclic.
+ListNode* detectCycle(ListNode* head) {
+    ListNode *slow = head, *fast = head;
+    while (fast && fast->next) {
+        slow = slow->next;          // +1
+        fast = fast->next->next;    // +2
+        if (slow == fast) {         // pointer identity
+            ListNode* p = head;
+            while (p != slow) { p = p->next; slow = slow->next; }
+            return p;               // entrance
+        }
     }
-    return prev;
+    return nullptr;
+}
+
+int cycleLength(ListNode* meeting) {
+    int len = 1;
+    for (ListNode* n = meeting->next; n != meeting; n = n->next) len++;
+    return len;
 }
 ```
 
@@ -248,124 +476,320 @@ ListNode* reverseList(ListNode* head) {
 ## 9. Solved Example 1
 
 ### Problem — Cycle (LeetCode 141)
-A representative **Cycle Detection** problem. The signal: floyd's tortoise & hare detects and locates cycles in o(1) space.
+Given the head of a linked list, return `true` if some node's `Next` eventually points back
+to an earlier node, forming a loop. Do it without extra memory.
 
 ### Thought Process
-1. Run a slow pointer one step and a fast pointer two steps per iteration.
-2. If the list ends (`fast` or `fast.next` is None) there is no cycle.
-3. If the two pointers ever meet, the fast one lapped the slow one inside a loop — return True.
+1. A visited-set answers it in O(n) memory; the interviewer wants O(1).
+2. Send `slow` forward one node per step and `fast` two.
+3. No cycle → `fast` runs out of list and the guard stops the loop → `false`.
+4. Cycle → both pointers end up inside it, the gap shrinks by exactly 1 per step, so it must
+   hit 0 → they land on the same node → `true`.
+5. Compare **nodes, not values** — a valid list may hold the same number twice.
 
 ### Dry Run
-Input `3→2→0→-4→(back to 2)`.
-- start slow=fast=3
-- slow=2, fast=0
-- slow=0, fast=2
-- slow=-4, fast=-4 → pointers meet → True
+
+Input: `1 → 2 → 3 → 4`, with node `4`'s `Next` pointing back at node `2`.
+
+```text
+idx  :  0    1    2    3
+value:  1 →  2 →  3 →  4
+             ↑         │
+             └─────────┘        L = 1, C = 3
+```
+
+| step | `slow` (+1) | `fast` (+2) | gap around the loop | same node? |
+|------|-------------|-------------|---------------------|------------|
+| start| `idx0 (1)`  | `idx0 (1)`  | — (not in the loop yet) | — |
+| 1    | `idx1 (2)`  | `idx2 (3)`  | 2 | no |
+| 2    | `idx2 (3)`  | `idx1 (2)`  | 1 | no |
+| 3    | `idx3 (4)`  | `idx3 (4)`  | 0 | **yes → `true`** |
+
+Output: **`true`**
+
+The gap column is the whole proof: `2 → 1 → 0`. It falls by exactly one each step, so it
+can never jump over zero.
+
+For an acyclic list such as `1 → 2`: step 1 gives `slow = idx1`, `fast = nil`, the guard
+`fast != nil` fails, and the answer is `false`.
 
 ### Visualization
-```
-input  ──▶ [ apply Cycle Detection step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+step 1        1     2     3     4
+                    ↑     ↑
+                  slow   fast          gap = 2
+
+step 2        1     2     3     4
+                    ↑     ↑
+                  fast   slow          gap = 1   (fast wrapped around)
+
+step 3        1     2     3     4
+                                ↑↑
+                          slow, fast   gap = 0   → cycle
 ```
 
 ### Code
+
+```go
+func hasCycle(head *ListNode) bool {
+    slow, fast := head, head
+    // fast takes two hops, so it and its successor must both exist.
+    for fast != nil && fast.Next != nil {
+        slow = slow.Next      // +1
+        fast = fast.Next.Next // +2
+        if slow == fast {     // pointer identity, not value equality
+            return true
+        }
+    }
+    return false // fast ran off the end
+}
+```
+
 ```python
 def hasCycle(head):
     slow = fast = head
-    while fast and fast.next:
-        slow = slow.next          # one step
-        fast = fast.next.next     # two steps
-        if slow is fast:          # lapped -> cycle
+    while fast and fast.next:   # fast needs two nodes ahead of it
+        slow = slow.next        # +1
+        fast = fast.next.next   # +2
+        if slow is fast:        # identity, not value equality
             return True
-    return False
+    return False                # fast ran off the end
 ```
 
 ### Complexity
-Time O(n), Space O(1). Fast pointer meets slow within one lap of the cycle.
+Time O(n) — `slow` walks at most `L + C` nodes before the meeting. Space **O(1)** — two
+pointers, no set.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Cycle II (LeetCode 142)
-A representative **Cycle Detection** problem. The signal: floyd's tortoise & hare detects and locates cycles in o(1) space.
+Same list, harder question: return the **node where the cycle begins**, or `nil` if there
+is no cycle. Still O(1) space.
 
 ### Thought Process
-1. Detect the meeting point with the standard tortoise/hare loop.
-2. Floyd's theorem: the distance from head to the cycle entrance equals the distance from the meeting point to the entrance.
-3. So reset one pointer to head and advance both one step at a time; where they meet is the cycle start.
+1. Run phase 1 exactly as in Example 1 to get a meeting node — but that node is somewhere
+   *inside* the loop, not its entrance.
+2. Name the distances: `L` = head → entrance, `C` = loop length, `k` = entrance → meeting
+   (measured forward around the loop).
+3. `fast` walked twice as far as `slow`, and the surplus is whole laps, which gives
+   `L = m·C − k` (chapter 08 derives this step by step).
+4. Read it in English: *head → entrance* and *meeting → entrance* are the same distance,
+   up to extra full laps that change nothing about where you land.
+5. So reset one pointer to `head`, leave the other at the meeting node, step both by one,
+   and the node where they collide is the entrance.
 
 ### Dry Run
-Input `3→2→0→-4→(back to 2)`.
-- slow/fast meet at node `-4`
-- reset ptr=head(3); step both: ptr=2, slow=2 → meet at node `2` → cycle entrance
+
+Input: `3 → 2 → 0 → 4 → 2 → 1`, with the last node pointing back at index 2.
+
+```text
+idx  :  0    1    2    3    4    5
+value:  3 →  2 →  0 →  4 →  2 →  1
+                  ↑                │
+                  └────────────────┘      L = 2, C = 4
+```
+
+**Phase 1 — find a meeting node**
+
+| step | `slow` (+1) | `fast` (+2) | met? |
+|------|-------------|-------------|------|
+| start| `idx0`      | `idx0`      | — |
+| 1    | `idx1`      | `idx2`      | no |
+| 2    | `idx2`      | `idx4`      | no |
+| 3    | `idx3`      | `idx2`      | no |
+| 4    | `idx4`      | `idx4`      | **yes** |
+
+Meeting at `idx4`, so `k = 2` (entrance `idx2` → `idx3` → `idx4`).
+Check the identity: `L = m·C − k` → `2 = 1·4 − 2` ✓.
+
+**Phase 2 — walk both at speed 1**
+
+| step | `p` (from head) | `q` (from meeting) | equal? |
+|------|-----------------|--------------------|--------|
+| start| `idx0`          | `idx4`             | no |
+| 1    | `idx1`          | `idx5`             | no |
+| 2    | `idx2`          | `idx2`             | **yes** |
+
+Output: **the node at index 2 (value `0`)** — the cycle entrance.
+
+Phase 2 took exactly `L = 2` steps, which is what the identity promised.
 
 ### Visualization
-```
-input  ──▶ [ apply Cycle Detection step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+     ├─── L = 2 ───┤
+     3 ──▶ 2 ──▶ ( 0 ──▶ 4 )
+                   ▲       │
+                   │       ▼
+                 ( 1 ◀── 2 )
+                           ▲
+                       meeting (k = 2 past the entrance)
+
+phase 2:  p ─┐                     ┌─ q
+             3 ▸ 2 ▸ 0        4 ▸ 2 ▸ 1 ▸ 0
+             └─2 steps─┘       └──2 steps──┘
+                       both land on 0
 ```
 
 ### Code
+
+```go
+func detectCycle(head *ListNode) *ListNode {
+    // Phase 1: does a cycle exist, and where do they meet?
+    slow, fast := head, head
+    for {
+        if fast == nil || fast.Next == nil {
+            return nil // no cycle
+        }
+        slow = slow.Next
+        fast = fast.Next.Next
+        if slow == fast {
+            break // meeting node found (somewhere inside the loop)
+        }
+    }
+    // Phase 2: L == distance from the meeting node to the entrance.
+    p := head
+    for p != slow {
+        p = p.Next
+        slow = slow.Next
+    }
+    return p // the entrance
+}
+```
+
 ```python
 def detectCycle(head):
+    # Phase 1: does a cycle exist, and where do they meet?
     slow = fast = head
-    while fast and fast.next:
+    while True:
+        if fast is None or fast.next is None:
+            return None                  # no cycle
         slow = slow.next
         fast = fast.next.next
-        if slow is fast:              # meeting point found
-            ptr = head
-            while ptr is not slow:    # walk to entrance
-                ptr = ptr.next
-                slow = slow.next
-            return ptr
-    return None
+        if slow is fast:
+            break                        # meeting node inside the loop
+    # Phase 2: L == distance from the meeting node to the entrance.
+    p = head
+    while p is not slow:
+        p = p.next
+        slow = slow.next
+    return p                             # the entrance
 ```
 
 ### Complexity
-Time O(n), Space O(1). Two linear passes with constant extra pointers.
+Time O(n) — phase 1 is at most `L + C` steps, phase 2 exactly `L`. Space O(1).
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Find Duplicate (LeetCode 287)
-A representative **Cycle Detection** problem. The signal: floyd's tortoise & hare detects and locates cycles in o(1) space.
+An array `nums` of `n+1` integers, each in `[1, n]`, contains exactly one repeated value.
+Return it **without modifying the array and using O(1) extra space**.
 
 ### Thought Process
-1. Treat the array as a function `i → nums[i]`; with n+1 values in range `[1, n]` the mapping must contain a cycle, and its entrance is the duplicate.
-2. Phase 1: run tortoise/hare over `nums[x]` until they meet inside the cycle.
-3. Phase 2: reset one pointer to `nums[0]` and step both one at a time; they meet at the duplicate value.
+1. Sorting or a seen-set both break a stated constraint, so the array itself must become
+   the data structure.
+2. Read `nums` as a linked list: node `i` has `Next = nums[i]`. Every value is in `[1, n]`,
+   so every "pointer" is a valid index — this walk can never fall off the end.
+3. Start at index `0`. Nothing points *to* index `0` (values are ≥ 1), so index `0` sits
+   outside the loop — exactly the "tail leading into a cycle" shape.
+4. Two different indices holding the same value are two nodes pointing at one node — that
+   node is the cycle entrance.
+5. So the duplicate **is** the entrance, and Floyd finds it: phase 1 to meet, phase 2 to
+   walk one pointer from index `0`.
 
 ### Dry Run
-Input `[1,3,4,2,2]`.
-- phase 1: slow=1→3→2, fast=1→2→2… meet at value `2`
-- phase 2: slow=nums[0]=1, fast=2; step → slow=3,fast=4 → slow=2,fast=2 → meet at `2`
+
+Input: `nums = [1, 3, 4, 2, 2]`
+
+```text
+index :  0    1    2    3    4
+value :  1    3    4    2    2
+
+as a list:  0 → 1 → 3 → 2 → 4 → 2 → 4 → ...
+                        ↑         │
+                        └─────────┘     entrance = 2 (the duplicate)
+```
+
+**Phase 1** — `slow = nums[slow]`, `fast = nums[nums[fast]]`
+
+| step | `slow` | `fast` | equal? |
+|------|--------|--------|--------|
+| init | `nums[0] = 1` | `nums[nums[0]] = nums[1] = 3` | no |
+| 1    | `nums[1] = 3` | `nums[nums[3]] = nums[2] = 4` | no |
+| 2    | `nums[3] = 2` | `nums[nums[4]] = nums[2] = 4` | no |
+| 3    | `nums[2] = 4` | `nums[nums[4]] = nums[2] = 4` | **yes** |
+
+**Phase 2** — restart `p` at index `0`, both move one hop
+
+| step | `p` | `slow` | equal? |
+|------|-----|--------|--------|
+| start| `0` | `4`    | no |
+| 1    | `nums[0] = 1` | `nums[4] = 2` | no |
+| 2    | `nums[1] = 3` | `nums[2] = 4` | no |
+| 3    | `nums[3] = 2` | `nums[4] = 2` | **yes** |
+
+Output: **`2`** — and indeed `nums[3] = nums[4] = 2`.
+
+Two indices point at `2`, which is precisely what makes `2` the entrance node.
 
 ### Visualization
-```
-input  ──▶ [ apply Cycle Detection step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+0 ──▶ 1 ──▶ 3 ──▶ 2 ──▶ 4
+                  ▲      │
+                  └──────┘
+
+indices 3 and 4 both hold the value 2
+  ⇒ two arrows converge on node 2
+  ⇒ node 2 is where the cycle begins
+  ⇒ 2 is the duplicate
 ```
 
 ### Code
+
+```go
+func findDuplicate(nums []int) int {
+    // Phase 1: i -> nums[i] is a linked list; find a meeting point.
+    slow, fast := nums[0], nums[nums[0]]
+    for slow != fast {
+        slow = nums[slow]       // +1 hop
+        fast = nums[nums[fast]] // +2 hops
+    }
+    // Phase 2: index 0 is outside the loop, so walk from there.
+    p := 0
+    for p != slow {
+        p = nums[p]
+        slow = nums[slow]
+    }
+    return p // the cycle entrance == the duplicated value
+}
+```
+
 ```python
 def findDuplicate(nums):
-    slow = fast = nums[0]
-    while True:                     # phase 1: find meeting point
-        slow = nums[slow]
-        fast = nums[nums[fast]]
-        if slow == fast:
-            break
-    slow = nums[0]                  # phase 2: find entrance
+    # Phase 1: i -> nums[i] is a linked list; find a meeting point.
+    slow, fast = nums[0], nums[nums[0]]
     while slow != fast:
+        slow = nums[slow]            # +1 hop
+        fast = nums[nums[fast]]      # +2 hops
+    # Phase 2: index 0 is outside the loop, so walk from there.
+    p = 0
+    while p != slow:
+        p = nums[p]
         slow = nums[slow]
-        fast = nums[fast]
-    return slow
+    return p                         # entrance == duplicated value
 ```
 
 ### Complexity
-Time O(n), Space O(1). Read-only array, no extra structures.
+Time O(n) — both phases are linear in the number of "nodes". Space **O(1)** — four `int`
+variables, and `nums` is never written to.
 
+---
 
 ## 12. LeetCode Practice Set
 

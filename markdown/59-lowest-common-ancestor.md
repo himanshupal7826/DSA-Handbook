@@ -41,32 +41,131 @@ lca, lowest common ancestor, tree, recursion, binary lifting.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"What is the deepest node that has both of these nodes underneath it?"*
+
+Running example:
+
+```text
+       3            p = 6,  q = 2
+      / \
+     5   1          answer: 5
+    / \   \
+   6   2   8
+```
+
 ### Intuition
-Recompute subtree properties repeatedly across calls — O(n^2).
+"Common ancestor of `p` and `q`" literally means "a node whose subtree contains both". So write a `contains(node, target)` helper and ask that question at every node. Among all the nodes that say yes, the deepest one wins.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Write `contains(node, target)` — a full subtree scan returning true/false.
+2. Start at the root (which certainly contains both).
+3. If `contains(node.Left, p)` **and** `contains(node.Left, q)`, move down to `node.Left`.
+4. Else if the same holds for `node.Right`, move down to `node.Right`.
+5. Otherwise `p` and `q` are split across the two sides (or one *is* this node) — return `node`.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n · h)** — each of the `h` steps down runs up to four O(n) subtree scans. On a skewed tree that is **O(n²)**.
+- Space: O(h) for the recursion inside `contains`.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Lowest Common Ancestor pattern is built to use.
+- Every `contains` call re-walks nodes an earlier `contains` already walked:
+
+  ```text
+  contains(3, 6)  visits  3,5,6,2,1,8      ← already saw node 6
+  contains(5, 6)  visits    5,6,2          ← visits node 6 AGAIN
+  ```
+
+- It asks a **yes/no** question when the recursion could just as easily hand back **which node it found**. That extra bit of information is free, and it is exactly what removes the repeated scans.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Lowest Common Ancestor invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Do one post-order pass in which every node reports upward "here is the interesting thing I found below me" — the first node that hears back from *both* children is the answer.**
+
+Imagine two people lost in a building, each walking up the corridors toward the exit. The first room where their two routes merge is the lowest common ancestor. Nobody searches the whole building; each person just reports "I came from here" to the room above.
+
+### The thought process
+
+```text
+We need    : the deepest node with p in its subtree and q in its subtree.
+Obvious way: at each node, scan both subtrees asking "do you contain p / q?"
+Too slow   : O(n·h) — the scans overlap enormously.
+Notice     : a scan that returns a NODE instead of a boolean costs the same.
+Notice too : if my left child reports something and my right child reports
+             something, the two reports must be p and q — so I am the answer.
+Therefore  : one post-order pass; each node returns p, q, an answer, or nil.
+Now        : O(n) — every node is visited exactly once.
+```
+
+### Why the "return it upward" rule works
+
+The whole algorithm is four lines of plain English. At a node, after asking both children:
+
+```text
+1. I am nil                      → return nil          ("nothing here")
+2. I am p or I am q              → return myself       ("found one")
+3. Both children returned        → return myself       ("I AM the LCA")
+4. Exactly one child returned    → return that one     ("pass it up")
+```
+
+Read the meaning of the return value carefully — it is deliberately overloaded, and that is what makes the code short:
+
+> *"the LCA, if I already know it; otherwise whichever of `p`/`q` lives in my subtree; otherwise nil."*
+
+**Why rule 3 is correct.** If my left subtree handed back a non-nil node and my right subtree did too, then each subtree contains at least one target. They are disjoint, so one holds `p` and the other holds `q`. Every node below me sits in only one of the two subtrees, so no deeper node can contain both. I am the deepest — the LCA.
+
+**Why rule 4 is correct.** If only one side reported, both targets (if both exist) are on that side, so the answer is somewhere down there. Passing the report up unchanged is safe: either it is already the LCA, in which case rules 3 and 4 keep forwarding it untouched all the way to the root, or it is a lone target still looking for its partner higher up.
+
+**Why rule 2 may stop early — the ancestor case.** Suppose `p` is an ancestor of `q`. Standing on `p`, we return immediately without looking below. That feels like cheating, but the answer is still right: `q` is inside `p`'s subtree, so `p` contains both, and nothing deeper than `p` can contain `p` itself. **LCA(p, descendant of p) = p.** This is the case candidates most often get wrong by "helpfully" searching deeper.
+
+**The assumption hiding in rule 2:** both nodes actually exist in the tree. Return early at `p` and you never confirm `q` is there at all — see section 11 for the fix.
+
+### The BST shortcut
+
+If the tree is a **binary search tree**, throw all of the above away. Values now tell you where things are, so you never need a return-value protocol:
+
+```text
+both p.val and q.val  <  node.val   → both are in the left subtree  → go left
+both p.val and q.val  >  node.val   → both are in the right subtree → go right
+otherwise (they split, or one IS node) → node is the LCA, stop
+```
+
+It is simpler for three reasons: no recursion needed (a `for` loop suffices), O(1) space instead of O(h) stack, and you touch only the O(h) nodes on one root-to-answer path instead of all `n`.
+
+### Steps
+
+```text
+Step 1 → If node is nil, return nil.
+Step 2 → If node == p or node == q, return node.
+Step 3 → left  = recurse(node.Left)
+Step 4 → right = recurse(node.Right)
+Step 5 → If left != nil and right != nil, return node.   (the split point)
+Step 6 → Otherwise return whichever of left/right is non-nil (possibly nil).
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "lowest / least common ancestor", "deepest node containing both"
+  "where do two root-to-node paths first diverge"
+  "distance between two nodes in a tree"
+        ↓
+Think about...
+  "Is it a BST? Are both nodes guaranteed to exist? Do I have parent pointers?"
+        ↓
+Use...
+  BST                        → walk down comparing values (O(h) time, O(1) space)
+  plain binary tree          → post-order 'return what you found' (LC 236)
+  nodes may be absent        → same walk, but COUNT the hits and require 2 (LC 1644)
+  parent pointers available  → lift the deeper node, then step up in lockstep
+  many queries on one tree   → preprocess: binary lifting / Euler tour + sparse table
+```
 
 ### Visual explanation
 
@@ -95,69 +194,128 @@ Trees are recursive: solve children first, combine their results at the parent. 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Lowest Common Ance: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+       3            p = 6,  q = 2
+      / \
+     5   1
+    / \   \
+   6   2   8
+
+post-order, each node returning what it found:
+
+   node 6 : leaf, node == p            → returns 6
+   node 2 : leaf, node == q            → returns 2
+   node 5 : left=6, right=2  BOTH      → returns 5   ★ I am the LCA
+   node 8 : leaf, neither              → returns nil
+   node 1 : left=nil, right=nil        → returns nil
+   node 3 : left=5, right=nil  ONE     → returns 5   (pass it up unchanged)
+
+answer: 5
 ```
 
 ### Interview explanation
-"This is a Lowest Common Ancestor problem. I'll trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates. That brings the complexity down to O(n) time and O(h) space — here's the template."
+"I'll do one post-order traversal where each call returns the most useful thing it found in its subtree: `p`, `q`, an already-determined LCA, or nil. If a node *is* `p` or `q` I return it immediately — that is safe because if the other target is below me, I'm still the answer. Otherwise I ask both children: if both come back non-nil, the two targets are split across my subtrees so I'm the deepest node containing both and I return myself; if only one comes back, I forward it upward unchanged. That's O(n) time and O(h) stack, one visit per node. If the tree happened to be a BST I'd skip all of this and just walk down comparing values — the first node whose value sits between `p` and `q` is the LCA, in O(h) time and O(1) space."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Trees** family template. Adapt the comparison/condition to the specific problem.
+> Post-order, and the return value means *"the LCA if I know it, else whichever target I found, else nil"*. In a BST, just walk down until the two targets split.
 
 ```go
-// Post-order DFS returning subtree height; also tracks diameter.
-type TreeNode struct { Val int; Left, Right *TreeNode }
-func height(node *TreeNode, best *int) int {
-    if node == nil { return 0 }
-    l := height(node.Left, best)
-    r := height(node.Right, best)
-    if l+r > *best { *best = l + r }   // path through this node
-    if l > r { return l + 1 }
-    return r + 1
+// General binary tree: one post-order pass, overloaded return value.
+func lca(node, p, q *TreeNode) *TreeNode {
+    if node == nil || node == p || node == q {
+        return node // nothing here, or one of the targets is right here
+    }
+    left := lca(node.Left, p, q)
+    right := lca(node.Right, p, q)
+    if left != nil && right != nil {
+        return node // targets split across my two subtrees → I am the LCA
+    }
+    if left != nil {
+        return left // forward the single report upward
+    }
+    return right
+}
+
+// BST: values reveal the side, so no recursion protocol is needed.
+func lcaBST(root *TreeNode, pVal, qVal int) *TreeNode {
+    node := root
+    for node != nil {
+        switch {
+        case pVal < node.Val && qVal < node.Val:
+            node = node.Left // both strictly smaller → both on the left
+        case pVal > node.Val && qVal > node.Val:
+            node = node.Right // both strictly larger → both on the right
+        default:
+            return node // they split here (or one IS this node)
+        }
+    }
+    return nil
 }
 ```
 
 ```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
+def lca(node, p, q):
+    if node is None or node is p or node is q:
+        return node                       # nothing here, or a target is right here
+    left = lca(node.left, p, q)
+    right = lca(node.right, p, q)
+    if left and right:
+        return node                       # targets split → this node is the LCA
+    return left or right                  # forward the single report upward
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+
+def lca_bst(root, p_val, q_val):
+    node = root
+    while node:
+        if p_val < node.val and q_val < node.val:
+            node = node.left              # both smaller → go left
+        elif p_val > node.val and q_val > node.val:
+            node = node.right             # both larger → go right
+        else:
+            return node                   # they split here → LCA
+    return None
 ```
 
 ```java
-class TreeNode { int val; TreeNode left, right; }
-int best = 0;
-int height(TreeNode node) {
-    if (node == null) return 0;
-    int l = height(node.left), r = height(node.right);
-    best = Math.max(best, l + r);
-    return 1 + Math.max(l, r);
+TreeNode lca(TreeNode node, TreeNode p, TreeNode q) {
+    if (node == null || node == p || node == q) return node;
+    TreeNode left = lca(node.left, p, q);
+    TreeNode right = lca(node.right, p, q);
+    if (left != null && right != null) return node;   // split → this is the LCA
+    return left != null ? left : right;               // forward one report up
+}
+
+TreeNode lcaBST(TreeNode root, int pVal, int qVal) {
+    TreeNode node = root;
+    while (node != null) {
+        if (pVal < node.val && qVal < node.val)       node = node.left;
+        else if (pVal > node.val && qVal > node.val)  node = node.right;
+        else return node;                             // they split here
+    }
+    return null;
 }
 ```
 
 ```cpp
-struct TreeNode { int val; TreeNode *left, *right; };
-int best = 0;
-int height(TreeNode* node) {
-    if (!node) return 0;
-    int l = height(node->left), r = height(node->right);
-    best = max(best, l + r);
-    return 1 + max(l, r);
+TreeNode* lca(TreeNode* node, TreeNode* p, TreeNode* q) {
+    if (!node || node == p || node == q) return node;
+    TreeNode* left = lca(node->left, p, q);
+    TreeNode* right = lca(node->right, p, q);
+    if (left && right) return node;        // split across subtrees → the LCA
+    return left ? left : right;            // forward the single report upward
+}
+
+TreeNode* lcaBST(TreeNode* root, int pVal, int qVal) {
+    TreeNode* node = root;
+    while (node) {
+        if (pVal < node->val && qVal < node->val)      node = node->left;
+        else if (pVal > node->val && qVal > node->val) node = node->right;
+        else return node;                  // they split here
+    }
+    return nullptr;
 }
 ```
 
@@ -243,126 +401,297 @@ int height(TreeNode* node) {
 ## 9. Solved Example 1
 
 ### Problem — LCA (LeetCode 236)
-A representative **Lowest Common Ancestor** problem. The signal: post-order recursion bubbles up where two targets first meet.
+Given a binary tree and two nodes `p` and `q` that are both guaranteed to be in it, return their lowest common ancestor — the deepest node having both in its subtree (a node may be its own ancestor).
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (lca, lowest common ancestor, tree, recursion, binary lifting).
-2. Reach for the Lowest Common Ancestor template below and map the problem's entities onto it.
-3. Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
+1. "Deepest node containing both" = "the node where the two search directions split".
+2. Let every recursive call return the most useful thing in its subtree: `p`, `q`, an LCA already found, or nil.
+3. If a node *is* `p` or `q`, return it right away — if the other target is below, this node is still the answer.
+4. If **both** children return non-nil, the targets are on opposite sides → this node is the LCA.
+5. If only one child returns non-nil, forward it up unchanged; the answer is that node or something above.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input:
+
+```text
+       3            p = 6,  q = 2
+      / \
+     5   1
+    / \   \
+   6   2   8
+```
+
+Rows are in post-order (a node finishes after both of its children):
+
+| step | node | left returns | right returns | rule fired | returns |
+|------|------|--------------|---------------|------------|---------|
+| 1 | 6 | — | — | node == p | **6** |
+| 2 | 2 | — | — | node == q | **2** |
+| 3 | 5 | 6 | 2 | both non-nil → **I am the LCA** | **5** |
+| 4 | 8 | nil | nil | nothing found | nil |
+| 5 | 1 | nil | nil | nothing found | nil |
+| 6 | 3 | 5 | nil | one non-nil → forward it | **5** |
+
+Output: **`5`**
+
+Step 3 is the only place a decision is actually made; steps 4-6 just carry the answer to the root. Note step 6: node `3` does **not** overwrite the answer just because it heard from one side — that is rule 4 doing its job.
 
 ### Visualization
-```
-input  ──▶ [ apply Lowest Common Ancestor step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+              3  ◄── returns 5 (forwarded)
+             / \
+   returns 5 5   1  ◄── returns nil
+   ★ LCA    / \   \
+           6   2   8
+           │   │
+        "I'm p"  "I'm q"
+
+reports travel UPWARD:   6 ──┐
+                             ├──▶ 5 hears from BOTH sides → 5 is the answer
+                         2 ──┘
 ```
 
 ### Code
-```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+```go
+func lowestCommonAncestor(root, p, q *TreeNode) *TreeNode {
+    if root == nil || root == p || root == q {
+        return root // nil, or one of the targets is standing right here
+    }
+    left := lowestCommonAncestor(root.Left, p, q)
+    right := lowestCommonAncestor(root.Right, p, q)
+    if left != nil && right != nil {
+        return root // p on one side, q on the other → this node is the LCA
+    }
+    if left != nil {
+        return left // only one side reported → forward it upward unchanged
+    }
+    return right
+}
+```
+
+```python
+def lowestCommonAncestor(root, p, q):
+    if root is None or root is p or root is q:
+        return root                     # nil, or a target is standing right here
+    left = lowestCommonAncestor(root.left, p, q)
+    right = lowestCommonAncestor(root.right, p, q)
+    if left and right:
+        return root                     # split across subtrees → this is the LCA
+    return left or right                # forward the single report upward
 ```
 
 ### Complexity
-Time O(n), Space O(h). Visit each node once; recursion stack is O(height).
+Time O(n) — each node is visited once and does O(1) work. Space O(h) for the recursion stack (O(n) on a skewed tree). The brute force was O(n·h) because its `contains` scans overlapped.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — LCA of BST (LeetCode 235)
-A representative **Lowest Common Ancestor** problem. The signal: post-order recursion bubbles up where two targets first meet.
+Same question, but the tree is a **binary search tree**: every left descendant is smaller than the node and every right descendant is larger.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (lca, lowest common ancestor, tree, recursion, binary lifting).
-2. Reach for the Lowest Common Ancestor template below and map the problem's entities onto it.
-3. Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
+1. In a BST a value tells you where it lives, so you never need to search both sides.
+2. If both targets are smaller than the current node, both are in the left subtree — go left.
+3. If both are larger, go right.
+4. Otherwise they straddle this node (or one of them *is* this node) — this is the split point, so it is the LCA.
+5. No recursion and no return-value protocol needed: a plain `while` loop walking down one path suffices.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input:
+
+```text
+        6            p = 3,  q = 5
+       / \
+      2   8
+     / \  / \
+    0  4 7   9
+      / \
+     3   5
+```
+
+| step | node | 3 vs node | 5 vs node | verdict | move |
+|------|------|-----------|-----------|---------|------|
+| 1 | 6 | 3 < 6 | 5 < 6 | both smaller | go left |
+| 2 | 2 | 3 > 2 | 5 > 2 | both larger | go right |
+| 3 | 4 | 3 < 4 | 5 > 4 | **they split** | **answer = 4** |
+
+Output: **`4`**
+
+Step 3 is the stopping rule. The `default` branch also covers the ancestor case: querying `(2, 4)` stops at node `2` on step 2, because `2 < 2` is false — a node counts as its own ancestor.
 
 ### Visualization
-```
-input  ──▶ [ apply Lowest Common Ancestor step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+        6      3<6 and 5<6  → both left
+       / \
+      2   8    3>2 and 5>2  → both right
+     / \
+    0   4      3<4 but 5>4  → SPLIT  ★ LCA = 4
+       / \
+      3   5    ← the two targets, now on opposite sides
+
+only one root-to-answer path is ever touched: 6 → 2 → 4
 ```
 
 ### Code
-```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+```go
+func lowestCommonAncestorBST(root *TreeNode, pVal, qVal int) *TreeNode {
+    node := root
+    for node != nil {
+        switch {
+        case pVal < node.Val && qVal < node.Val:
+            node = node.Left // both strictly smaller → both live on the left
+        case pVal > node.Val && qVal > node.Val:
+            node = node.Right // both strictly larger → both live on the right
+        default:
+            return node // they split here, or one of them IS this node
+        }
+    }
+    return nil
+}
+```
+
+```python
+def lowestCommonAncestorBST(root, p_val, q_val):
+    node = root
+    while node:
+        if p_val < node.val and q_val < node.val:
+            node = node.left            # both smaller → both on the left
+        elif p_val > node.val and q_val > node.val:
+            node = node.right           # both larger → both on the right
+        else:
+            return node                 # they split here → this is the LCA
+    return None
 ```
 
 ### Complexity
-Time O(n), Space O(h). Visit each node once; recursion stack is O(height).
+Time O(h) — one step per level, `h ≈ log n` on a balanced BST. Space **O(1)** — a loop, no recursion stack. That is strictly better than the general O(n)/O(h) version, and it is why "is it a BST?" is worth asking out loud.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — LCA II (LeetCode 1644)
-A representative **Lowest Common Ancestor** problem. The signal: post-order recursion bubbles up where two targets first meet.
+Same as LeetCode 236, except `p` and `q` are **not guaranteed to exist** in the tree. Return `nil` unless both are present.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (lca, lowest common ancestor, tree, recursion, binary lifting).
-2. Reach for the Lowest Common Ancestor template below and map the problem's entities onto it.
-3. Trees are recursive: solve children first, combine their results at the parent. BFS handles level-aggregates.
+1. The LC 236 trick returns as soon as it stands on `p` — so it never checks whether `q` exists at all. On `p = 6, q = 10` it would happily return `6`.
+2. Fix: **always recurse into both children first**, then check whether this node is a target. No early exit.
+3. Keep a counter `found`, incremented once per target actually seen.
+4. Compute the candidate exactly as in LC 236 (both sides reported → me; one side → forward it).
+5. Return the candidate only if `found == 2`; otherwise return nil.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input:
+
+```text
+       3            p = 6,  q = 10  ← 10 is NOT in the tree
+      / \
+     5   1
+    / \   \
+   6   2   8
+```
+
+Post-order again, with the counter:
+
+| step | node | left | right | is target? | `found` | returns |
+|------|------|------|-------|------------|---------|---------|
+| 1 | 6 | nil | nil | **yes (p)** | 1 | **6** |
+| 2 | 2 | nil | nil | no | 1 | nil |
+| 3 | 5 | 6 | nil | no | 1 | 6 (forward) |
+| 4 | 8 | nil | nil | no | 1 | nil |
+| 5 | 1 | nil | nil | no | 1 | nil |
+| 6 | 3 | 6 | nil | no | 1 | 6 (forward) |
+| 7 | final check | — | — | — | **1 ≠ 2** | **nil** |
+
+Output: **`nil`**
+
+Step 7 is the entire difference from LeetCode 236. The walk still produced the candidate `6`; only the counter reveals that `q` was never seen. Run the same code with `q = 2` and step 2 would increment `found` to 2, step 3 would fire the both-sides rule and return `5`, and step 7 would let it through.
 
 ### Visualization
-```
-input  ──▶ [ apply Lowest Common Ancestor step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+LC 236 (both guaranteed):        LC 1644 (may be missing):
+
+  at node p:                       at node p:
+     return p  ── STOP               left  = recurse(...)    ← still descend
+     (never looks below)             right = recurse(...)
+                                     found++ ; return p      ← count, then report
+
+                                   at the very end:
+                                     found == 2 ?  answer : nil
+
+on p=6, q=10:  236 → 6 (wrong)   |   1644 → found=1 → nil (right)
 ```
 
 ### Code
-```python
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val, self.left, self.right = val, left, right
 
-def diameter(root):
-    best = 0
-    def height(node):
-        nonlocal best
-        if not node: return 0
-        l, r = height(node.left), height(node.right)
-        best = max(best, l + r)       # longest path through node
-        return 1 + max(l, r)
-    height(root)
-    return best
+```go
+func lowestCommonAncestorII(root, p, q *TreeNode) *TreeNode {
+    found := 0
+    var walk func(node *TreeNode) *TreeNode
+    walk = func(node *TreeNode) *TreeNode {
+        if node == nil {
+            return nil
+        }
+        // Descend FIRST — unlike LC 236 we may not stop at a target,
+        // because we still have to prove the other target exists.
+        left := walk(node.Left)
+        right := walk(node.Right)
+        if node == p || node == q {
+            found++
+            return node
+        }
+        if left != nil && right != nil {
+            return node // targets split across my subtrees
+        }
+        if left != nil {
+            return left
+        }
+        return right
+    }
+    candidate := walk(root)
+    if found == 2 {
+        return candidate // both really are in the tree
+    }
+    return nil
+}
+```
+
+```python
+def lowestCommonAncestorII(root, p, q):
+    found = 0
+
+    def walk(node):
+        nonlocal found
+        if node is None:
+            return None
+        # Descend FIRST: we may not stop at a target, because we still
+        # have to prove the other target exists.
+        left = walk(node.left)
+        right = walk(node.right)
+        if node is p or node is q:
+            found += 1
+            return node
+        if left and right:
+            return node                 # targets split across my subtrees
+        return left or right
+
+    candidate = walk(root)
+    return candidate if found == 2 else None
 ```
 
 ### Complexity
-Time O(n), Space O(h). Visit each node once; recursion stack is O(height).
+Time O(n) — the traversal is now guaranteed to be full (no early exit), so it is exactly `n` visits. Space O(h) for the recursion. Losing the early return costs nothing asymptotically; it only removes a best-case shortcut.
 
+---
 
 ## 12. LeetCode Practice Set
 

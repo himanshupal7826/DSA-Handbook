@@ -41,32 +41,134 @@ tree dp, rerooting, subtree dp, postorder, states.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"What is the best I can do in this subtree, given a constraint that couples a node to its children?"*
+
+Running example: rob a tree of houses for maximum money, but never two houses joined by an edge.
+
 ### Intuition
-Naive recursion recomputes overlapping subproblems — exponential time.
+At every node there are two worlds: rob it, or don't. If you rob it, its children are off-limits, so you jump to the grandchildren. If you don't, you are free to solve both children normally. Try both worlds and keep the bigger number.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. `best(node)` = most money obtainable from the subtree rooted at `node`.
+2. If `node` is nil, return 0.
+3. **Rob it:** `node.val` + `best` of all four grandchildren.
+4. **Skip it:** `best(node.left) + best(node.right)`.
+5. Return the larger of the two.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(2^h)** on a balanced tree with height `h` — closer to exponential in the node count on a path-shaped tree.
+- Space: O(h) recursion stack.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the DP on Trees pattern is built to use.
+- Every subtree is solved twice, once from each of two different ancestors:
+
+```text
+best(A) --skip--> best(B)  --skip--> best(C)   ← C's subtree, visit #1
+best(A) --rob---> best(C)                      ← C's subtree, visit #2
+
+    A
+    |
+    B        A's "rob" branch jumps straight to C.
+    |        A's "skip" branch reaches C through B.
+    C        Both compute best(C) from scratch.
+```
+
+- The wasted work is structural: the recursion asks a node about its **grandchildren**, so it descends two levels at a time in one branch and one level at a time in the other, and the two descents overlap.
+- What it fails to exploit: **a node only ever needs to know two facts about each child — the child's best answer if the child is used, and its best answer if it isn't.** Both facts are produced by the same single visit.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the DP on Trees invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Visit the tree once in post-order, and have every node hand its parent a small tuple that already answers every question the parent could possibly ask about that subtree.**
+
+Think of it as an org chart rolling numbers upward. A manager doesn't re-audit the whole department; each report submits a tiny summary — "here's my number if you use me, here's my number if you don't" — and the manager combines the summaries in constant time. Nobody is asked twice.
+
+### The thought process
+
+```text
+We need    : an optimum over a tree with a parent/child constraint.
+Obvious way: recurse, branching on "use this node or not".
+Too slow   : the two branches descend at different speeds and overlap.
+Notice     : a parent's decision depends on the child only through a couple
+             of summary numbers, never on the child's internal structure.
+Notice too : those numbers can all be produced during one visit to the child.
+Therefore  : return a TUPLE from each node instead of a single number.
+Now        : one post-order traversal, O(1) work per node -> O(n) total.
+```
+
+### Why a single number is not enough
+
+Suppose each node returned only `best(subtree)`. Take this chain, where the parent `P` is deciding:
+
+```text
+P (val 2)
+|
+B (val 5)          best(B) = 5   -- achieved by ROBBING B
+|
+C (val 4)          best(C) = 4
+```
+
+`P` wants to rob itself, so it needs "B's best **given B is not robbed**", which is 4. But the number it was handed is 5, and 5 is unusable — adding it would rob two adjacent houses. A single number tells the parent *how good* the child can be, not *whether that goodness is still legal*. The parent's only recourse is to descend again to the grandchildren, which is exactly the brute force.
+
+Return both numbers and the ambiguity disappears:
+
+```text
+C returns (rob = 4, skip = 0)
+B returns (rob = 5 + C.skip = 5,  skip = max(C.rob, C.skip) = 4)
+P returns (rob = 2 + B.skip = 6,  skip = max(B.rob, B.skip) = 5)
+answer = max(6, 5) = 6
+```
+
+The rule generalises: **the tuple must contain one entry per "mode" the parent can put this node in.** Two modes for house robbing (used / unused). Three for camera placement (has a camera / covered without one / still uncovered). One for max-path-sum, plus a side-channel global (see below).
+
+### Why post-order, and never anything else
+
+The recurrence for a node is written purely in terms of its children's tuples, so a node is only computable once **both** children are final. Post-order — left subtree, right subtree, *then* the node — is exactly the order that guarantees that. Pre-order or level-order would ask a parent to combine tuples that do not exist yet.
+
+Concretely, in code, the shape is always:
+
+```text
+tuple := dfs(node.left)      ← must come first
+other := dfs(node.right)     ← must come first
+combine(node, tuple, other)  ← only now is the node decidable
+```
+
+> **One extra idea: the global side-channel.** Sometimes the best answer is *not* the value a node returns upward. In max-path-sum a path may bend at a node and use both children — but such a bent path cannot be extended by the parent, so it must not be returned. The fix is to *record* the bent value into a running maximum and *return* the straight one. Recording locally while returning something else is a normal, correct tree-DP move.
+
+### Steps
+
+```text
+Step 1 → Name the modes a parent can force on a child. That list IS the tuple.
+Step 2 → Write, in English, what each tuple entry means for one subtree.
+Step 3 → Base case: what should nil return so that a leaf behaves correctly?
+Step 4 → Combine: express the node's tuple from the two children's tuples.
+Step 5 → If some answer cannot be returned upward, record it in a global.
+Step 6 → Answer = a function of the root's tuple (and the global, if used).
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  a tree (or a general graph with no cycles) and a rule that links a node
+  to its parent/children: "no two adjacent", "cover every node",
+  "path through the tree", "subtree sum / count"
+        ↓
+Think about...
+  "What would my parent need to know about me?"
+  If the answer is more than one number, that's your tuple.
+        ↓
+Use...
+  post-order DFS returning a tuple
+  independent set / robbery -> (include, exclude)
+  covering / matching       -> (has, covered, uncovered)
+  best path                 -> return the best single arm, record the bend
+```
 
 ### Visual explanation
 
@@ -91,61 +193,220 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-DP on Trees       : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+House robbing on a tiny tree. Each node returns (rob, skip).
+
+              3                (rob = 3 + 3 + 1 = 7,  skip = 3 + 3 = 6)
+             / \                                              answer 7
+            /   \
+     (2,3) 2     3 (3,1)
+            \     \
+             3     1
+          (3,0)   (1,0)
+
+reading it bottom-up:
+
+  leaf 3 -> (rob 3, skip 0)      a leaf robbed is its own value
+  leaf 1 -> (rob 1, skip 0)
+
+  node 2 -> rob  = 2 + 0        (child must be skipped)
+            skip = max(3, 0) = 3 (child free to be robbed)
+
+  node 3 -> rob  = 3 + 0 = 3
+            skip = max(1, 0) = 1
+
+  root 3 -> rob  = 3 + skip(2) + skip(3) = 3 + 3 + 1 = 7   <-- winner
+            skip = max(2,3) + max(3,1)   = 3 + 3     = 6
 ```
 
 ### Interview explanation
-"This is a DP on Trees problem. I'll optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it. That brings the complexity down to O(states × transitions) time and O(states) space — here's the template."
+"This is tree DP. The trick is that a node's parent doesn't need the child's whole subtree — it only needs a couple of summary numbers, one for each mode the parent can force the child into. For house robbing that's two numbers: the best money if we rob this node, and the best if we don't. So the DFS returns a pair instead of a single integer. If we rob a node, we must add each child's *skip* value; if we don't, each child contributes the better of its two values. Base case is nil returning `(0, 0)`. It has to be post-order, because a node's pair is defined entirely in terms of its children's pairs. That's one visit per node with O(1) combining work, so O(n) time and O(h) stack space for the recursion."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Dynamic Programming** family template. Adapt the comparison/condition to the specific problem.
+> Post-order DFS. Each node returns a tuple — one entry per mode its parent can put it in.
 
 ```go
-// 0/1 Knapsack, space-optimized to 1D. dp[w] = best value at capacity w.
-func knapsack(weights, values []int, cap int) int {
-    dp := make([]int, cap+1)
-    for i := range weights {
-        for w := cap; w >= weights[i]; w-- {  // reverse: each item once
-            if dp[w-weights[i]]+values[i] > dp[w] {
-                dp[w] = dp[w-weights[i]] + values[i]
-            }
+// TreeNode is the usual binary tree node.
+type TreeNode struct {
+    Val         int
+    Left, Right *TreeNode
+}
+
+// MaxIndependentSet is the include/exclude skeleton: pick a maximum-weight set
+// of nodes with no two of them adjacent.
+// dfs returns (use, skip):
+//   use  = best total for this subtree when THIS node is taken
+//   skip = best total for this subtree when this node is NOT taken
+func MaxIndependentSet(root *TreeNode) int {
+    var dfs func(*TreeNode) (int, int)
+    dfs = func(node *TreeNode) (int, int) {
+        if node == nil {
+            return 0, 0 // an absent subtree contributes nothing either way
         }
+        leftUse, leftSkip := dfs(node.Left)   // children first: post-order
+        rightUse, rightSkip := dfs(node.Right)
+
+        use := node.Val + leftSkip + rightSkip // taking me forbids my children
+        skip := max(leftUse, leftSkip) + max(rightUse, rightSkip)
+        return use, skip
     }
-    return dp[cap]
+
+    use, skip := dfs(root)
+    return max(use, skip)
+}
+
+// BestArmSum is the "return one arm, record the bend" skeleton.
+// dfs returns the best sum of a path that starts at the node and descends into
+// AT MOST ONE child, so a parent can extend it. The best bent path (using both
+// children) can never be extended, so it is recorded in a global instead.
+func BestArmSum(root *TreeNode) int {
+    best := -1 << 62 // sentinel: smaller than any real path sum
+
+    var arm func(*TreeNode) int
+    arm = func(node *TreeNode) int {
+        if node == nil {
+            return 0 // an empty arm adds nothing
+        }
+        left := max(arm(node.Left), 0)   // a negative arm is better dropped
+        right := max(arm(node.Right), 0)
+
+        best = max(best, node.Val+left+right) // path BENDING here: record only
+        return node.Val + max(left, right)    // path passing THROUGH: return
+    }
+
+    arm(root)
+    return best
 }
 ```
 
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val, self.left, self.right = val, left, right
+
+
+def max_independent_set(root):
+    """Include/exclude skeleton. dfs returns (use, skip) for each subtree."""
+    def dfs(node):
+        if node is None:
+            return (0, 0)                     # absent subtree: nothing either way
+        left_use, left_skip = dfs(node.left)      # children first: post-order
+        right_use, right_skip = dfs(node.right)
+
+        use = node.val + left_skip + right_skip   # taking me forbids my children
+        skip = max(left_use, left_skip) + max(right_use, right_skip)
+        return (use, skip)
+
+    return max(dfs(root))
+
+
+def best_arm_sum(root):
+    """Return one arm upward, record the bend in a global."""
+    best = float('-inf')
+
+    def arm(node):
+        nonlocal best
+        if node is None:
+            return 0                          # empty arm adds nothing
+        left = max(arm(node.left), 0)         # drop negative arms
+        right = max(arm(node.right), 0)
+
+        best = max(best, node.val + left + right)   # bends here: record only
+        return node.val + max(left, right)          # passes through: return
+
+    arm(root)
+    return best
 ```
 
 ```java
-int knapsack(int[] weights, int[] values, int cap) {
-    int[] dp = new int[cap + 1];
-    for (int i = 0; i < weights.length; i++)
-        for (int w = cap; w >= weights[i]; w--)
-            dp[w] = Math.max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+class TreeNode {
+    int val;
+    TreeNode left, right;
+    TreeNode(int val) { this.val = val; }
+}
+
+public class TreeDP {
+    // Include/exclude skeleton: dfs returns {use, skip} for each subtree.
+    public static int maxIndependentSet(TreeNode root) {
+        int[] r = dfsIndep(root);
+        return Math.max(r[0], r[1]);
+    }
+
+    private static int[] dfsIndep(TreeNode node) {
+        if (node == null) return new int[]{0, 0};   // absent subtree
+        int[] l = dfsIndep(node.left);              // children first
+        int[] r = dfsIndep(node.right);
+
+        int use = node.val + l[1] + r[1];           // taking me forbids children
+        int skip = Math.max(l[0], l[1]) + Math.max(r[0], r[1]);
+        return new int[]{use, skip};
+    }
+
+    // "Return one arm, record the bend" skeleton.
+    private static int best;
+
+    public static int bestArmSum(TreeNode root) {
+        best = Integer.MIN_VALUE;
+        arm(root);
+        return best;
+    }
+
+    private static int arm(TreeNode node) {
+        if (node == null) return 0;                 // empty arm adds nothing
+        int left = Math.max(arm(node.left), 0);     // drop negative arms
+        int right = Math.max(arm(node.right), 0);
+
+        best = Math.max(best, node.val + left + right);  // bend: record only
+        return node.val + Math.max(left, right);         // through: return
+    }
 }
 ```
 
 ```cpp
-int knapsack(vector<int>& weights, vector<int>& values, int cap) {
-    vector<int> dp(cap + 1, 0);
-    for (size_t i = 0; i < weights.size(); ++i)
-        for (int w = cap; w >= weights[i]; --w)
-            dp[w] = max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+#include <algorithm>
+#include <climits>
+#include <utility>
+using namespace std;
+
+struct TreeNode {
+    int val;
+    TreeNode *left, *right;
+    TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}
+};
+
+// Include/exclude skeleton: returns {use, skip} for each subtree.
+pair<int, int> dfsIndep(TreeNode* node) {
+    if (!node) return {0, 0};                       // absent subtree
+    auto l = dfsIndep(node->left);                  // children first
+    auto r = dfsIndep(node->right);
+
+    int use = node->val + l.second + r.second;      // taking me forbids children
+    int skip = max(l.first, l.second) + max(r.first, r.second);
+    return {use, skip};
+}
+
+int maxIndependentSet(TreeNode* root) {
+    auto r = dfsIndep(root);
+    return max(r.first, r.second);
+}
+
+// "Return one arm, record the bend" skeleton.
+int arm(TreeNode* node, int& best) {
+    if (!node) return 0;                            // empty arm adds nothing
+    int left = max(arm(node->left, best), 0);       // drop negative arms
+    int right = max(arm(node->right, best), 0);
+
+    best = max(best, node->val + left + right);     // bend: record only
+    return node->val + max(left, right);            // through: return
+}
+
+int bestArmSum(TreeNode* root) {
+    int best = INT_MIN;
+    arm(root, best);
+    return best;
 }
 ```
 
@@ -231,140 +492,371 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — House Robber III (LeetCode 337)
-Rob a binary tree of houses for maximum money, but you cannot rob two directly-connected (parent–child) nodes.
+Houses are arranged as a binary tree. Robbing two directly-connected houses (a parent and its child) triggers the alarm. Return the maximum money you can rob.
 
 ### Thought Process
-1. For each node, the choice depends on whether we rob it. Return **two** values per subtree: `rob` (max money if we DO rob this node) and `notRob` (max if we don't).
-2. If we rob a node: add `node.val` plus each child's `notRob` (children must be skipped).
-3. If we don't rob it: each child contributes `max(childRob, childNotRob)` — free to pick the better option.
-4. Post-order DFS bubbles these pairs up; the answer is `max(rob, notRob)` at the root.
+1. **What does the state mean?** `dfs(node)` returns a pair `(rob, skip)`.
+   `rob` = *the most money obtainable from the subtree rooted at `node`, in the world where we do rob `node` itself.*
+   `skip` = *the most money obtainable from that same subtree, in the world where we do not rob `node`.*
+2. **How do we compute it?** If we rob `node`, both children become illegal, so each child may only contribute its `skip`: `rob = node.Val + left.skip + right.skip`. If we don't rob `node`, each child is unconstrained and contributes whichever of its two worlds is larger: `skip = max(left.rob, left.skip) + max(right.rob, right.skip)`.
+3. **What is the base case?** `nil → (0, 0)`. An absent subtree yields nothing whether or not you "rob" it. This makes a leaf fall out correctly: `rob = val + 0 + 0 = val`, `skip = 0`.
+4. **Why post-order?** A node's pair is written purely in terms of its children's pairs, so both children must be finished first. Left, right, then combine — never any other order.
+5. Answer is `max(rob, skip)` at the root: the root is free to be robbed or not.
 
 ### Dry Run
-Tree: root=3, left=2 (leaf), right=3 (leaf).
-- Leaf 2 → (rob=2, notRob=0); leaf 3 → (rob=3, notRob=0).
-- Root: rob = 3 + 0 + 0 = 3; notRob = max(2,0) + max(3,0) = 5.
-- Answer = max(3, 5) = **5** (rob the two children, skip root).
+
+Input:
+```text
+      3
+     / \
+    2   3
+     \    \
+      3    1
+```
+
+Post-order visit order: the leaf `3`, then node `2`, then the leaf `1`, then the right `3`, then the root.
+
+| node | left pair | right pair | `rob` = val + L.skip + R.skip | `skip` = max(L) + max(R) | returns |
+|------|-----------|------------|-------------------------------|---------------------------|---------|
+| leaf `3` | (0,0) | (0,0) | `3 + 0 + 0` = **3** | `0 + 0` = **0** | (3, 0) |
+| `2` | (0,0) | (3,0) | `2 + 0 + 0` = **2** | `0 + max(3,0)` = **3** | (2, 3) |
+| leaf `1` | (0,0) | (0,0) | `1 + 0 + 0` = **1** | `0 + 0` = **0** | (1, 0) |
+| right `3` | (0,0) | (1,0) | `3 + 0 + 0` = **3** | `0 + max(1,0)` = **1** | (3, 1) |
+| root `3` | (2,3) | (3,1) | `3 + 3 + 1` = **7** | `max(2,3) + max(3,1)` = `3 + 3` = **6** | (7, 6) |
+
+Output: **7** — rob the root (3) plus both grandchildren (3 and 1).
+
+Notice node `2`: its `skip` (3) beats its `rob` (2). The root then used that `skip = 3` when robbing itself. Had the child returned only the single number "best = 3", the root could not have known that the 3 came from the *grandchild* and was therefore still legal — that ambiguity is exactly what the pair removes.
 
 ### Visualization
-```
-each node ──▶ returns (rob, notRob)
-rob     = node.val + left.notRob + right.notRob
-notRob  = max(left) + max(right)
-answer  = max(rob, notRob) at root
+
+```text
+each node hands its parent a pair (rob, skip)
+
+              3  (7, 6)
+             / \
+    (2,3)   2   3   (3,1)
+             \   \
+      (3,0)   3   1  (1,0)
+
+the two worlds at the root, drawn:
+
+  world "rob the root"          world "skip the root"
+        [3]                            3
+        / \                           / \
+       2   3      forbidden          [2] [3]     free choice per child
+        \   \                          \   \
+       [3] [1]    grandchildren ok      3   1     (but then 3 and 1 are out
+                                                   of reach via those parents)
+    3 + 3 + 1 = 7   <-- winner      3 + 3 = 6
 ```
 
 ### Code
+
+```go
+// rob returns the maximum money robbable from a binary tree of houses without
+// taking two directly-connected houses.
+// dfs returns (robHere, skipHere) for the subtree rooted at node.
+func rob(root *TreeNode) int {
+    var dfs func(*TreeNode) (int, int)
+    dfs = func(node *TreeNode) (int, int) {
+        if node == nil {
+            return 0, 0 // absent subtree pays nothing either way
+        }
+
+        leftRob, leftSkip := dfs(node.Left)    // post-order: children first
+        rightRob, rightSkip := dfs(node.Right)
+
+        // Robbing this node forbids both children -> use their skip values.
+        robHere := node.Val + leftSkip + rightSkip
+        // Skipping it leaves each child free to do whatever is best for it.
+        skipHere := max(leftRob, leftSkip) + max(rightRob, rightSkip)
+
+        return robHere, skipHere
+    }
+
+    robRoot, skipRoot := dfs(root)
+    return max(robRoot, skipRoot)
+}
+```
+
 ```python
-def rob(self, root):
+def rob(root):
     def dfs(node):
-        if not node:
-            return (0, 0)                       # (rob, notRob)
-        l_rob, l_not = dfs(node.left)
-        r_rob, r_not = dfs(node.right)
-        rob_here = node.val + l_not + r_not     # rob node -> skip children
-        skip_here = max(l_rob, l_not) + max(r_rob, r_not)
+        """Return (rob_here, skip_here) for the subtree rooted at node."""
+        if node is None:
+            return (0, 0)                    # absent subtree pays nothing
+
+        left_rob, left_skip = dfs(node.left)      # post-order: children first
+        right_rob, right_skip = dfs(node.right)
+
+        # Robbing this node forbids both children -> use their skip values.
+        rob_here = node.val + left_skip + right_skip
+        # Skipping it leaves each child free to pick its own best.
+        skip_here = max(left_rob, left_skip) + max(right_rob, right_skip)
+
         return (rob_here, skip_here)
+
     return max(dfs(root))
 ```
 
 ### Complexity
-Time O(n) — each node visited once; Space O(h) recursion stack (h = tree height).
+Time O(n) — every node is visited exactly once and does O(1) combining work. Space O(h) for the recursion stack, where `h` is the tree height (O(log n) balanced, O(n) for a degenerate chain).
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Binary Tree Cameras (LeetCode 968)
-Place the minimum number of cameras on tree nodes so every node is monitored; a camera covers its parent, itself, and its direct children.
+Place cameras on nodes so that every node is monitored. A camera on a node watches that node, its parent, and its direct children. Return the minimum number of cameras.
 
 ### Thought Process
-1. Greedy post-order DFS with three states per node: `0` = not covered, `1` = covered (no camera), `2` = has a camera.
-2. Push cameras as high as possible: only place one when a child is uncovered — leaves should never hold cameras.
-3. If any child returns `0` (uncovered), this node MUST hold a camera → return `2` and increment count.
-4. Else if any child has a camera (`2`), this node is covered → return `1`; otherwise it is uncovered → return `0`. A `null` node returns `1` (covered) so leaves report uncovered.
+1. **What does the state mean?** `dfs(node)` returns one of three labels describing the subtree *after* it has been optimally handled:
+   `UNCOVERED` — *`node` has no camera and nothing in its subtree watches it; its parent must take care of it.*
+   `COVERED` — *`node` is watched by a camera somewhere in its subtree, but `node` itself has no camera, so it offers its parent nothing.*
+   `HAS_CAMERA` — *`node` holds a camera, so it also watches its parent.*
+2. **How do we compute it?** Look at the two children's labels, in this priority:
+   - If **either child is `UNCOVERED`**, nobody else can ever reach that child, so a camera must go here → count it and return `HAS_CAMERA`.
+   - Else if **either child has a camera**, this node is already watched → return `COVERED`.
+   - Else (both children covered but camera-less) nothing is watching this node → return `UNCOVERED` and let the parent handle it.
+3. **What is the base case?** `nil → COVERED`. This is the one design decision in the problem. `nil` needs no camera, so it must not be reported `UNCOVERED`; if it were, every leaf would see an uncovered child and place a camera on itself. Reporting `COVERED` instead makes a leaf return `UNCOVERED`, which pushes its camera up to the parent — where it also covers a sibling and a grandparent. **Cameras belong one level above the leaves**, and that fact is encoded entirely in the nil base case.
+4. **Why post-order?** You cannot decide whether a node needs a camera until you know whether either child was left uncovered. Strictly children first.
+5. After the traversal, if the **root** comes back `UNCOVERED`, it has no parent to save it — add one more camera.
 
 ### Dry Run
-Tree: root=0, root.left=0, root.left.left=0 (a left-leaning chain of 3).
-- Deepest leaf → children are null (`1`,`1`) → node is uncovered → returns `0`.
-- Its parent sees a child `0` → places camera, count=1, returns `2`.
-- Root sees child `2` → covered → returns `1`. Root itself covered by that camera.
-- Answer = **1** camera.
+
+Input (LeetCode's first example):
+```text
+      A
+     /
+    B
+   / \
+  C   D
+```
+
+| visit | node | left label | right label | rule fired | returns | cameras |
+|-------|------|------------|-------------|------------|---------|---------|
+| 1 | `C` | `COVERED` (nil) | `COVERED` (nil) | neither child uncovered, neither has a camera | `UNCOVERED` | 0 |
+| 2 | `D` | `COVERED` (nil) | `COVERED` (nil) | same | `UNCOVERED` | 0 |
+| 3 | `B` | `UNCOVERED` | `UNCOVERED` | a child is uncovered → place a camera | `HAS_CAMERA` | **1** |
+| 4 | `A` | `HAS_CAMERA` | `COVERED` (nil) | no uncovered child; a child holds a camera | `COVERED` | 1 |
+
+Root returned `COVERED`, so no extra camera is needed.
+
+Output: **1**
+
+Row 3 is the whole algorithm: the camera lands on `B`, not on `C` or `D`, and from `B` it covers `B`, `C`, `D` **and** `A` — four nodes for one camera. That leverage is only available because nil reported `COVERED` and let the leaves say "not my job".
 
 ### Visualization
-```
-null      ──▶ 1 (treated as covered)
-child==0  ──▶ place camera here, return 2  (count++)
-child==2  ──▶ covered by child, return 1
-else      ──▶ uncovered, return 0 (parent must cover)
+
+```text
+labels flowing upward             what one camera at B covers
+
+      A  COVERED                        A   <- covered as B's parent
+     /                                 /
+    B  HAS_CAMERA  <- placed here     [B]  <- the camera
+   / \                                / \
+  C   D   both UNCOVERED             C   D <- covered as B's children
+ / \ / \
+nil ... all COVERED
+
+if nil returned UNCOVERED instead:
+
+    C and D would each place their own camera  -> 2 cameras
+    A would still be uncovered                 -> 3 cameras total
+    ...versus 1. The base case IS the optimisation.
 ```
 
 ### Code
+
+```go
+// minCameraCover returns the fewest cameras needed so that every node is
+// watched; a camera watches its own node, its parent and its children.
+func minCameraCover(root *TreeNode) int {
+    const (
+        uncovered = 0 // no camera here, and nothing watches me: parent must act
+        covered   = 1 // watched from below, but I hold no camera
+        hasCamera = 2 // I hold a camera, so I also watch my parent
+    )
+
+    cameras := 0
+
+    var dfs func(*TreeNode) int
+    dfs = func(node *TreeNode) int {
+        if node == nil {
+            return covered // nil needs nothing; this keeps cameras off leaves
+        }
+
+        left := dfs(node.Left) // post-order: children decide first
+        right := dfs(node.Right)
+
+        if left == uncovered || right == uncovered {
+            cameras++ // nobody else can ever reach that child
+            return hasCamera
+        }
+        if left == hasCamera || right == hasCamera {
+            return covered // a child's camera reaches up to me
+        }
+        return uncovered // both children fine, but nothing watches me
+    }
+
+    if dfs(root) == uncovered {
+        cameras++ // the root has no parent to rescue it
+    }
+    return cameras
+}
+```
+
 ```python
-def minCameraCover(self, root):
-    self.count = 0
-    NOT_COVERED, COVERED, CAMERA = 0, 1, 2
+def minCameraCover(root):
+    UNCOVERED, COVERED, HAS_CAMERA = 0, 1, 2
+    cameras = 0
 
     def dfs(node):
-        if not node:
-            return COVERED                       # null is fine, needs no camera
-        l = dfs(node.left)
-        r = dfs(node.right)
-        if l == NOT_COVERED or r == NOT_COVERED:
-            self.count += 1
-            return CAMERA
-        if l == CAMERA or r == CAMERA:
-            return COVERED
-        return NOT_COVERED
+        nonlocal cameras
+        if node is None:
+            return COVERED               # nil needs nothing; keeps cameras off leaves
 
-    return self.count + (1 if dfs(root) == NOT_COVERED else 0)
+        left = dfs(node.left)            # post-order: children decide first
+        right = dfs(node.right)
+
+        if left == UNCOVERED or right == UNCOVERED:
+            cameras += 1                 # nobody else can reach that child
+            return HAS_CAMERA
+        if left == HAS_CAMERA or right == HAS_CAMERA:
+            return COVERED               # a child's camera reaches up to me
+        return UNCOVERED                 # children fine, but nothing watches me
+
+    if dfs(root) == UNCOVERED:
+        cameras += 1                     # the root has no parent
+    return cameras
 ```
 
 ### Complexity
-Time O(n) — one post-order pass; Space O(h) recursion stack (h = tree height).
+Time O(n) — one visit per node, constant work each. Space O(h) recursion stack.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Binary Tree Maximum Path Sum (LeetCode 124)
-Find the maximum sum of any path in a binary tree, where a path is any node sequence connected by edges (need not pass through the root).
+A path is any sequence of nodes connected by edges; it need not touch the root, and it must contain at least one node. Return the maximum sum of node values along any path.
 
 ### Thought Process
-1. Each node's DFS returns the best **downward gain**: `node.val + max(0, leftGain, rightGain)` — a straight path extending into at most one child.
-2. Clamp negative child gains to `0`, since a path can always drop a harmful branch.
-3. The best path *through* a node bends: `node.val + leftGain + rightGain` (uses both children). Update a global `max` with this at every node.
-4. Return the one-sided gain upward so the parent can extend a valid single path.
+1. **What does the state mean?** `arm(node)` returns *the largest sum of a path that starts at `node` and goes strictly downward, entering at most one child.* Call it the node's best "arm" — the piece a parent could grab and extend.
+2. **How do we compute it?** Let `left = max(arm(node.Left), 0)` and `right = max(arm(node.Right), 0)`. The clamp to `0` says "a negative arm is worse than no arm at all" — a path is always allowed to stop at the node. Then `arm(node) = node.Val + max(left, right)`.
+3. **What about the answer?** The best path *through* `node` may bend, using both arms: `node.Val + left + right`. But a bent path cannot be extended by the parent — the parent would create a fork with three edges at `node`, which is not a path. So the bent value is **recorded** into a running global maximum and **not returned**. Returning one arm while recording the bend is the crux of the problem.
+4. **What is the base case?** `nil → 0`: an empty arm contributes nothing. Note the global starts at negative infinity, not `0` — an all-negative tree must be allowed to answer with a negative number.
+5. **Why post-order?** Both arms must be final before the node's bend can be evaluated or its own arm returned.
 
 ### Dry Run
-Tree: root=-10, left=9, right=20 (20.left=15, 20.right=7).
-- Leaves 9,15,7 → gains 9,15,7.
-- Node 20: through = 20+15+7 = 42 → update global; returns 20+15 = 35.
-- Root -10: through = -10+9+35 = 34; global stays **42**.
-- Answer = **42** (path 15→20→7).
+
+Input:
+```text
+     -10
+     /  \
+    9    20
+        /  \
+      15    7
+```
+
+Post-order visit order: `9`, `15`, `7`, `20`, `-10`. Global `best` starts at `-inf`.
+
+| visit | node | `left` (clamped) | `right` (clamped) | bend = `val + left + right` | new `best` | returns `val + max(left,right)` |
+|-------|------|------------------|--------------------|------------------------------|------------|-----------------------------------|
+| 1 | `9`   | 0 | 0 | `9 + 0 + 0` = 9 | **9** | `9 + 0` = 9 |
+| 2 | `15`  | 0 | 0 | `15 + 0 + 0` = 15 | **15** | `15 + 0` = 15 |
+| 3 | `7`   | 0 | 0 | `7 + 0 + 0` = 7 | 15 | `7 + 0` = 7 |
+| 4 | `20`  | 15 | 7 | `20 + 15 + 7` = **42** | **42** | `20 + max(15,7)` = 35 |
+| 5 | `-10` | `max(9,0)` = 9 | `max(35,0)` = 35 | `-10 + 9 + 35` = 34 | 42 | `-10 + 35` = 25 |
+
+Output: **42** — the path `15 → 20 → 7`.
+
+Visit 4 is the money row: `20` records **42** for the bent path but only returns **35** upward. If it had returned 42, the root would have computed `-10 + 9 + 42`, describing a shape that visits `20` three times — not a path at all.
 
 ### Visualization
-```
-gain(node)  = node.val + max(0, gain(left), gain(right))   # extend upward
-through     = node.val + max(0,gain(left)) + max(0,gain(right))  # bend here
-best        = max over all nodes of `through`
+
+```text
+     -10                arms returned upward        bends recorded
+     /  \                 9  -> 9                     9  -> 9
+    9    20              15  -> 15                   15  -> 15
+        /  \              7  -> 7                     7  -> 7
+      15    7            20  -> 35 (20+15)           20  -> 42 (15+20+7)  ★
+                        -10  -> 25 (-10+35)         -10  -> 34
+
+the winning path bends at 20:
+
+      15 ──▶ 20 ──▶ 7          sum 42
+
+what an arm looks like (extendable)   what a bend looks like (terminal)
+
+        20                                  20
+       /                                   /  \
+     15                                  15    7
+     (returned: 20 + 15 = 35)            (recorded: 42, never returned)
 ```
 
 ### Code
+
+```go
+// maxPathSum returns the largest sum over any node-to-node path in the tree.
+// arm(node) = best downward path starting at node and using at most one child.
+func maxPathSum(root *TreeNode) int {
+    best := math.MinInt32 // must start below any real value: trees can be all-negative
+
+    var arm func(*TreeNode) int
+    arm = func(node *TreeNode) int {
+        if node == nil {
+            return 0 // an empty arm contributes nothing
+        }
+
+        left := arm(node.Left) // post-order: both arms first
+        if left < 0 {
+            left = 0 // a negative arm is worse than stopping here
+        }
+        right := arm(node.Right)
+        if right < 0 {
+            right = 0
+        }
+
+        // Path BENDING at this node uses both arms: record it, never return it.
+        if bend := node.Val + left + right; bend > best {
+            best = bend
+        }
+
+        // Path PASSING THROUGH toward the parent may use only one arm.
+        return node.Val + max(left, right)
+    }
+
+    arm(root)
+    return best
+}
+```
+
 ```python
-def maxPathSum(self, root):
-    self.best = float('-inf')
+def maxPathSum(root):
+    best = float('-inf')          # trees can be entirely negative
 
-    def gain(node):
-        if not node:
-            return 0
-        l = max(gain(node.left), 0)     # drop negative branches
-        r = max(gain(node.right), 0)
-        self.best = max(self.best, node.val + l + r)   # path bending at node
-        return node.val + max(l, r)     # extend one side upward
+    def arm(node):
+        """Best downward path from node using at most one child."""
+        nonlocal best
+        if node is None:
+            return 0                          # empty arm contributes nothing
 
-    gain(root)
-    return self.best
+        left = max(arm(node.left), 0)         # a negative arm is worth dropping
+        right = max(arm(node.right), 0)
+
+        best = max(best, node.val + left + right)   # bends here: record only
+        return node.val + max(left, right)          # passes through: return
+
+    arm(root)
+    return best
 ```
 
 ### Complexity
-Time O(n) — each node visited once; Space O(h) recursion stack (h = tree height).
+Time O(n) — one visit per node with constant work. Space O(h) for the recursion stack.
 
+---
 
 ## 12. LeetCode Practice Set
 

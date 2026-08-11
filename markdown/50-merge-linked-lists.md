@@ -41,32 +41,128 @@ merge, sorted lists, linked list, dummy, two pointer.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Two (or more) chains are already sorted — how do I zip them into one without re-sorting anything?"*
+
+Running example: merge `A = 1 → 4` with `B = 2 → 3`.
+
 ### Intuition
-Copy to an array, manipulate, rebuild — O(n) extra space.
+Forget the lists are sorted. Pour every value into an array, sort the array, rebuild a
+list from it. Guaranteed correct because sorting doesn't care where the numbers came from.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Walk `A` and `B`, appending every `Val` to one slice → `[1, 4, 2, 3]`.
+2. Sort the slice → `[1, 2, 3, 4]`.
+3. Allocate a fresh node per value and chain them together.
+4. Return the new head.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n log n)** — the sort dominates, where `n` is the total node count.
+- Space: **O(n)** — the slice plus a whole second set of nodes.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Merge Linked Lists pattern is built to use.
+- **It throws away the only useful fact in the problem.** The inputs are already sorted, so
+  the comparisons the sort performs are almost all re-deriving order you were handed for free.
+- Concretely, on `[1, 4]` and `[2, 3]` the sort compares `1↔4` and `2↔3` — two comparisons
+  whose answers were already encoded in the input lists' links.
+- It allocates `n` new nodes when the answer needs **zero** new nodes: the correct list is
+  the same nodes with different `Next` pointers.
+- It cannot stream. Merging two 10 GB sorted files this way needs 20 GB of RAM; the optimal
+  version needs two pointers.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Merge Linked Lists invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Both lists are sorted, so the smaller of the two front nodes is the smallest node left anywhere — take it, advance that list, repeat.**
+
+It is the shuffle at the end of a card game: two sorted piles face up, you keep taking
+whichever top card is lower. You never look deeper than one card into either pile, because
+a sorted pile can't be hiding anything smaller underneath.
+
+### The thought process
+
+```text
+We need    : one sorted list from two sorted lists.
+Obvious way: dump everything into an array and sort it.
+Too slow   : O(n log n), plus n fresh nodes, for information we already had.
+Notice     : if A and B are sorted, min(A.head, B.head) is the global minimum
+             of everything not yet placed. No deeper look is ever needed.
+Therefore  : compare the two heads, splice the smaller one on, advance it.
+Now        : O(n) time, O(1) space, zero new nodes.
+```
+
+### Why the "smaller head" choice is always safe
+
+Suppose the output so far ends with value `t`, and the remaining heads are `a` and `b`
+with `a <= b`. Could some node *behind* `a` or `b` be smaller than `a`?
+
+- Behind `a`: no — `A` is sorted, so everything after `a` is `>= a`.
+- Behind `b`: no — `B` is sorted, so everything after `b` is `>= b >= a`.
+
+So `a` is the minimum of everything left, and appending it keeps the output sorted. The
+greedy choice is not a heuristic; it is forced.
+
+**Use `<=`, not `<`.** With `<`, equal values pull from `B` first, which reverses the
+relative order of equal elements — the merge stops being *stable*. Stability is what makes
+this same routine safe as the merge step of merge sort.
+
+### Why a dummy node
+
+Without one, the first splice is a special case: there is no `tail` to attach to yet, so
+you need an `if this is the first node, set head = ... else tail.Next = ...` in the hot
+loop, plus a separate variable for the head you must remember to return.
+
+A dummy node is a fake node that exists only so `tail` always points at *something*:
+
+```text
+dummy → (nothing yet)
+tail ────┘
+
+every step:  tail.Next = chosen ;  tail = chosen     ← no branch, ever
+at the end:  return dummy.Next                        ← skip the fake node
+```
+
+One throwaway node buys you a loop with no special cases. (Chapter 51 is entirely about
+this trick.)
+
+### Steps
+
+```text
+Step 1 → dummy = new node, tail = dummy
+Step 2 → while a != nil and b != nil:
+Step 3 →     if a.Val <= b.Val: tail.Next = a; a = a.Next
+Step 4 →     else:              tail.Next = b; b = b.Next
+Step 5 →     tail = tail.Next
+Step 6 → one list is empty; the other is already sorted:
+Step 7 →     tail.Next = (a if a != nil else b)      ← attach the whole rest at once
+Step 8 → return dummy.Next
+```
+
+Step 7 is not an optimization detail — it is the reason the loop can stop early. Whatever
+remains is a sorted suffix that already outranks everything placed, so it is appended
+whole, in O(1).
+
+### How should I recognize this?
+
+```text
+If you see...
+  "two sorted lists", "merge", "k sorted lists"
+  "sort a linked list in O(n log n) and O(1) space"
+  "merge intervals / streams that arrive in order"
+        ↓
+Think about...
+  "Is the smallest thing left always at the front of one of my inputs?"
+        ↓
+Use...
+  dummy + tail, splice min(heads), attach the leftover in one move
+    · 2 lists      → the loop as written
+    · k lists      → merge pairs tournament-style, O(N log k)
+    · sort a list  → split at the middle, sort both, merge (merge sort)
+```
 
 ### Visual explanation
 
@@ -98,32 +194,77 @@ Most list problems are pointer-rewiring; a dummy sentinel removes head edge case
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Merge Linked Lists: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+A: 1 → 4        B: 2 → 3        dummy → _        tail = dummy
+
+step 1   a=1  b=2   1 <= 2  → take A          merged: 1        a=4  b=2
+step 2   a=4  b=2   2 <  4  → take B          merged: 1 2      a=4  b=3
+step 3   a=4  b=3   3 <  4  → take B          merged: 1 2 3    a=4  b=nil
+step 4   b == nil   → attach the rest of A    merged: 1 2 3 4
+
+return dummy.Next = 1 → 2 → 3 → 4
 ```
 
 ### Interview explanation
-"This is a Merge Linked Lists problem. I'll most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure. That brings the complexity down to O(n) time and O(1) space — here's the template."
+"Since both lists are sorted, the smaller of the two head nodes is the smallest node left
+anywhere — nothing behind a sorted head can beat it — so I greedily splice that one on and
+advance only that list. I use a dummy node so the first append needs no special case and
+so I have a stable handle to return, and I compare with `<=` to keep the merge stable. When
+one list empties I attach the entire remainder in one assignment. That's O(n + m) time and
+O(1) extra space, because I re-link the original nodes instead of allocating new ones."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Linked Lists** family template. Adapt the comparison/condition to the specific problem.
+> Dummy + tail; splice `min(a, b)` with `<=`; when one side empties, attach the rest whole.
 
 ```go
-// Reverse a singly linked list in place.
-type ListNode struct { Val int; Next *ListNode }
-func reverseList(head *ListNode) *ListNode {
-    var prev *ListNode
-    for head != nil {
-        next := head.Next   // save
-        head.Next = prev    // reverse pointer
-        prev = head         // advance prev
-        head = next         // advance head
+type ListNode struct {
+    Val  int
+    Next *ListNode
+}
+
+// MergeTwo splices two sorted lists into a single sorted chain.
+// It allocates nothing but the sentinel and is stable (ties take from a).
+func MergeTwo(a, b *ListNode) *ListNode {
+    dummy := &ListNode{} // sentinel: tail always has somewhere to write
+    tail := dummy
+    for a != nil && b != nil {
+        if a.Val <= b.Val { // <= keeps equal values in a-then-b order
+            tail.Next = a
+            a = a.Next
+        } else {
+            tail.Next = b
+            b = b.Next
+        }
+        tail = tail.Next
     }
-    return prev
+    if a != nil { // the leftover is sorted and all >= everything placed
+        tail.Next = a
+    } else {
+        tail.Next = b
+    }
+    return dummy.Next
+}
+
+// MergeAll folds k sorted lists pairwise: O(N log k) instead of O(N k).
+func MergeAll(lists []*ListNode) *ListNode {
+    if len(lists) == 0 {
+        return nil
+    }
+    for len(lists) > 1 {
+        var round []*ListNode
+        for i := 0; i < len(lists); i += 2 {
+            if i+1 < len(lists) {
+                round = append(round, MergeTwo(lists[i], lists[i+1]))
+            } else {
+                round = append(round, lists[i]) // odd one out rides along
+            }
+        }
+        lists = round
+    }
+    return lists[0]
 }
 ```
 
@@ -132,41 +273,69 @@ class ListNode:
     def __init__(self, val=0, nxt=None):
         self.val, self.next = val, nxt
 
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+
+def merge_two(a, b):
+    """Splice two sorted lists into one. Stable; allocates only the sentinel."""
+    dummy = ListNode()          # sentinel: tail always has somewhere to write
+    tail = dummy
+    while a and b:
+        if a.val <= b.val:      # <= keeps equal values in a-then-b order
+            tail.next, a = a, a.next
+        else:
+            tail.next, b = b, b.next
+        tail = tail.next
+    tail.next = a or b          # the leftover suffix is already sorted
+    return dummy.next
+
+
+def merge_all(lists):
+    """Fold k sorted lists pairwise: O(N log k)."""
+    if not lists:
+        return None
+    while len(lists) > 1:
+        nxt = []
+        for i in range(0, len(lists), 2):
+            if i + 1 < len(lists):
+                nxt.append(merge_two(lists[i], lists[i + 1]))
+            else:
+                nxt.append(lists[i])
+        lists = nxt
+    return lists[0]
 ```
 
 ```java
-class ListNode { int val; ListNode next; ListNode(int v){val=v;} }
-ListNode reverseList(ListNode head) {
-    ListNode prev = null;
-    while (head != null) {
-        ListNode next = head.next;
-        head.next = prev;
-        prev = head;
-        head = next;
+class ListNode { int val; ListNode next; ListNode(int v) { val = v; } }
+
+ListNode mergeTwo(ListNode a, ListNode b) {
+    ListNode dummy = new ListNode(0); // sentinel
+    ListNode tail = dummy;
+    while (a != null && b != null) {
+        if (a.val <= b.val) { tail.next = a; a = a.next; } // <= is stable
+        else               { tail.next = b; b = b.next; }
+        tail = tail.next;
     }
-    return prev;
+    tail.next = (a != null) ? a : b;  // attach the sorted leftover whole
+    return dummy.next;
 }
 ```
 
 ```cpp
-struct ListNode { int val; ListNode* next; ListNode(int v):val(v),next(nullptr){} };
-ListNode* reverseList(ListNode* head) {
-    ListNode* prev = nullptr;
-    while (head) {
-        ListNode* next = head->next;
-        head->next = prev;
-        prev = head;
-        head = next;
+struct ListNode {
+    int val;
+    ListNode* next;
+    ListNode(int v) : val(v), next(nullptr) {}
+};
+
+ListNode* mergeTwo(ListNode* a, ListNode* b) {
+    ListNode dummy(0);               // sentinel on the stack
+    ListNode* tail = &dummy;
+    while (a && b) {
+        if (a->val <= b->val) { tail->next = a; a = a->next; } // <= is stable
+        else                  { tail->next = b; b = b->next; }
+        tail = tail->next;
     }
-    return prev;
+    tail->next = a ? a : b;          // attach the sorted leftover whole
+    return dummy.next;
 }
 ```
 
@@ -252,133 +421,330 @@ ListNode* reverseList(ListNode* head) {
 ## 9. Solved Example 1
 
 ### Problem — Merge Two Lists (LeetCode 21)
-A representative **Merge Linked Lists** problem. The signal: splice two sorted lists with a dummy head and pointer chasing.
+Given the heads of two lists that are each sorted ascending, splice them into one sorted
+list and return its head. Reuse the existing nodes.
 
 ### Thought Process
-1. Use a dummy head and a `tail` pointer so appending never needs a special first-node case.
-2. Compare the fronts of both lists; splice the smaller node onto `tail` and advance that list.
-3. When one list empties, attach the remaining list wholesale.
+1. Both inputs are sorted, so the smaller of the two head values is the smallest value left
+   in either list — nothing behind a sorted head can undercut it.
+2. Splice that node onto the output and advance only the list it came from.
+3. Use a dummy node so the very first splice looks like every other splice, and so there is
+   a stable handle (`dummy.Next`) to return.
+4. Break ties with `<=` so equal values keep their `a`-before-`b` order (stability).
+5. When one list runs out, the other is a sorted suffix that already outranks everything
+   placed — attach it whole in one assignment.
 
 ### Dry Run
-Input `1→2→4` and `1→3→4`.
-- 1(a) ≤ 1(b): tail→1a; then 3 vs 1b: tail→1b; 2 vs 3: tail→2; 4 vs 3: tail→3; 4 vs 4: tail→4a
-- b still has 4 → attach → `1→1→2→3→4→4`
+
+Input: `a = 1 → 4`, `b = 2 → 3`
+
+| step | `a` head | `b` head | comparison | node spliced | `tail` after | output so far |
+|------|----------|----------|------------|--------------|--------------|---------------|
+| start| `1`      | `2`      | —          | —            | `dummy`      | *(empty)* |
+| 1    | `1`      | `2`      | `1 <= 2` → take `a` | `1` | `1` | `1` |
+| 2    | `4`      | `2`      | `4 > 2` → take `b`  | `2` | `2` | `1 → 2` |
+| 3    | `4`      | `3`      | `4 > 3` → take `b`  | `3` | `3` | `1 → 2 → 3` |
+| 4    | `4`      | `nil`    | `b` empty → attach the rest of `a` | `4` | — | `1 → 2 → 3 → 4` |
+
+Output: **`1 → 2 → 3 → 4`**
+
+Step 4 is the payoff: the tail `4` is appended by a single pointer write, not by looping
+through it. If `a` had 10,000 nodes left, that step would still cost one assignment.
 
 ### Visualization
-```
-input  ──▶ [ apply Merge Linked Lists step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+             a                          b
+             ↓                          ↓
+A:      [1] → [4]                B:  [2] → [3]
+
+dummy → _ ← tail
+
+step 1  take 1 :  dummy → 1                 a → 4   b → 2
+step 2  take 2 :  dummy → 1 → 2             a → 4   b → 3
+step 3  take 3 :  dummy → 1 → 2 → 3         a → 4   b → nil
+step 4  attach :  dummy → 1 → 2 → 3 → 4     (one write, whole suffix)
+                        ↑
+                  return dummy.Next
 ```
 
 ### Code
+
+```go
+func mergeTwoLists(a, b *ListNode) *ListNode {
+    dummy := &ListNode{} // sentinel so tail always has somewhere to write
+    tail := dummy
+    for a != nil && b != nil {
+        if a.Val <= b.Val { // <= keeps equal values stable (a before b)
+            tail.Next = a
+            a = a.Next
+        } else {
+            tail.Next = b
+            b = b.Next
+        }
+        tail = tail.Next
+    }
+    if a != nil { // whatever is left is sorted and >= everything placed
+        tail.Next = a
+    } else {
+        tail.Next = b
+    }
+    return dummy.Next // skip the sentinel
+}
+```
+
 ```python
-def mergeTwoLists(l1, l2):
-    dummy = tail = ListNode()
-    while l1 and l2:
-        if l1.val <= l2.val:
-            tail.next, l1 = l1, l1.next
+def mergeTwoLists(a, b):
+    dummy = ListNode()          # sentinel so tail always has somewhere to write
+    tail = dummy
+    while a and b:
+        if a.val <= b.val:      # <= keeps equal values stable (a before b)
+            tail.next, a = a, a.next
         else:
-            tail.next, l2 = l2, l2.next
+            tail.next, b = b, b.next
         tail = tail.next
-    tail.next = l1 or l2          # attach the leftover
-    return dummy.next
+    tail.next = a or b          # attach the sorted leftover in one move
+    return dummy.next           # skip the sentinel
 ```
 
 ### Complexity
-Time O(n + m), Space O(1). One pass over both lists, pointers only.
+Time O(n + m) — every node is spliced at most once, and the leftover costs O(1).
+Space O(1) — one sentinel plus two pointers; no new nodes are allocated.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Merge K Lists (LeetCode 23)
-A representative **Merge Linked Lists** problem. The signal: splice two sorted lists with a dummy head and pointer chasing.
+You are given an array of `k` sorted linked lists. Merge all of them into one sorted list.
 
 ### Thought Process
-1. The smallest unused node is always at the head of one of the k lists — a min-heap gives it in O(log k).
-2. Seed the heap with the head of every non-empty list, keyed by value (tie-break on list index so nodes never compare).
-3. Pop the min, append it to the result, and push its successor; repeat until the heap drains.
+1. The obvious extension — merge list 0 with 1, then that with 2, then with 3 — is
+   quadratic: the growing accumulator is re-walked on every merge, giving O(N·k).
+2. The waste is that the *same* early nodes get compared again in every round.
+3. Merge in **pairs** instead: `(0,1)`, `(2,3)`, `(4,5)`… Each round halves the number of
+   lists while touching every node exactly once.
+4. After `log k` rounds one list remains, and each node participated in `log k` merges →
+   O(N log k).
+5. Every merge is exactly Example 1's routine — no new idea, just a better schedule.
 
 ### Dry Run
-Input `[1→4, 1→3, 2→6]`.
-- heap fronts {1a,1b,2}; pop 1a, push 4 → out `1`
-- fronts {1b,2,4}; pop 1b, push 3 → `1→1`
-- pop 2, push 6 → `1→1→2`; then 3, 4, 6 → `1→1→2→3→4→6`
+
+Input: `lists = [ [1,4], [2,6], [3,5] ]`
+
+| round | lists at start | pairings | lists after |
+|-------|----------------|----------|-------------|
+| 1 | `[1,4]`, `[2,6]`, `[3,5]` | merge(`[1,4]`,`[2,6]`) = `[1,2,4,6]`; `[3,5]` has no partner, carried over | `[1,2,4,6]`, `[3,5]` |
+| 2 | `[1,2,4,6]`, `[3,5]` | merge(`[1,2,4,6]`,`[3,5]`) = `[1,2,3,4,5,6]` | `[1,2,3,4,5,6]` |
+
+Only one list left → stop.
+
+Output: **`1 → 2 → 3 → 4 → 5 → 6`**
+
+Six nodes, `k = 3`, so `⌈log₂3⌉ = 2` rounds — matching the two rows above. Chaining
+one-by-one instead would have re-walked `[1,4]` in every round.
 
 ### Visualization
-```
-input  ──▶ [ apply Merge Linked Lists step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+round 1     [1,4]   [2,6]      [3,5]
+              └──┬───┘           │      (odd list rides along untouched)
+                 ▼               ▼
+round 2     [1,2,4,6]         [3,5]
+                 └───────┬──────┘
+                         ▼
+result           [1,2,3,4,5,6]
+
+each node crosses log2(k) merge levels → O(N log k)
 ```
 
 ### Code
-```python
-import heapq
 
+```go
+// mergePair is Example 1's routine, renamed so this block stands alone.
+func mergePair(a, b *ListNode) *ListNode {
+    dummy := &ListNode{}
+    tail := dummy
+    for a != nil && b != nil {
+        if a.Val <= b.Val {
+            tail.Next = a
+            a = a.Next
+        } else {
+            tail.Next = b
+            b = b.Next
+        }
+        tail = tail.Next
+    }
+    if a != nil {
+        tail.Next = a
+    } else {
+        tail.Next = b
+    }
+    return dummy.Next
+}
+
+func mergeKLists(lists []*ListNode) *ListNode {
+    if len(lists) == 0 {
+        return nil
+    }
+    for len(lists) > 1 { // one round halves the number of lists
+        var round []*ListNode
+        for i := 0; i < len(lists); i += 2 {
+            if i+1 < len(lists) {
+                round = append(round, mergePair(lists[i], lists[i+1]))
+            } else {
+                round = append(round, lists[i]) // odd one out, carried over
+            }
+        }
+        lists = round
+    }
+    return lists[0]
+}
+```
+
+```python
 def mergeKLists(lists):
-    heap = [(node.val, i, node) for i, node in enumerate(lists) if node]
-    heapq.heapify(heap)
-    dummy = tail = ListNode()
-    while heap:
-        val, i, node = heapq.heappop(heap)
-        tail.next = node
-        tail = node
-        if node.next:
-            heapq.heappush(heap, (node.next.val, i, node.next))
-    return dummy.next
+    if not lists:
+        return None
+    while len(lists) > 1:            # one round halves the number of lists
+        nxt = []
+        for i in range(0, len(lists), 2):
+            if i + 1 < len(lists):
+                nxt.append(mergeTwoLists(lists[i], lists[i + 1]))
+            else:
+                nxt.append(lists[i])  # odd one out, carried over
+        lists = nxt
+    return lists[0]
 ```
 
 ### Complexity
-Time O(N log k) for N total nodes across k lists, Space O(k) for the heap.
+Time **O(N log k)** — `log k` rounds, and each round touches all `N` nodes once.
+Space O(k) for the round buffer (O(1) if you merge in place in the same slice).
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Sort List (LeetCode 148)
-A representative **Merge Linked Lists** problem. The signal: splice two sorted lists with a dummy head and pointer chasing.
+Sort a linked list in ascending order. The expected solution is O(n log n) time and O(1)
+extra space (ignoring recursion).
 
 ### Thought Process
-1. Merge sort fits linked lists perfectly: splitting and merging are pointer operations, no random access needed.
-2. Split the list in half with slow/fast pointers, cutting the link at the midpoint.
-3. Recursively sort each half, then merge the two sorted halves with the two-pointer splice.
+1. Quicksort needs random access to pick pivots well; a list has none. Merge sort only ever
+   walks forward — a perfect fit.
+2. Merge sort needs three things: split in half, sort each half, merge. We already have the
+   merge from Example 1.
+3. Split with slow/fast pointers. Start `fast` one node ahead so `slow` stops on the **last
+   node of the left half**, then cut with `slow.Next = nil`.
+4. That off-by-one start matters: with `fast = head` a two-node list would put `slow` on the
+   second node, the "left half" would be the whole list, and the recursion would never shrink.
+5. Base case: zero or one node is already sorted.
 
 ### Dry Run
-Input `4→2→1→3`.
-- split → `4→2` and `1→3`
-- sort halves → `2→4` and `1→3`
-- merge → `1→2→3→4`
+
+Input: `4 → 2 → 1 → 3`
+
+**Splitting** (`slow = head`, `fast = head.Next`)
+
+| call | list | `slow` stops at | left | right |
+|------|------|-----------------|------|-------|
+| 1 | `4,2,1,3` | node `2` | `4,2` | `1,3` |
+| 2 | `4,2`     | node `4` | `4`  | `2`   |
+| 3 | `1,3`     | node `1` | `1`  | `3`   |
+
+**Merging back up** (each row is Example 1's routine)
+
+| merge | inputs | result |
+|-------|--------|--------|
+| a | `4` and `2`       | `2 → 4` |
+| b | `1` and `3`       | `1 → 3` |
+| c | `2 → 4` and `1 → 3` | `1 → 2 → 3 → 4` |
+
+Output: **`1 → 2 → 3 → 4`**
+
+Trace merge `c` by hand: heads `2` vs `1` → take `1`; `2` vs `3` → take `2`; `4` vs `3` →
+take `3`; right side empty → attach `4`. Exactly the Example 1 loop.
 
 ### Visualization
-```
-input  ──▶ [ apply Merge Linked Lists step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+                   [4, 2, 1, 3]
+                    /        \                split
+              [4, 2]          [1, 3]
+              /    \          /    \          split
+           [4]    [2]      [1]    [3]         base case
+              \    /          \    /
+              [2, 4]          [1, 3]          merge
+                    \        /
+                   [1, 2, 3, 4]               merge
+
+depth = log2(n) levels, O(n) work per level  →  O(n log n)
 ```
 
 ### Code
+
+```go
+// splitAtMiddle cuts the list in two and returns both heads.
+// fast starts one node ahead so slow lands on the LAST node of the left half.
+func splitAtMiddle(head *ListNode) (*ListNode, *ListNode) {
+    slow, fast := head, head.Next
+    for fast != nil && fast.Next != nil {
+        slow = slow.Next
+        fast = fast.Next.Next
+    }
+    right := slow.Next
+    slow.Next = nil // cut
+    return head, right
+}
+
+// mergeSorted is Example 1's routine, renamed so this block stands alone.
+func mergeSorted(a, b *ListNode) *ListNode {
+    dummy := &ListNode{}
+    tail := dummy
+    for a != nil && b != nil {
+        if a.Val <= b.Val {
+            tail.Next = a
+            a = a.Next
+        } else {
+            tail.Next = b
+            b = b.Next
+        }
+        tail = tail.Next
+    }
+    if a != nil {
+        tail.Next = a
+    } else {
+        tail.Next = b
+    }
+    return dummy.Next
+}
+
+func sortList(head *ListNode) *ListNode {
+    if head == nil || head.Next == nil { // 0 or 1 node is already sorted
+        return head
+    }
+    left, right := splitAtMiddle(head)
+    return mergeSorted(sortList(left), sortList(right))
+}
+```
+
 ```python
 def sortList(head):
-    if not head or not head.next:
+    if head is None or head.next is None:   # 0 or 1 node is already sorted
         return head
-    slow, fast = head, head.next          # split into two halves
+    # split: fast starts one ahead so slow lands on the last left-half node
+    slow, fast = head, head.next
     while fast and fast.next:
-        slow = slow.next
-        fast = fast.next.next
-    mid, slow.next = slow.next, None
-    left, right = sortList(head), sortList(mid)
-    dummy = tail = ListNode()             # merge sorted halves
-    while left and right:
-        if left.val <= right.val:
-            tail.next, left = left, left.next
-        else:
-            tail.next, right = right, right.next
-        tail = tail.next
-    tail.next = left or right
-    return dummy.next
+        slow, fast = slow.next, fast.next.next
+    right, slow.next = slow.next, None      # cut
+    return mergeTwoLists(sortList(head), sortList(right))
 ```
 
 ### Complexity
-Time O(n log n), Space O(log n) for the recursion stack.
+Time O(n log n) — `log n` levels of splitting, O(n) merging work per level.
+Space O(log n) for the recursion stack; no arrays and no new nodes.
 
+---
 
 ## 12. LeetCode Practice Set
 

@@ -41,32 +41,151 @@ unbounded knapsack, dp, reuse, coin change, repeat items.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"If I may take as many copies of each item as I like, what is the most I can fit into the bag?"*
+
+Running example: two item **types**, available in unlimited supply — **A** (weight 2, value 3) and **B** (weight 3, value 4) — and a bag of capacity **7**.
+
 ### Intuition
-Naive recursion recomputes overlapping subproblems — exponential time.
+Nothing stops you from taking an item twice, so instead of "in or out" each type has a *count*: 0, 1, 2, … up to `capacity / weight`. Try every combination of counts and keep the best one that fits.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Recurse over item types. At type `i`, loop `k = 0, 1, 2, …` while `k · wt[i] ≤ remaining`.
+2. Subtract `k · wt[i]` from the remaining capacity, add `k · val[i]` to the running value, recurse on type `i+1`.
+3. When the types run out, report the running value.
+4. Return the maximum reported value.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O((W/w₁ + 1) × (W/w₂ + 1) × …)** — exponential in the number of types; with `n` types and small weights it behaves like `O(W^n)`.
+- Space: O(n) recursion depth.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Unbounded Knapsack pattern is built to use.
+- **The exact wasted work:** with `A(2,3)` and `B(3,4)` and capacity 7, these two branches land in the same place:
+
+  ```text
+  take A once,   then B once   →  B still available, 2 capacity free
+  take B once,   then A once   →  B still available, 2 capacity free   ← identical
+  ```
+
+  and so does "take A twice then stop, with 3 left" versus several other orderings. Every ordering of the same multiset is explored separately even though only the leftover capacity matters.
+- **The fact it fails to exploit:** the future depends on the remaining capacity **and nothing else** — not on which items produced it, not on the order they were taken in, and (unlike 0/1) not even on which types are still "unused", because every type stays available forever.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Unbounded Knapsack invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Because every item type stays available no matter how often you used it, the state collapses to a single number — the capacity still free — and `dp[w]` can be built from smaller capacities that already include the same item.**
+
+Think of a vending machine rather than a suitcase. In 0/1 knapsack an item, once taken, is gone; in unbounded knapsack the shelf is restocked instantly. So "best value for capacity `w`" no longer needs to remember which items are spent — it is a one-dimensional fact about `w` alone.
+
+### The thought process
+
+```text
+We need    : max value with unlimited copies of each item type, weight <= W.
+Obvious way: try every count for every type.
+Too slow   : counts multiply -> W^n.
+Notice     : after any purchase, only "capacity left" survives into the future.
+Notice too : the SAME item may legally be bought again.
+Therefore  : dp over capacity alone; dp[w] may read a dp cell that already
+             used this item.
+Now        : n x W states, O(1) each -> O(n*W).
+```
+
+### The recurrence, in words
+
+```text
+dp[w] means : the best total value you can pack into a bag of capacity exactly
+              w or less, using unlimited copies of the item types considered so far.
+
+dp[w] = max( dp[w]                     ← don't add another copy of this item
+           , dp[w - wt] + val )        ← add one more copy of this item; the
+                                         remaining w-wt must be packed optimally
+                                         and IS ALLOWED to contain this item too
+base case   : dp[0] = 0 — an empty bag is worth nothing, and there is no
+              smaller capacity to build it from. Everything else starts at 0
+              too, because "take nothing" is always legal.
+answer      : dp[W].
+```
+
+### Why the capacity loop runs **upward** — and why 0/1 runs downward
+
+This is the single most valuable contrast in dynamic programming, because in the space-optimised 1-D form the two algorithms are **the same five lines with the loop reversed**:
+
+```text
+0/1        : for w = W down to wt:   dp[w] = max(dp[w], dp[w-wt] + val)
+unbounded  : for w = wt up to W:     dp[w] = max(dp[w], dp[w-wt] + val)
+```
+
+`dp[w-wt]` is the cell in question. Downward, it has not been touched yet this round, so it means *"best value before this item existed"* → the item can be added at most once. Upward, it has already been rewritten this round, so it means *"best value that may already contain this item"* → the item can be added again.
+
+**Demonstrate it.** One item type: weight 2, value 3. Capacity 7.
+
+*Upward* — watch a single item become three copies:
+
+```text
+start          dp = [0, 0, 0, 0, 0, 0, 0, 0]
+w=2  dp[2] = max(0, dp[0]+3) = max(0, 0+3) = 3     dp = [0,0,3,0,0,0,0,0]
+w=3  dp[3] = max(0, dp[1]+3) = max(0, 0+3) = 3     dp = [0,0,3,3,0,0,0,0]
+w=4  dp[4] = max(0, dp[2]+3) = max(0, 3+3) = 6     dp = [0,0,3,3,6,0,0,0]
+                              ^^^^^^ dp[2] already holds ONE copy -> now TWO
+w=5  dp[5] = max(0, dp[3]+3) = max(0, 3+3) = 6     dp = [0,0,3,3,6,6,0,0]
+w=6  dp[6] = max(0, dp[4]+3) = max(0, 6+3) = 9     dp = [0,0,3,3,6,6,9,0]
+                              ^^^^^^ dp[4] holds TWO copies -> now THREE
+w=7  dp[7] = max(0, dp[5]+3) = max(0, 6+3) = 9     dp = [0,0,3,3,6,6,9,9]
+
+dp[7] = 9 = three copies of the item (weight 6, value 9). Exactly what
+"unlimited supply" should give — the reuse is the FEATURE here.
+```
+
+*Downward* — the same five lines, and the item can only be bought once:
+
+```text
+start          dp = [0, 0, 0, 0, 0, 0, 0, 0]
+w=7  dp[7] = max(0, dp[5]+3) = max(0, 0+3) = 3     (dp[5] untouched this round)
+w=6  dp[6] = max(0, dp[4]+3) = max(0, 0+3) = 3
+w=5  dp[5] = max(0, dp[3]+3) = 3
+w=4  dp[4] = max(0, dp[2]+3) = 3
+w=3  dp[3] = max(0, dp[1]+3) = 3
+w=2  dp[2] = max(0, dp[0]+3) = 3
+               dp = [0, 0, 3, 3, 3, 3, 3, 3]
+
+dp[7] = 3 = one copy. That is the 0/1 answer, and it is WRONG here.
+```
+
+Two directions, two problems, one line of code. If you remember nothing else from this chapter, remember which way the arrow points.
+
+### Steps
+
+```text
+Step 1 → dp = array of W+1 zeros.
+Step 2 → for each item type i:
+Step 3 →     for w = wt[i] up to W:            (UPWARD — reuse allowed)
+Step 4 →         dp[w] = max(dp[w], dp[w-wt[i]] + val[i])
+Step 5 → answer = dp[W]
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "unlimited supply", "you may reuse", "as many as you want",
+  "infinite coins", "cut the rod into pieces", "repetition allowed"
+        ↓
+Think about...
+  "Does using an item remove it from the pool?"
+  No  -> unbounded, capacity loop UPWARD
+  Yes -> 0/1,       capacity loop DOWNWARD
+        ↓
+Use...
+  dp over capacity/amount, one pass per item type, loop upward
+    ├─ maximise value      → dp[w] = max(dp[w], dp[w-wt]+val)     (rod cutting)
+    ├─ minimise count      → dp[a] = min(dp[a], dp[a-c]+1)        (coin change)
+    ├─ count COMBINATIONS  → item loop OUTSIDE, amount inside
+    └─ count PERMUTATIONS  → amount loop OUTSIDE, item inside
+```
 
 ### Visual explanation
 
@@ -97,61 +216,100 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Unbounded Knapsack: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+types: A(wt 2, val 3), B(wt 3, val 4)   unlimited copies   capacity 7
+
+start            dp = [0, 0, 0, 0, 0, 0, 0, 0]
+
+type A (2,3), w = 2 → 7   (upward)
+  w=2: dp[0]+3 = 3 > 0    → dp[2]=3
+  w=3: dp[1]+3 = 3 > 0    → dp[3]=3
+  w=4: dp[2]+3 = 6 > 0    → dp[4]=6      (second A)
+  w=5: dp[3]+3 = 6 > 0    → dp[5]=6
+  w=6: dp[4]+3 = 9 > 0    → dp[6]=9      (third A)
+  w=7: dp[5]+3 = 9 > 0    → dp[7]=9
+                 dp = [0, 0, 3, 3, 6, 6, 9, 9]   ← the state drawn above
+
+type B (3,4), w = 3 → 7   (upward)
+  w=3: dp[0]+4 = 4 > 3    → dp[3]=4
+  w=4: dp[1]+4 = 4 < 6    → dp[4]=6  (keep A+A)
+  w=5: dp[2]+4 = 7 > 6    → dp[5]=7  (A + B)
+  w=6: dp[3]+4 = 8 < 9    → dp[6]=9  (keep A+A+A)
+  w=7: dp[4]+4 = 10 > 9   → dp[7]=10 (A + A + B)
+                 dp = [0, 0, 3, 4, 6, 7, 9, 10]
+
+answer dp[7] = 10   (A + A + B: weight 2+2+3 = 7, value 3+3+4 = 10)
 ```
 
 ### Interview explanation
-"This is a Unbounded Knapsack problem. I'll optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it. That brings the complexity down to O(states × transitions) time and O(states) space — here's the template."
+"Because every item type can be reused, the state is just the remaining capacity — I don't have to remember which items are spent. So `dp[w] = max(dp[w], dp[w - wt] + val)` over a single array of size `W+1`. The important detail is that I sweep capacity **upward**: `dp[w - wt]` is then a cell I have already updated in this same pass, so it may already contain a copy of the current item, which is exactly the reuse I want. Sweeping downward would turn this into 0/1 knapsack. That's O(n·W) time and O(W) space, and the same skeleton handles min-coins and counting variants by swapping `max` for `min` or `+=`."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Dynamic Programming** family template. Adapt the comparison/condition to the specific problem.
+> One array over capacity, one pass per item type, capacity **ascending** — ascending is what allows reuse.
 
 ```go
-// 0/1 Knapsack, space-optimized to 1D. dp[w] = best value at capacity w.
-func knapsack(weights, values []int, cap int) int {
-    dp := make([]int, cap+1)
+// UnboundedKnapsack returns the greatest total value obtainable with unlimited
+// copies of each item type, subject to a total weight of at most capacity.
+//
+// dp[w] = best value for a bag of capacity w using the types seen so far.
+func UnboundedKnapsack(weights, values []int, capacity int) int {
+    dp := make([]int, capacity+1) // taking nothing is always allowed -> 0
+
     for i := range weights {
-        for w := cap; w >= weights[i]; w-- {  // reverse: each item once
-            if dp[w-weights[i]]+values[i] > dp[w] {
-                dp[w] = dp[w-weights[i]] + values[i]
+        // Ascending: dp[w-weights[i]] has ALREADY been updated in this pass,
+        // so it may already contain item i — that is how reuse happens.
+        for w := weights[i]; w <= capacity; w++ {
+            if take := dp[w-weights[i]] + values[i]; take > dp[w] {
+                dp[w] = take
             }
         }
     }
-    return dp[cap]
+    return dp[capacity]
 }
 ```
 
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def unbounded_knapsack(weights, values, capacity):
+    """Best total value with unlimited copies of each item type.
+
+    dp[w] = best value for a bag of capacity w using the types seen so far.
+    """
+    dp = [0] * (capacity + 1)          # taking nothing is always allowed
+    for weight, value in zip(weights, values):
+        # ascending: dp[w - weight] may already contain this item -> reuse
+        for w in range(weight, capacity + 1):
+            dp[w] = max(dp[w], dp[w - weight] + value)
+    return dp[capacity]
 ```
 
 ```java
-int knapsack(int[] weights, int[] values, int cap) {
-    int[] dp = new int[cap + 1];
-    for (int i = 0; i < weights.length; i++)
-        for (int w = cap; w >= weights[i]; w--)
+// dp[w] = best value for a bag of capacity w using the types seen so far.
+int unboundedKnapsack(int[] weights, int[] values, int capacity) {
+    int[] dp = new int[capacity + 1];              // taking nothing is allowed
+    for (int i = 0; i < weights.length; i++) {
+        // Ascending lets dp[w - weights[i]] already contain item i.
+        for (int w = weights[i]; w <= capacity; w++) {
             dp[w] = Math.max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+        }
+    }
+    return dp[capacity];
 }
 ```
 
 ```cpp
-int knapsack(vector<int>& weights, vector<int>& values, int cap) {
-    vector<int> dp(cap + 1, 0);
-    for (size_t i = 0; i < weights.size(); ++i)
-        for (int w = cap; w >= weights[i]; --w)
+// dp[w] = best value for a bag of capacity w using the types seen so far.
+int unboundedKnapsack(const vector<int>& weights, const vector<int>& values, int capacity) {
+    vector<int> dp(capacity + 1, 0);               // taking nothing is allowed
+    for (size_t i = 0; i < weights.size(); ++i) {
+        // Ascending lets dp[w - weights[i]] already contain item i.
+        for (int w = weights[i]; w <= capacity; ++w) {
             dp[w] = max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+        }
+    }
+    return dp[capacity];
 }
 ```
 
@@ -237,120 +395,336 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — Coin Change (LeetCode 322)
-Find the **minimum** number of coins to make `amount`, coins reusable any number of times. Minimization over an unbounded knapsack.
+Given coin denominations and an `amount`, return the fewest coins that add up to `amount`, or `-1` if it cannot be done. Every denomination is available in unlimited supply.
 
 ### Thought Process
-1. `dp[a]` = fewest coins to make amount `a`; seed `dp[0] = 0`, all others `inf`.
-2. Fill `a` from 1 to `amount`; for each coin `c ≤ a`, `dp[a] = min(dp[a], dp[a - c] + 1)`.
-3. Because we sweep amounts **upward** and reuse `dp[a - c]`, each coin may be used repeatedly.
-4. Return `dp[amount]`, or `-1` if it stayed `inf`.
+1. This is unbounded knapsack with `min` where the maximisation version had `max`: the "value" of a coin is 1 coin spent, and we want the smallest total.
+2. Greedy fails — with coins `{1, 3, 4}` and amount 6, grabbing the biggest coin first gives `4+1+1 = 3` coins while `3+3 = 2` is optimal. So we must actually try every coin at every amount.
+3. `dp[a]` = fewest coins for amount `a`. Try each coin as the **last** coin placed: that costs `dp[a - coin] + 1`.
+4. Unreachable amounts must be marked with a sentinel (infinity) so they never win a `min` and never get `+1`'d into a fake answer.
+
+### The DP, spelled out
+
+```text
+What does dp[a] mean?
+    dp[a] is the minimum number of coins whose values add up to exactly a.
+    If no set of coins adds up to a, dp[a] is INF ("impossible").
+
+How is dp[a] computed?
+    dp[a] = 1 + min over every coin c <= a of dp[a - c]
+    Term by term: pick which coin is placed LAST. After placing coin c you
+    still owe a - c, and the cheapest way to owe a - c is dp[a-c] — already
+    computed, because a - c < a. The "+1" is the coin you just placed.
+    Skip any c where dp[a-c] is INF: you cannot extend an impossibility.
+
+What is the base case?
+    dp[0] = 0. Making amount 0 needs zero coins, and it is the only amount
+    that is free. Every other cell starts at INF so that "unreachable" is
+    the default and must be earned.
+
+Why forward?
+    dp[a] reads dp[a-c] with c > 0, i.e. strictly smaller amounts. Sweeping a
+    upward from 1 guarantees those cells are final before they are read. And
+    because dp[a-c] may itself already use coin c, coins are automatically
+    reusable — exactly the unbounded behaviour we want.
+```
 
 ### Dry Run
-Input `coins = [1, 2, 5]`, amount = 11.
-- `dp[1]=1, dp[2]=1, dp[3]=2, dp[4]=2, dp[5]=1`.
-- `dp[6]=2, dp[10]=2` (5+5).
-- `dp[11] = min(dp[10]+1, dp[9]+1, dp[6]+1) = 3` (5+5+1).
-- Answer `3`.
+
+Input: `coins = [1, 2, 5]`, `amount = 11`
+
+| a | via 1: dp[a−1]+1 | via 2: dp[a−2]+1 | via 5: dp[a−5]+1 | **dp[a]** |
+|---|---|---|---|---|
+| 0 | — | — | — | **0** |
+| 1 | 0+1 = 1 | — | — | **1** |
+| 2 | 1+1 = 2 | 0+1 = 1 | — | **1** |
+| 3 | 1+1 = 2 | 1+1 = 2 | — | **2** |
+| 4 | 2+1 = 3 | 1+1 = 2 | — | **2** |
+| 5 | 2+1 = 3 | 2+1 = 3 | 0+1 = 1 | **1** |
+| 6 | 1+1 = 2 | 2+1 = 3 | 1+1 = 2 | **2** |
+| 7 | 2+1 = 3 | 1+1 = 2 | 1+1 = 2 | **2** |
+| 8 | 2+1 = 3 | 2+1 = 3 | 2+1 = 3 | **3** |
+| 9 | 3+1 = 4 | 2+1 = 3 | 2+1 = 3 | **3** |
+| 10 | 3+1 = 4 | 3+1 = 4 | 1+1 = 2 | **2** |
+| 11 | 2+1 = 3 | 3+1 = 4 | 2+1 = 3 | **3** |
+
+Output: **`3`** — `5 + 5 + 1`.
+
+Row `a = 10` is the reuse in action: it wins through `dp[5] + 1`, and `dp[5]` was itself a single 5-coin. One denomination, used twice, with no extra machinery — that is what the forward sweep buys.
 
 ### Visualization
-```
-amount = 11 ──▶ [ dp[a] = min(dp[a-c]+1), a ascending -> coins reused ]
-dp[11] = 3  ──▶ 5 + 5 + 1
+
+```text
+a     0   1   2   3   4   5   6   7   8   9  10  11
+dp    0   1   1   2   2   1   2   2   3   3   2   3
+                          ^                   ^   ^
+                        one 5              5+5   5+5+1
+
+back-trace from dp[11]:
+  dp[11]=3 came from dp[10]+1  → take coin 1,  owe 10
+  dp[10]=2 came from dp[5]+1   → take coin 5,  owe 5
+  dp[5] =1 came from dp[0]+1   → take coin 5,  owe 0   ✔
 ```
 
 ### Code
+
+```go
+func coinChange(coins []int, amount int) int {
+    const impossible = 1 << 30 // sentinel: bigger than any real coin count
+
+    // dp[a] = fewest coins adding up to exactly a
+    dp := make([]int, amount+1)
+    for a := 1; a <= amount; a++ {
+        dp[a] = impossible
+    }
+    dp[0] = 0 // amount 0 needs no coins
+
+    // Forward over amounts: dp[a-c] is final, and may already contain coin c.
+    for a := 1; a <= amount; a++ {
+        for _, c := range coins {
+            if c <= a && dp[a-c]+1 < dp[a] {
+                dp[a] = dp[a-c] + 1
+            }
+        }
+    }
+
+    if dp[amount] == impossible {
+        return -1
+    }
+    return dp[amount]
+}
+```
+
 ```python
 def coinChange(coins, amount):
-    INF = float('inf')
-    dp = [0] + [INF] * amount           # dp[a] = min coins for amount a
-    for a in range(1, amount + 1):
+    INF = float('inf')                  # sentinel for "unreachable"
+    dp = [INF] * (amount + 1)           # dp[a] = fewest coins adding up to a
+    dp[0] = 0                           # amount 0 needs no coins
+
+    for a in range(1, amount + 1):      # forward: dp[a - c] is already final
         for c in coins:
-            if c <= a:
-                dp[a] = min(dp[a], dp[a - c] + 1)
+            if c <= a and dp[a - c] + 1 < dp[a]:
+                dp[a] = dp[a - c] + 1
+
     return -1 if dp[amount] == INF else dp[amount]
 ```
 
 ### Complexity
-Time O(amount × len(coins)), Space O(amount).
+Time **O(amount × len(coins))** — every amount tries every coin once. Space **O(amount)** for the single row.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Coin Change II (LeetCode 518)
-Count the number of **combinations** of coins that make `amount`, coins reusable. Order does not matter, so the coin loop goes **outside**.
+Count how many **combinations** of coins add up to `amount`. Coins are unlimited, and two selections that differ only in order count as one.
 
 ### Thought Process
-1. `dp[a]` = number of combinations summing to `a`; seed `dp[0] = 1` (one way: pick nothing).
-2. Put the **coin loop outermost**; for each coin sweep `a` **upward** from `coin` to `amount`: `dp[a] += dp[a - coin]`.
-3. Coin-outer ordering counts each combination once (no permutations), and upward sweep allows reuse.
-4. Return `dp[amount]`.
+1. Same unbounded knapsack, but the combine step counts instead of minimising: `dp[a] += dp[a - coin]`.
+2. The whole difficulty is *not* the recurrence — it is the **loop order**. Put the coin loop **outside** and the amount loop inside.
+3. Coin-outside means: by the time coin `c` is being processed, every combination already counted uses only coins from earlier iterations. So each multiset is built in exactly one canonical order (smallest-indexed coin first) and is counted exactly once.
+4. Swap the loops and you count ordered sequences instead — that is LeetCode 377, the next example.
+
+### The DP, spelled out
+
+```text
+What does dp[a] mean?
+    dp[a] is the number of distinct MULTISETS of coins, drawn only from the
+    denominations processed so far, whose values add up to exactly a.
+
+How is dp[a] computed?
+    dp[a] += dp[a - coin]
+    Every combination summing to a-coin (built from this coin and earlier ones)
+    becomes a distinct combination summing to a when one more `coin` is dropped
+    in. dp[a]'s current value already counts the combinations that use no copy
+    of `coin` at all, so the += merges "without it" and "with at least one".
+
+What is the base case?
+    dp[0] = 1. There is exactly one way to make 0: take nothing. Every "+="
+    chain ultimately bottoms out here, so seeding it to 0 would zero everything.
+
+Why forward, and why the coin loop outside?
+    Forward (a ascending) means dp[a-coin] may already include copies of `coin`
+    -> unlimited supply. Coin-outside means a combination is only ever extended
+    by coins at or before the current one, which fixes a single canonical order
+    per multiset and prevents double counting.
+```
 
 ### Dry Run
-Input `amount = 5`, coins = [1, 2, 5].
-- After coin 1: `dp = [1,1,1,1,1,1]` (all-ones way).
-- After coin 2: `dp[2..5] += dp[a-2]` → `dp = [1,1,2,2,3,3]`.
-- After coin 5: `dp[5] += dp[0]` → `dp[5] = 4`.
-- Answer `4` (5; 1+2+2; 1+1+1+2; 1+1+1+1+1).
+
+Input: `coins = [1, 2, 3]`, `amount = 4`
+
+| after coin | dp[0] | dp[1] | dp[2] | dp[3] | dp[4] |
+|---|---|---|---|---|---|
+| *(start)* | 1 | 0 | 0 | 0 | 0 |
+| `1` | 1 | 1 | 1 | 1 | 1 |
+| `2` | 1 | 1 | 2 | 2 | 3 |
+| `3` | 1 | 1 | 2 | 3 | 4 |
+
+Output: **`4`** — the multisets are `{1,1,1,1}`, `{1,1,2}`, `{2,2}`, `{1,3}`.
+
+Follow the `2` row: `dp[2] += dp[0]` gives 2 (`{1,1}` and `{2}`), then `dp[4] += dp[2]` reads the **already updated** `dp[2] = 2`, contributing `{1,1,2}` and `{2,2}`. That second contribution is a *second* copy of the coin 2 — the forward sweep is what allows it.
 
 ### Visualization
-```
-coins outer ──▶ [ dp[a] += dp[a-coin], a ascending ]
-each combination counted once  ──▶ dp[5] = 4
+
+```text
+coin loop OUTSIDE  →  each multiset gets one canonical build order
+
+  coin 1 pass:  1+1+1+1                                 dp[4] = 1
+  coin 2 pass:  1+1+2 , 2+2                             dp[4] = 3
+  coin 3 pass:  1+3                                     dp[4] = 4
+
+nothing is ever built as "2 then 1 then 1" — by the time coin 1 has been
+processed the pass is over, so no combination can prepend a smaller coin later.
 ```
 
 ### Code
+
+```go
+func change(amount int, coins []int) int {
+    // ways[a] = number of coin multisets (from the coins processed so far)
+    // that add up to exactly a
+    ways := make([]int, amount+1)
+    ways[0] = 1 // one way to make 0: take nothing
+
+    for _, coin := range coins { // coin OUTSIDE -> combinations, not orderings
+        for a := coin; a <= amount; a++ { // ascending -> the coin may repeat
+            ways[a] += ways[a-coin]
+        }
+    }
+    return ways[amount]
+}
+```
+
 ```python
 def change(amount, coins):
-    dp = [0] * (amount + 1)
-    dp[0] = 1                           # one way to make 0: empty selection
-    for coin in coins:                  # coin outer -> combinations, not permutations
-        for a in range(coin, amount + 1):   # ascending -> coin reusable
-            dp[a] += dp[a - coin]
-    return dp[amount]
+    # ways[a] = number of coin multisets summing to exactly a
+    ways = [0] * (amount + 1)
+    ways[0] = 1                         # one way to make 0: take nothing
+
+    for coin in coins:                  # coin OUTSIDE -> combinations
+        for a in range(coin, amount + 1):   # ascending -> the coin may repeat
+            ways[a] += ways[a - coin]
+
+    return ways[amount]
 ```
 
 ### Complexity
-Time O(amount × len(coins)), Space O(amount).
+Time **O(amount × len(coins))**. Space **O(amount)**.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Combination Sum IV (LeetCode 377)
-Count ordered sequences (**permutations**) of `nums` that sum to `target`, numbers reusable. Because order matters, the target loop goes **outside** and nums inner.
+Given distinct positive integers `nums` and a `target`, count the **ordered sequences** of numbers (repeats allowed) that sum to `target`. Despite the name, `(1,2)` and `(2,1)` are counted separately.
 
 ### Thought Process
-1. `dp[a]` = number of ordered sequences summing to `a`; seed `dp[0] = 1`.
-2. Put the **target loop outermost**; for each amount `a` from 1 to `target`, add `dp[a - n]` for every `n ≤ a`.
-3. Target-outer ordering lets the same amount be reached by different last-picked numbers, so `[1,2]` and `[2,1]` both count.
-4. Return `dp[target]`.
+1. Identical recurrence to example 10 — `dp[t] += dp[t - n]` — with the loops **swapped**: target outside, numbers inside.
+2. Target-outside means: at amount `t`, *every* number gets a chance to be the last element of the sequence. Different last elements produce different orderings, so orderings are counted separately.
+3. That is the entire distinction. Same array, same `+=`, opposite nesting, different question answered.
+4. Feed it the same input as example 10 to see the gap directly.
+
+### The DP, spelled out
+
+```text
+What does dp[t] mean?
+    dp[t] is the number of ordered SEQUENCES (order matters, repeats allowed)
+    of elements of nums whose sum is exactly t.
+
+How is dp[t] computed?
+    dp[t] = sum over every n in nums with n <= t of dp[t - n]
+    Term by term: fix which number is LAST in the sequence. If it is n, the
+    part before it is any sequence summing to t-n, and there are dp[t-n] of
+    those. Different choices of last element give genuinely different
+    sequences, so the counts simply add.
+
+What is the base case?
+    dp[0] = 1 — the empty sequence, the unique sequence summing to 0.
+
+Why forward, and why the target loop outside?
+    Forward because dp[t] needs dp[t-n] for smaller t, which must be final.
+    Target-outside because every number must be allowed to be the last element
+    of every sequence; with the number loop outside, only "non-decreasing by
+    coin index" builds are reachable and you would count multisets instead.
+```
 
 ### Dry Run
-Input `nums = [1, 2, 3]`, target = 4.
-- `dp[0]=1`.
-- `dp[1]=dp[0]=1`.
-- `dp[2]=dp[1]+dp[0]=2`.
-- `dp[3]=dp[2]+dp[1]+dp[0]=4`.
-- `dp[4]=dp[3]+dp[2]+dp[1]=4+2+1=7`. Answer `7`.
+
+Input: `nums = [1, 2, 3]`, `target = 4`
+
+| t | dp[t−1] | dp[t−2] | dp[t−3] | **dp[t] = sum** |
+|---|---|---|---|---|
+| 0 | — | — | — | **1** (base) |
+| 1 | dp[0] = 1 | — | — | **1** |
+| 2 | dp[1] = 1 | dp[0] = 1 | — | **2** |
+| 3 | dp[2] = 2 | dp[1] = 1 | dp[0] = 1 | **4** |
+| 4 | dp[3] = 4 | dp[2] = 2 | dp[1] = 1 | **7** |
+
+Output: **`7`**
+
+Same `nums`, same target as example 10 — which returned **4**. Here is the whole difference, written out:
+
+```text
+combinations (LC 518, coin loop outside) = 4
+    {1,1,1,1}   {1,1,2}   {2,2}   {1,3}
+
+permutations (LC 377, target loop outside) = 7
+    1+1+1+1
+    1+1+2   1+2+1   2+1+1        ← one multiset, three orderings
+    2+2
+    1+3     3+1                  ← one multiset, two orderings
+```
 
 ### Visualization
-```
-target outer ──▶ [ dp[a] += dp[a-n] for n in nums, a ascending ]
-order matters -> [1,2] and [2,1] both counted  ──▶ dp[4] = 7
+
+```text
+target loop OUTSIDE: at each t, every number may be the tail
+
+  t=4 ──┬── last = 1 → prefix sums to 3 → dp[3] = 4 sequences
+        ├── last = 2 → prefix sums to 2 → dp[2] = 2 sequences
+        └── last = 3 → prefix sums to 1 → dp[1] = 1 sequence
+                                          ------------------
+                                          dp[4] = 7
 ```
 
 ### Code
+
+```go
+func combinationSum4(nums []int, target int) int {
+    // ways[t] = number of ORDERED sequences of nums summing to exactly t
+    ways := make([]int, target+1)
+    ways[0] = 1 // the empty sequence
+
+    for t := 1; t <= target; t++ { // target OUTSIDE -> order matters
+        for _, n := range nums { // n is the LAST element of the sequence
+            if n <= t {
+                ways[t] += ways[t-n]
+            }
+        }
+    }
+    return ways[target]
+}
+```
+
 ```python
 def combinationSum4(nums, target):
-    dp = [0] * (target + 1)
-    dp[0] = 1                           # empty sequence sums to 0
-    for a in range(1, target + 1):      # amount outer -> permutations
-        for n in nums:
-            if n <= a:
-                dp[a] += dp[a - n]
-    return dp[target]
+    # ways[t] = number of ORDERED sequences of nums summing to exactly t
+    ways = [0] * (target + 1)
+    ways[0] = 1                         # the empty sequence
+
+    for t in range(1, target + 1):      # target OUTSIDE -> order matters
+        for n in nums:                  # n is the LAST element of the sequence
+            if n <= t:
+                ways[t] += ways[t - n]
+
+    return ways[target]
 ```
 
 ### Complexity
-Time O(target × len(nums)), Space O(target).
+Time **O(target × len(nums))**. Space **O(target)**.
 
+---
 
 ## 12. LeetCode Practice Set
 

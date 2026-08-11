@@ -41,32 +41,115 @@ sliding window maximum, deque, monotonic, window, max.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"I need `max(...)` of a trailing window at every index — how do I get it without looking at all `k` values each time?"*
+
+Running example: `nums = [4, 1, 5, 2]`, `k = 2`. Three windows: `[4,1]`, `[1,5]`, `[5,2]`.
+
 ### Intuition
-Recompute the window extremum or re-traverse levels each step — O(nk) / O(n^2).
+Stand at each window position and just look at everything inside it. Take the biggest. Move one step right and do it again. Nothing is remembered between positions, so nothing can go wrong — and nothing is saved either.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each start `i` from `0` to `n - k`:
+2. Set `best = nums[i]`.
+3. For `j` from `i+1` to `i+k-1`, `best = max(best, nums[j])`.
+4. Append `best` to the output.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n·k)** — with `n = 10^5` and `k = 10^4` that is 10^9 comparisons.
+- Space: O(1) beyond the output.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Sliding Window Maximum pattern is built to use.
+
+The tempting "fix" is to carry a running max and only compare it with the newcomer. Watch it break:
+
+```text
+window [4, 1]   running max = 4                      ✓
+slide: 4 leaves, 5 enters
+        max(4, 5) = 5                                ✓ by luck
+window [1, 5]   running max = 5
+slide: 1 leaves, 2 enters
+        max(5, 2) = 5                                ✓ by luck
+
+now try  nums = [4, 1, 2],  k = 2
+window [4, 1]   running max = 4
+slide: 4 leaves — 4 WAS the max, so the stored 4 is now a lie.
+        max(4, 2) = 4, but the real answer for [1, 2] is 2.       ✗
+```
+
+- **The specific wasted work:** consecutive windows share `k-1` elements, yet all `k` are re-read every step.
+- **The fact the brute force fails to exploit:** a sum can be repaired when an element leaves (subtract it); a **maximum cannot**. If the departing element was the max, the new max is a value you never bothered to keep. So the fix is not "one number" — it is "a short list of values that could still become the max".
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Sliding Window Maximum invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Carry a shrinking list of *candidates* instead of a single max: any value with a bigger value to its right is dead, because that bigger value both beats it and outlives it.**
+
+Think of a queue at a ticket counter where only the tallest person is served. If someone taller joins the back, everyone shorter already standing in front of them can go home — they will never be the tallest again while the taller person is present, and they leave the queue sooner anyway. What remains is a line of people whose heights decrease from front to back: the front is the answer.
+
+### The thought process
+
+```text
+We need    : max over a window of size k, at every position
+Obvious way: rescan the window each step
+Too slow   : O(n*k)
+Notice     : max cannot be un-added — dropping the max leaves no fallback
+Notice     : if nums[j] <= nums[i] for j < i, then j is both smaller and
+             expires earlier, so j is never again the answer
+Therefore  : keep only indices whose values strictly decrease left to right
+Now        : front = max (O(1)); each index is pushed once, popped once → O(n)
+```
+
+### Why the deque of indices works
+
+Store **indices**, never bare values, so you can tell when a candidate expires.
+
+**Rule 1 — pop the back while `nums[back] <= v`.** Index `back` is to the left of the arriving index `i`, so every future window that contains `back` also contains `i`. Since `nums[back] <= v`, `back` can never be the strict maximum again. Deleting it loses nothing.
+
+**Rule 2 — pop the front while `front <= i - k`.** The front is the current best candidate, but "best" only counts if it is still inside the window. Once its index falls behind the left edge it must go.
+
+Together these keep the deque **strictly decreasing in value and entirely inside the window**, so the front is the window max by construction.
+
+**Why this is O(n), not O(n·k).** Rule 1's inner loop can pop many indices at one step — but each index enters the deque exactly once and leaves at most once. Over the whole array that is at most `n` pushes and `n` pops: **amortised O(1) per element**.
+
+**Why not a heap?** A max-heap also answers "biggest so far", but it cannot delete the element that just left the window in O(log k) without extra bookkeeping. The usual workaround is lazy deletion (`(value, index)` pairs, discard stale tops), which costs O(n log n) and O(n) space. The deque is O(n) time and O(k) space because it *proactively throws away* everything that can never win, so nothing stale accumulates.
+
+### Steps
+
+```text
+Step 1 → for i, v := range nums:
+Step 2 →   pop the back while nums[back] <= v      (dominated candidates)
+Step 3 →   push i at the back
+Step 4 →   if front <= i - k: pop the front        (expired candidate)
+Step 5 →   if i >= k-1: answer for this window is nums[front]
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "max/min of every subarray of length k"
+  a DP recurrence  dp[i] = f(nums[i]) + max(dp[i-k .. i-1])
+  "you may jump at most k steps"  /  "indices at most k apart"
+  n up to 1e5 and the obvious loop is O(n*k)
+        ↓
+Think about...
+  "Is the quantity reversible when an element leaves the window?"
+  sum / count  → yes, plain sliding window
+  max / min / best  → no, you need surviving candidates
+        ↓
+Use...
+  a deque of INDICES, monotone by value
+    · window maximum          → decreasing deque, pop back while <=
+    · window minimum          → increasing deque, pop back while >=
+    · DP over a k-window      → push dp[i] into the deque; read the front
+                                BEFORE computing dp[i], push AFTER
+    · need max AND min        → two deques over the same window
+```
 
 ### Visual explanation
 
@@ -97,75 +180,137 @@ A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand fro
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Sliding Window Max: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [4, 1, 5, 2]   k = 2        deque holds INDICES; values shown below
+
+i=0  v=4   back-pops: none        deque=[0]      vals=(4)     window not full
+i=1  v=1   4 <= 1? no             deque=[0,1]    vals=(4,1)
+           front 0 <= i-k = -1? no             window [4,1] → max = nums[0] = 4
+i=2  v=5   pop 1 (1<=5), pop 0 (4<=5)
+                                  deque=[2]      vals=(5)
+           front 2 <= 0? no                    window [1,5] → max = nums[2] = 5
+i=3  v=2   5 <= 2? no             deque=[2,3]    vals=(5,2)
+           front 2 <= 1? no                    window [5,2] → max = nums[2] = 5
+
+output = [4, 5, 5]
+
+At i=2 both older candidates die at once — but each was pushed only once,
+so the total pop count over the whole array is at most n.
 ```
 
 ### Interview explanation
-"This is a Sliding Window Maximum problem. I'll a double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier. That brings the complexity down to O(n) time and O(k) space — here's the template."
+"The naive solution rescans each window for O(n·k). I can't just keep a running max, because when the maximum itself leaves the window I have no fallback value. So I keep a deque of candidate **indices** whose values are strictly decreasing. When a new value arrives I pop from the back every index whose value is `<=` it — those are smaller *and* expire earlier, so they can never be the max again. Then I pop the front if it has slid out of the window. The front is always the current window's maximum in O(1). Each index is pushed once and popped once, so it's O(n) time and O(k) space — better than the O(n log n) heap-with-lazy-deletion alternative."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Queues** family template. Adapt the comparison/condition to the specific problem.
+> Wrap the deque in a tiny "window max oracle": `Push` the newest value, `Max` answers for the last `k` pushes in O(1). DP loops read it before pushing.
 
 ```go
-// Sliding window maximum with a monotonic decreasing deque of indices.
-func maxSlidingWindow(nums []int, k int) []int {
-    dq := []int{}      // indices, values decreasing
-    res := []int{}
-    for i, v := range nums {
-        for len(dq) > 0 && nums[dq[len(dq)-1]] < v { dq = dq[:len(dq)-1] }
-        dq = append(dq, i)
-        if dq[0] <= i-k { dq = dq[1:] }          // evict out-of-window
-        if i >= k-1 { res = append(res, nums[dq[0]]) }
-    }
-    return res
+// WindowMax answers "maximum of the last k pushed values" in O(1) amortised.
+// Push after computing a value, Max before — that is exactly the shape of
+// dp[i] = f(nums[i]) + max(dp[i-k .. i-1]).
+type WindowMax struct {
+	k     int
+	vals  []int // every value pushed, in push order
+	deque []int // indices into vals; vals[deque] strictly decreasing
 }
+
+func NewWindowMax(k int) *WindowMax { return &WindowMax{k: k} }
+
+func (w *WindowMax) Push(v int) {
+	i := len(w.vals)
+	w.vals = append(w.vals, v)
+	// dominated: smaller value AND expires earlier -> can never be the max
+	for len(w.deque) > 0 && w.vals[w.deque[len(w.deque)-1]] <= v {
+		w.deque = w.deque[:len(w.deque)-1]
+	}
+	w.deque = append(w.deque, i)
+	if w.deque[0] <= i-w.k { // front slid out of the window
+		w.deque = w.deque[1:]
+	}
+}
+
+// Empty reports whether nothing has been pushed yet.
+func (w *WindowMax) Empty() bool { return len(w.deque) == 0 }
+
+// Max is the maximum of the last k pushed values. Panics if Empty.
+func (w *WindowMax) Max() int { return w.vals[w.deque[0]] }
 ```
 
 ```python
 from collections import deque
-def max_sliding_window(nums, k):
-    dq, res = deque(), []          # dq holds indices, values decreasing
-    for i, v in enumerate(nums):
-        while dq and nums[dq[-1]] < v:
-            dq.pop()
-        dq.append(i)
-        if dq[0] <= i - k:
-            dq.popleft()
-        if i >= k - 1:
-            res.append(nums[dq[0]])
-    return res
+
+
+class WindowMax:
+    """Maximum of the last k pushed values, O(1) amortised per push."""
+
+    def __init__(self, k):
+        self.k = k
+        self.vals = []
+        self.dq = deque()                 # indices into vals, values decreasing
+
+    def push(self, v):
+        i = len(self.vals)
+        self.vals.append(v)
+        while self.dq and self.vals[self.dq[-1]] <= v:
+            self.dq.pop()                 # dominated: smaller and expires earlier
+        self.dq.append(i)
+        if self.dq[0] <= i - self.k:      # front slid out of the window
+            self.dq.popleft()
+
+    def empty(self):
+        return not self.dq
+
+    def max(self):
+        return self.vals[self.dq[0]]
 ```
 
 ```java
-int[] maxSlidingWindow(int[] nums, int k) {
-    Deque<Integer> dq = new ArrayDeque<>();
-    int[] res = new int[nums.length - k + 1];
-    for (int i = 0; i < nums.length; i++) {
-        while (!dq.isEmpty() && nums[dq.peekLast()] < nums[i]) dq.pollLast();
+// Maximum of the last k pushed values, O(1) amortised per push.
+class WindowMax {
+    private final int k;
+    private final List<Integer> vals = new ArrayList<>();
+    private final Deque<Integer> dq = new ArrayDeque<>();  // indices, values decreasing
+
+    WindowMax(int k) { this.k = k; }
+
+    void push(int v) {
+        int i = vals.size();
+        vals.add(v);
+        while (!dq.isEmpty() && vals.get(dq.peekLast()) <= v) dq.pollLast();
         dq.offerLast(i);
-        if (dq.peekFirst() <= i - k) dq.pollFirst();
-        if (i >= k - 1) res[i - k + 1] = nums[dq.peekFirst()];
+        if (dq.peekFirst() <= i - k) dq.pollFirst();   // expired
     }
-    return res;
+
+    boolean empty() { return dq.isEmpty(); }
+
+    int max() { return vals.get(dq.peekFirst()); }
 }
 ```
 
 ```cpp
-vector<int> maxSlidingWindow(vector<int>& nums, int k) {
-    deque<int> dq; vector<int> res;
-    for (int i = 0; i < (int)nums.size(); ++i) {
-        while (!dq.empty() && nums[dq.back()] < nums[i]) dq.pop_back();
+// Maximum of the last k pushed values, O(1) amortised per push.
+class WindowMax {
+    int k;
+    vector<int> vals;
+    deque<int> dq;                         // indices into vals, values decreasing
+public:
+    explicit WindowMax(int k) : k(k) {}
+
+    void push(int v) {
+        int i = (int)vals.size();
+        vals.push_back(v);
+        while (!dq.empty() && vals[dq.back()] <= v) dq.pop_back();
         dq.push_back(i);
-        if (dq.front() <= i - k) dq.pop_front();
-        if (i >= k - 1) res.push_back(nums[dq.front()]);
+        if (dq.front() <= i - k) dq.pop_front();       // expired
     }
-    return res;
-}
+
+    bool empty() const { return dq.empty(); }
+
+    int max() const { return vals[dq.front()]; }
+};
 ```
 
 ---
@@ -250,145 +395,300 @@ vector<int> maxSlidingWindow(vector<int>& nums, int k) {
 ## 9. Solved Example 1
 
 ### Problem — Sliding Window Max (LeetCode 239)
-A representative **Sliding Window Maximum** problem. The signal: deque of candidate indices gives window maxima in o(n).
+A window of size `k` slides across `nums` from left to right, one position at a time. Return an array containing the maximum value in each window position.
 
 ### Thought Process
-1. Keep a deque of indices whose values are in strictly decreasing order — the front is always the max of the current window.
-2. Before pushing index `i`, pop indices from the back whose value is `<= nums[i]`; they can never be the max while `i` is in the window.
-3. Pop the front when it falls out of the window (`dq[0] <= i - k`), and once `i >= k-1` record `nums[dq[0]]` as that window's maximum.
+1. Rescanning every window is O(n·k), and a single running max breaks the moment the max leaves.
+2. Keep a deque of **indices** whose values strictly decrease front → back.
+3. Before pushing `i`, pop every back index with `nums[back] <= nums[i]` — dominated in value *and* in lifetime.
+4. After pushing, pop the front if `front <= i - k`, because it has slid out of the window.
+5. Once `i >= k-1` a full window exists, so emit `nums[front]`.
 
 ### Dry Run
-`nums=[1,3,-1,-3,5], k=3`
-- i=0 v=1 → dq=[0]
-- i=1 v=3 pops 0 → dq=[1]
-- i=2 v=-1 → dq=[1,2]; window full → max=nums[1]=3
-- i=3 v=-3 → dq=[1,2,3]; front 1 <= 3-3=0? no → max=nums[1]=3
-- i=4 v=5 pops 3,2,1 → dq=[4]; max=nums[4]=5 → result `[3,3,5]`.
+
+Input: `nums = [1,3,-1,-3,5,3,6,7]`, `k = 3`
+
+| i | v | back-pops | deque (indices) | values | front expired (`front <= i-3`)? | emit |
+|---|----|-----------|-----------------|--------|----------------------------------|------|
+| 0 | 1 | — | `[0]` | `(1)` | `0 <= -3`? no | — |
+| 1 | 3 | pop 0 (`1<=3`) | `[1]` | `(3)` | `1 <= -2`? no | — |
+| 2 | -1 | none | `[1,2]` | `(3,-1)` | `1 <= -1`? no | **3** |
+| 3 | -3 | none | `[1,2,3]` | `(3,-1,-3)` | `1 <= 0`? no | **3** |
+| 4 | 5 | pop 3, 2, 1 | `[4]` | `(5)` | `4 <= 1`? no | **5** |
+| 5 | 3 | none | `[4,5]` | `(5,3)` | `4 <= 2`? no | **5** |
+| 6 | 6 | pop 5, 4 | `[6]` | `(6)` | `6 <= 3`? no | **6** |
+| 7 | 7 | pop 6 | `[7]` | `(7)` | `7 <= 4`? no | **7** |
+
+Output: **`[3,3,5,5,6,7]`**
+
+Rows `i=4` and `i=6` show the amortisation: three pops then two pops, but every index popped had been pushed exactly once — total pops over the run is 7, not 7×3. Row `i=3` shows the other rule doing nothing: index 1 is `> i-k = 0`, so the max stays index 1 even though two newer elements arrived.
 
 ### Visualization
-```
-input  ──▶ [ apply Sliding Window Maximum step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums:  1    3   -1   -3    5    3    6    7
+idx :  0    1    2    3    4    5    6    7
+
+              [ 1  3 -1 ]                    front→ 3
+                 [ 3 -1 -3 ]                 front→ 3
+                    [-1 -3  5 ]              front→ 5
+                        [-3  5  3 ]          front→ 5
+                            [ 5  3  6 ]      front→ 6
+                               [ 3  6  7 ]   front→ 7
+
+deque values are ALWAYS decreasing front → back:
+
+  i=3   deque = [1, 2, 3]      values  3 > -1 > -3
+  i=4   arriving 5 sweeps all three away, since 3, -1, -3 are all <= 5
+        deque = [4]            values  5
 ```
 
 ### Code
+
+```go
+// maxSlidingWindow returns the maximum of each k-sized window of nums.
+func maxSlidingWindow(nums []int, k int) []int {
+	if k <= 0 || len(nums) < k {
+		return nil
+	}
+	deque := make([]int, 0, len(nums)) // indices; nums[deque] strictly decreasing
+	out := make([]int, 0, len(nums)-k+1)
+	for i, v := range nums {
+		for len(deque) > 0 && nums[deque[len(deque)-1]] <= v {
+			deque = deque[:len(deque)-1] // dominated: smaller and expires earlier
+		}
+		deque = append(deque, i)
+		if deque[0] <= i-k {
+			deque = deque[1:] // front slid out of the window
+		}
+		if i >= k-1 { // first full window has formed
+			out = append(out, nums[deque[0]])
+		}
+	}
+	return out
+}
+```
+
 ```python
 from collections import deque
 
-def maxSlidingWindow(nums, k):
-    dq, res = deque(), []          # dq holds indices, values decreasing
+
+def max_sliding_window(nums, k):
+    if k <= 0 or len(nums) < k:
+        return []
+    dq, out = deque(), []                    # dq holds indices, values decreasing
     for i, v in enumerate(nums):
         while dq and nums[dq[-1]] <= v:
-            dq.pop()
+            dq.pop()                         # dominated: smaller and expires earlier
         dq.append(i)
-        if dq[0] <= i - k:         # front slid out of the window
-            dq.popleft()
-        if i >= k - 1:             # window fully formed
-            res.append(nums[dq[0]])
-    return res
+        if dq[0] <= i - k:
+            dq.popleft()                     # front slid out of the window
+        if i >= k - 1:
+            out.append(nums[dq[0]])
+    return out
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is pushed and popped from the deque at most once.
+Time O(n) — each index is appended once and removed at most once, so the inner loop does ≤ n pops in total. Space O(k) — the deque holds at most one window of indices (output not counted).
 
 ## 10. Solved Example 2
 
 ### Problem — Jump VI (LeetCode 1696)
-A representative **Sliding Window Maximum** problem. The signal: deque of candidate indices gives window maxima in o(n).
+You start at index `0` of `nums` and repeatedly jump forward between `1` and `k` steps until you reach the last index. Your score is the sum of the values you land on. Return the maximum score.
 
 ### Thought Process
-1. Let `dp[i]` be the max score to reach index `i`; then `dp[i] = nums[i] + max(dp[i-k .. i-1])`, since you can jump here from up to `k` steps back.
-2. The `max(dp[i-k .. i-1])` is a sliding-window maximum over the `dp` array — maintain a deque of indices with decreasing `dp` values.
-3. For each `i`, drop front indices older than `i-k`, read `dp[dq[0]]` as the best predecessor, compute `dp[i]`, then push `i` after popping smaller `dp` from the back. Answer is `dp[n-1]`.
+1. Let `dp[i]` = the best score achievable when standing on index `i`. Then `dp[i] = nums[i] + max(dp[i-k .. i-1])`, because you must have jumped here from somewhere in the previous `k` indices.
+2. Base case `dp[0] = nums[0]` — you start there for free.
+3. Computing `max(dp[i-k .. i-1])` by scanning is O(n·k). But it is literally a sliding window maximum over the `dp` array.
+4. Keep a deque of indices with decreasing `dp`. Read the front **before** computing `dp[i]`; push `i` **after**.
+5. Evict the front while `front < i - k`, so the deque only holds legal predecessors. The answer is `dp[n-1]`.
 
 ### Dry Run
-`nums=[1,-1,-2,4,-7,3], k=2`
-- dp[0]=1, dq=[0]
-- i=1: best=dp[0]=1 → dp[1]=1+(-1)=0; dq=[0,1]
-- i=2: front 0 in window; best=dp[0]=1 → dp[2]=1+(-2)=-1; dq=[0,1,2]
-- i=3: drop front 0 (0 < 3-2=1) → dq=[1,2]; best=dp[1]=0 → dp[3]=4; pops 2,1 → dq=[3]
-- i=4: best=dp[3]=4 → dp[4]=-7+4=-3; dq=[3,4]
-- i=5: best=dp[3]=4 → dp[5]=3+4=7 → answer **7**.
+
+Input: `nums = [1,-1,-2,4,-7,3]`, `k = 2`
+
+| i | evict front (`front < i-2`) | deque before read | best = dp[front] | dp[i] = nums[i] + best | back-pops (`dp[back] <= dp[i]`) | deque after |
+|---|------------------------------|-------------------|------------------|------------------------|----------------------------------|-------------|
+| 0 | — (base case) | — | — | `dp[0] = 1` | — | `[0]` |
+| 1 | `0 < -1`? no | `[0]` | `dp[0] = 1` | `-1 + 1 = 0` | `dp[0]=1 <= 0`? no | `[0,1]` |
+| 2 | `0 < 0`? no | `[0,1]` | `dp[0] = 1` | `-2 + 1 = -1` | `dp[1]=0 <= -1`? no | `[0,1,2]` |
+| 3 | `0 < 1`? **yes**, pop | `[1,2]` | `dp[1] = 0` | `4 + 0 = 4` | pop 2 (`-1<=4`), pop 1 (`0<=4`) | `[3]` |
+| 4 | `3 < 2`? no | `[3]` | `dp[3] = 4` | `-7 + 4 = -3` | `dp[3]=4 <= -3`? no | `[3,4]` |
+| 5 | `3 < 3`? no | `[3,4]` | `dp[3] = 4` | `3 + 4 = 7` | — | `[3,5]` |
+
+Output: **`7`** (jump 0 → 1 → 3 → 5, scoring `1 + (-1) + 4 + 3 = 7`)
+
+Row `i=3` is the one to stare at: index 0 held the best `dp` so far (`1`), but it is now more than `k = 2` steps back, so it is *illegal*, not merely worse. That front eviction is what makes `dp[3]` build on `dp[1] = 0` instead of `dp[0] = 1`.
 
 ### Visualization
-```
-input  ──▶ [ apply Sliding Window Maximum step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums:   1   -1   -2    4   -7    3
+dp  :   1    0   -1    4   -3    7
+idx :   0    1    2    3    4    5
+
+legal predecessors of i are the k = 2 indices just before it:
+
+  i=3 :        [1, 2]           max dp = dp[1] = 0   → dp[3] = 4 + 0 = 4
+  i=5 :                 [3, 4]  max dp = dp[3] = 4   → dp[5] = 3 + 4 = 7
+                         ^
+                         deque front — index 4 sits behind it because
+                         dp[4] = -3 <= dp[3] = 4, so it is dominated
+
+answer = dp[5] = 7
 ```
 
 ### Code
+
+```go
+// maxResult returns the best score reachable at the last index when each jump
+// advances between 1 and k positions.
+func maxResult(nums []int, k int) int {
+	n := len(nums)
+	dp := make([]int, n)
+	dp[0] = nums[0]
+	deque := []int{0} // indices with decreasing dp values
+	for i := 1; i < n; i++ {
+		for deque[0] < i-k { // predecessor is out of jump range
+			deque = deque[1:]
+		}
+		dp[i] = nums[i] + dp[deque[0]] // best legal predecessor
+		for len(deque) > 0 && dp[deque[len(deque)-1]] <= dp[i] {
+			deque = deque[:len(deque)-1] // dominated predecessor
+		}
+		deque = append(deque, i)
+	}
+	return dp[n-1]
+}
+```
+
 ```python
 from collections import deque
 
-def maxResult(nums, k):
+
+def max_result(nums, k):
     n = len(nums)
     dp = [0] * n
     dp[0] = nums[0]
-    dq = deque([0])                    # indices with decreasing dp values
+    dq = deque([0])                      # indices with decreasing dp values
     for i in range(1, n):
-        while dq[0] < i - k:           # front outside [i-k, i-1]
+        while dq[0] < i - k:             # predecessor out of jump range
             dq.popleft()
-        dp[i] = nums[i] + dp[dq[0]]    # best reachable predecessor
+        dp[i] = nums[i] + dp[dq[0]]      # best legal predecessor
         while dq and dp[dq[-1]] <= dp[i]:
-            dq.pop()
+            dq.pop()                     # dominated predecessor
         dq.append(i)
     return dp[-1]
 ```
 
 ### Complexity
-Time O(n), Space O(n) for the dp array (deque holds at most k+1 indices).
+Time O(n) — one pass, with each index pushed and popped from the deque at most once. Space O(n) for the `dp` array; the deque itself never exceeds `k+1` entries.
 
 ## 11. Solved Example 3
 
 ### Problem — Constrained Subseq (LeetCode 1425)
-A representative **Sliding Window Maximum** problem. The signal: deque of candidate indices gives window maxima in o(n).
+Pick a non-empty subsequence of `nums` in which every two consecutive chosen indices are at most `k` apart. Return the maximum possible sum of such a subsequence.
 
 ### Thought Process
-1. Let `dp[i]` be the best subsequence sum ending at `i`; then `dp[i] = nums[i] + max(0, max(dp[i-k .. i-1]))` — extend the best window predecessor, or start fresh if it is negative.
-2. Maintain a deque of indices with decreasing `dp` values to read `max(dp[i-k .. i-1])` in O(1), evicting the front once it leaves the window.
-3. Unlike Jump VI, the subsequence can end anywhere, so track a running answer as the maximum `dp[i]` over all `i`.
+1. Let `dp[i]` = the best sum of a valid subsequence that **ends at index `i`**. The answer is `max(dp)` over all `i`, since the subsequence may end anywhere.
+2. Recurrence: `dp[i] = nums[i] + max(0, max(dp[i-k .. i-1]))`. The inner `max(0, ...)` says "or start a brand-new subsequence at `i`" — never extend a negative prefix.
+3. Base: `dp[0] = nums[0]` (the window `dp[-k..-1]` is empty, so the inner max is 0).
+4. `max(dp[i-k .. i-1])` is again a sliding window maximum — deque of indices with decreasing `dp`, front evicted while `front < i - k`.
+5. Unlike Jump VI, track a running `answer` as you go instead of reading `dp[n-1]`.
 
 ### Dry Run
-`nums=[10,2,-10,5,20], k=2`
-- i=0: best=0 → dp[0]=10, ans=10, dq=[0]
-- i=1: max(0,dp[0])=10 → dp[1]=12; pop 0 (10<=12) → dq=[1]; ans=12
-- i=2: front 1 in window, max(0,dp[1])=12 → dp[2]=2; dq=[1,2]; ans=12
-- i=3: front 1 stays (1 < 3-2=1 is false); max(0,dp[1])=12 → dp[3]=17; pops 2,1 → dq=[3]; ans=17
-- i=4: max(0,dp[3])=17 → dp[4]=37; ans=**37**.
+
+Input: `nums = [10,2,-10,5,20]`, `k = 2`
+
+| i | evict front (`front < i-2`) | deque | best = `max(0, dp[front])` | dp[i] | back-pops | deque after | answer |
+|---|------------------------------|-------|-----------------------------|-------|-----------|-------------|--------|
+| 0 | deque empty → best 0 | `[]` | `0` | `10 + 0 = 10` | — | `[0]` | 10 |
+| 1 | `0 < -1`? no | `[0]` | `max(0, 10) = 10` | `2 + 10 = 12` | pop 0 (`10<=12`) | `[1]` | 12 |
+| 2 | `1 < 0`? no | `[1]` | `max(0, 12) = 12` | `-10 + 12 = 2` | `dp[1]=12 <= 2`? no | `[1,2]` | 12 |
+| 3 | `1 < 1`? no | `[1,2]` | `max(0, 12) = 12` | `5 + 12 = 17` | pop 2 (`2<=17`), pop 1 (`12<=17`) | `[3]` | 17 |
+| 4 | `3 < 2`? no | `[3]` | `max(0, 17) = 17` | `20 + 17 = 37` | — | `[3,4]` | **37** |
+
+Output: **`37`** (the subsequence `10, 2, 5, 20` — index gaps 1, 2, 1, all ≤ `k`)
+
+Row `i=2` is the interesting one: `dp[2] = 2` is worse than `dp[1] = 12`, but index 2 still enters the deque, because once index 1 expires it may become the best *legal* predecessor. Domination is only allowed to remove entries that are worse **and** expire no later.
 
 ### Visualization
-```
-input  ──▶ [ apply Sliding Window Maximum step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums:  10    2  -10    5   20
+dp  :  10   12    2   17   37
+idx :   0    1    2    3    4
+
+i=3, k=2 → legal predecessors are indices [1, 2]
+
+   dp:      12    2
+   deque:  [1,   2]        12 > 2, decreasing ✓
+            ^ front → best predecessor = 12
+   dp[3] = 5 + max(0, 12) = 17
+   17 beats both, so both are popped from the back →  deque = [3]
+
+why max(0, ...)?  if the best predecessor's dp were negative, extending it
+would only hurt; starting fresh at i gives dp[i] = nums[i].
+
+answer = max over all dp = 37
 ```
 
 ### Code
+
+```go
+// constrainedSubsetSum returns the largest sum of a subsequence in which
+// consecutive chosen indices are at most k apart.
+func constrainedSubsetSum(nums []int, k int) int {
+	n := len(nums)
+	dp := make([]int, n)
+	deque := make([]int, 0, n) // indices with decreasing dp values
+	answer := nums[0]
+	for i := 0; i < n; i++ {
+		for len(deque) > 0 && deque[0] < i-k {
+			deque = deque[1:] // predecessor too far back to be legal
+		}
+		bestPrev := 0 // 0 means "start a fresh subsequence at i"
+		if len(deque) > 0 && dp[deque[0]] > 0 {
+			bestPrev = dp[deque[0]]
+		}
+		dp[i] = nums[i] + bestPrev
+		if dp[i] > answer {
+			answer = dp[i]
+		}
+		for len(deque) > 0 && dp[deque[len(deque)-1]] <= dp[i] {
+			deque = deque[:len(deque)-1] // dominated predecessor
+		}
+		deque = append(deque, i)
+	}
+	return answer
+}
+```
+
 ```python
 from collections import deque
 
-def constrainedSubsetSum(nums, k):
+
+def constrained_subset_sum(nums, k):
     n = len(nums)
     dp = [0] * n
-    dq = deque()                       # indices with decreasing dp values
-    ans = float('-inf')
+    dq = deque()                              # indices with decreasing dp values
+    answer = nums[0]
     for i in range(n):
-        while dq and dq[0] < i - k:    # front outside window [i-k, i-1]
-            dq.popleft()
-        best = dp[dq[0]] if dq else 0
-        dp[i] = nums[i] + max(0, best)
-        ans = max(ans, dp[i])
+        while dq and dq[0] < i - k:
+            dq.popleft()                      # predecessor too far back
+        best_prev = dp[dq[0]] if dq else 0
+        dp[i] = nums[i] + max(0, best_prev)   # 0 -> start fresh at i
+        answer = max(answer, dp[i])
         while dq and dp[dq[-1]] <= dp[i]:
-            dq.pop()
+            dq.pop()                          # dominated predecessor
         dq.append(i)
-    return ans
+    return answer
 ```
 
 ### Complexity
-Time O(n), Space O(n) for the dp array (deque holds at most k+1 indices).
+Time O(n) — one pass; every index enters and leaves the deque at most once. Space O(n) for `dp`; the deque holds at most `k+1` indices.
 
+---
 
 ## 12. LeetCode Practice Set
 

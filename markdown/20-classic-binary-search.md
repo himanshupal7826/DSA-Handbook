@@ -41,32 +41,126 @@ binary search, sorted, logn, mid, divide.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Where does this value sit in an ordered space?"*
+
+Running example: `nums = [-1, 0, 3, 5, 9, 12]`, `target = 9`. (Answer: index 4.)
+
 ### Intuition
-Linear scan checks each candidate — O(n).
+Walk the array from the front and compare each element with the target. Stop at the first match; if you fall off the end, it isn't there.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For `i` from `0` to `n − 1`:
+2. &nbsp;&nbsp;If `nums[i] == target`, return `i`.
+3. Return `-1`.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n)** — up to `n` comparisons.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Classic Binary Search pattern is built to use.
+- On the running example the scan reads `-1, 0, 3, 5, 9` — five comparisons. But the very first one already told us everything: `-1 < 9`, and the array is **sorted**, so `0` and `3` cannot possibly be 9 either. We compared them anyway.
+- Each comparison is thrown away. A comparison against a sorted array carries information about *every* element on both sides of it, and the linear scan uses it only for the single element it touched.
+- The cost is not academic: on a million-element array a scan averages 500,000 comparisons where 20 would do.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Classic Binary Search invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Compare against the middle: one comparison against a sorted array eliminates half of everything that is left.**
+
+It's how you find a word in a paper dictionary. You don't start at "aardvark" — you open it in the middle, see whether your word sorts before or after, and throw away the half it can't be in. Repeat. A 100,000-word dictionary is exhausted in 17 openings, because each one halves the pile.
+
+### The thought process
+
+```text
+We need    : the index of target in a sorted array.
+Obvious way: scan from the left.
+Too slow   : O(n) — and it ignores the sortedness entirely.
+Notice     : if nums[mid] < target, then EVERY index <= mid is also < target.
+Therefore  : one comparison rules out half the remaining candidates.
+Now        : n -> n/2 -> n/4 -> ... -> 1  is log2(n) steps → O(log n).
+```
+
+### Why the half-open range `[lo, hi)` is the invariant to memorise
+
+Binary search is famously easy to get wrong — off-by-ones, infinite loops, `hi = mid` versus `hi = mid - 1`. The cure is to fix **one** convention and never deviate. Throughout chapters 20–24 we use the *half-open* range:
+
+```text
+[lo, hi)   means   lo, lo+1, ..., hi-1      (lo included, hi EXCLUDED)
+```
+
+Three things follow, and together they make every variant in this family fall out mechanically:
+
+**1. The loop invariant, in words:**
+
+> *If the answer exists at all, it is inside `[lo, hi)`.*
+
+We start with `lo = 0`, `hi = n`, which is the whole array — so the invariant is true at the start. Each iteration only discards indices that the comparison has proved cannot be the answer, so the invariant stays true. When the loop ends, `lo == hi` and the range is empty.
+
+**2. Why `hi = mid` and not `hi = mid - 1`.** Because `hi` is *exclusive*, writing `hi = mid` discards `mid` and everything after it — exactly one half — while keeping the range's meaning unchanged. There is no `-1` to forget. Symmetrically `lo = mid + 1` discards `mid` and everything before it, because `lo` is *inclusive*.
+
+**3. Why the loop terminates.** With `lo < hi`, integer division gives
+
+```text
+lo  <=  mid  <  hi
+```
+
+`mid` can equal `lo` but can never equal `hi`. So `lo = mid + 1` strictly increases `lo`, and `hi = mid` strictly decreases `hi` (since `mid < hi`). The gap `hi − lo` shrinks by at least 1 every iteration and can never go negative — the loop must end. The classic infinite loop (`hi = mid` paired with a `mid` that rounds *up*) is impossible here because `mid` always rounds **down**.
+
+### Why `mid = lo + (hi - lo) / 2` and not `(lo + hi) / 2`
+
+Mathematically they are the same number. On a machine with fixed-width integers they are not:
+
+```text
+32-bit signed int maxes out at 2,147,483,647
+
+lo = 1,500,000,000
+hi = 2,000,000,000
+
+(lo + hi)      = 3,500,000,000   → overflows → wraps to a NEGATIVE number
+(lo + hi) / 2  = a negative "midpoint" → out-of-bounds index or infinite loop
+
+lo + (hi - lo) / 2:
+   hi - lo     =   500,000,000   → fits comfortably
+   /2          =   250,000,000
+   lo + that   = 1,750,000,000   → correct, and never exceeded hi
+```
+
+Because `hi >= lo`, the quantity `hi - lo` is non-negative and no larger than `hi`, so no intermediate value can exceed the largest index — the expression cannot overflow. This is not a hypothetical: the bug sat undetected in Java's `Arrays.binarySearch` for nine years. Python's arbitrary-precision integers make `(lo + hi) // 2` safe there, but write the subtraction form everywhere so the habit survives the language switch.
+
+### Steps
+
+```text
+Step 1 → lo = 0, hi = n            (the invariant: answer, if any, is in [lo, hi))
+Step 2 → while lo < hi:
+Step 3 →     mid = lo + (hi - lo) / 2
+Step 4 →     if nums[mid] == target → return mid
+Step 5 →     if nums[mid] <  target → lo = mid + 1   (mid and everything left of it is too small)
+Step 6 →     else                   → hi = mid       (mid and everything right of it is too big)
+Step 7 → return -1                  (range is empty: target is absent)
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "sorted array", "O(log n) required", n up to 1e5..1e9,
+  a monotonic predicate ("once true, always true"),
+  an API you may only call a limited number of times
+        ↓
+Think about...
+  "Can one probe at the middle rule out half the remaining candidates?"
+        ↓
+Use...
+  half-open [lo, hi), mid = lo + (hi-lo)/2
+  ├─ exact match wanted      → return on ==, else lo = mid+1 / hi = mid   (this chapter)
+  ├─ boundary wanted         → never return early; let lo converge        (chapters 21-24)
+  └─ search space is VALUES  → set lo/hi to the value range, not indices
+```
 
 ### Visual explanation
 
@@ -91,69 +185,99 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Classic Binary Sea: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [-1,  0,  3,  5,  9, 12]      target = 9
+index    0   1   2   3   4   5
+
+step 1   [lo=0 ................ hi=6)     mid = 0 + 6/2 = 3
+         nums[3] = 5 < 9  →  everything at index <= 3 is too small
+                             lo = 4
+
+step 2               [lo=4 ..... hi=6)    mid = 4 + 2/2 = 5
+         nums[5] = 12 > 9 →  everything at index >= 5 is too big
+                             hi = 5
+
+step 3               [lo=4 hi=5)          mid = 4 + 1/2 = 4
+         nums[4] = 9  ==  9  →  return 4  ★
+
+6 candidates → 2 → 1 → done.  3 comparisons instead of 5.
 ```
 
 ### Interview explanation
-"This is a Classic Binary Search problem. I'll if the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration. That brings the complexity down to O(log n) time and O(1) space — here's the template."
+"The array is sorted, so a single comparison against the middle element tells me which half the target must be in, and I can discard the other half — that's O(log n). I keep a half-open range `[lo, hi)` with the invariant that the answer, if it exists, is always inside it: `lo = mid + 1` when the middle is too small, `hi = mid` when it's too large, and I return immediately on a match. The half-open convention means neither update needs an off-by-one adjustment on `hi`. I compute the midpoint as `lo + (hi-lo)/2` rather than `(lo+hi)/2` so the sum can't overflow on large ranges. The loop terminates because `mid` always rounds down, so `lo <= mid < hi` and the gap strictly shrinks. O(log n) time, O(1) space."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Binary Search** family template. Adapt the comparison/condition to the specific problem.
+> Half-open `[lo, hi)`, `mid = lo + (hi-lo)/2`, `lo = mid+1` or `hi = mid`. Memorise this shape once; chapters 21–24 change only the comparison.
 
 ```go
-// Lower bound: first index with a[i] >= target. Half-open invariant [lo, hi).
-func lowerBound(a []int, target int) int {
-    lo, hi := 0, len(a)
+// BinarySearch returns an index of target in the sorted slice a, or -1.
+// Invariant: if target is present, its index lies in [lo, hi).
+func BinarySearch(a []int, target int) int {
+    lo, hi := 0, len(a) // half-open: hi is one PAST the last candidate
     for lo < hi {
-        mid := lo + (hi-lo)/2     // avoids overflow
-        if a[mid] < target {
-            lo = mid + 1
-        } else {
-            hi = mid
+        mid := lo + (hi-lo)/2 // subtraction form: cannot overflow
+        switch {
+        case a[mid] == target:
+            return mid
+        case a[mid] < target:
+            lo = mid + 1 // mid and everything before it is too small
+        default:
+            hi = mid // mid and everything after it is too large
         }
     }
-    return lo
+    return -1 // range is empty → absent
 }
 ```
 
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def binary_search(a, target):
+    """Index of target in the sorted list a, or -1.
+    Invariant: if target is present, its index lies in [lo, hi)."""
+    lo, hi = 0, len(a)                 # half-open: hi is one PAST the last candidate
     while lo < hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2      # subtraction form: habit that survives other languages
+        if a[mid] == target:
+            return mid
         if a[mid] < target:
-            lo = mid + 1
+            lo = mid + 1               # mid and everything before it is too small
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            hi = mid                   # mid and everything after it is too large
+    return -1                          # range is empty → absent
 ```
 
 ```java
-int lowerBound(int[] a, int target) {
-    int lo = 0, hi = a.length;
-    while (lo < hi) {
-        int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+public class BinarySearchTemplate {
+    // Index of target in the sorted array a, or -1.
+    public static int binarySearch(int[] a, int target) {
+        int lo = 0, hi = a.length;              // half-open [lo, hi)
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;       // cannot overflow
+            if (a[mid] == target) return mid;
+            if (a[mid] < target) lo = mid + 1;  // too small
+            else hi = mid;                      // too large
+        }
+        return -1;
     }
-    return lo;
 }
 ```
 
 ```cpp
-int lowerBound(vector<int>& a, int target) {
-    int lo = 0, hi = (int)a.size();
+#include <vector>
+using namespace std;
+
+// Index of target in the sorted vector a, or -1.
+int binarySearch(const vector<int>& a, int target) {
+    int lo = 0, hi = (int)a.size();          // half-open [lo, hi)
     while (lo < hi) {
-        int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+        int mid = lo + (hi - lo) / 2;        // cannot overflow
+        if (a[mid] == target) return mid;
+        if (a[mid] < target) lo = mid + 1;   // too small
+        else hi = mid;                       // too large
     }
-    return lo;
+    return -1;
 }
 ```
 
@@ -239,124 +363,285 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Binary Search (LeetCode 704)
-Given a sorted array `nums` and a `target`, return the index of `target`, or `-1` if it is absent.
+Given a sorted array of distinct integers `nums` and a `target`, return the index of `target`, or `-1` if it is not present. Required complexity: O(log n).
 
 ### Thought Process
-1. Keep a closed interval `[lo, hi]` of indices that could still hold the target.
-2. Compare `nums[mid]` to `target`: equal → return `mid`; smaller → search right (`lo = mid+1`); larger → search left (`hi = mid-1`).
-3. When `lo > hi` the interval is empty, so the target is absent → return `-1`.
+1. The array is sorted and we want an exact match — the textbook case.
+2. Keep the half-open range `[lo, hi)` starting at `[0, n)`, with the invariant *"if the target is in the array, its index is in `[lo, hi)`"*.
+3. Probe `mid = lo + (hi-lo)/2`. Equal → done. Smaller → the target must be to the right, so `lo = mid + 1`. Larger → `hi = mid`.
+4. Because `hi` is exclusive, `hi = mid` drops `mid` without any `−1` bookkeeping.
+5. If the loop ends, `lo == hi`, the range is empty, and the invariant says the target was never there → `-1`.
 
 ### Dry Run
-`nums = [-1,0,3,5,9,12], target = 9`
-- lo=0, hi=5, mid=2 → nums[2]=3 < 9 → lo=3
-- lo=3, hi=5, mid=4 → nums[4]=9 == 9 → return 4
+
+Input: `nums = [-1, 0, 3, 5, 9, 12]`, `target = 9`
+
+| step | `lo` | `hi` | `mid = lo+(hi-lo)/2` | `nums[mid]` | vs target | action |
+|------|------|------|----------------------|-------------|-----------|--------|
+| 1 | 0 | 6 | 0 + 3 = **3** | 5 | 5 < 9 | `lo = 4` (indices 0–3 ruled out) |
+| 2 | 4 | 6 | 4 + 1 = **5** | 12 | 12 > 9 | `hi = 5` (index 5 ruled out) |
+| 3 | 4 | 5 | 4 + 0 = **4** | 9 | **equal** | return **4** |
+
+Output: **4**
+
+A missing target, `target = 2`: step 1 `mid=3`, `5 > 2` → `hi=3`; step 2 `lo=0,hi=3,mid=1`, `0 < 2` → `lo=2`; step 3 `lo=2,hi=3,mid=2`, `3 > 2` → `hi=2`; now `lo == hi == 2`, the range is empty → **−1**.
 
 ### Visualization
-```
-input  ──▶ [ apply Classic Binary Search step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+index      0    1    2    3    4    5
+nums     [-1,   0,   3,   5,   9,  12]      target = 9
+
+step 1   [ lo=0 ─────────────────── hi=6 )
+                          ↑ mid=3, value 5 < 9
+                          discard [0,4)
+
+step 2                      [ lo=4 ─── hi=6 )
+                                       ↑ mid=5, value 12 > 9
+                                       discard [5,6)
+
+step 3                      [ lo=4  hi=5 )
+                              ↑ mid=4, value 9  ★ found
+
+candidates: 6 → 2 → 1
 ```
 
 ### Code
+
+```go
+func search(nums []int, target int) int {
+    lo, hi := 0, len(nums) // half-open [lo, hi)
+
+    for lo < hi {
+        mid := lo + (hi-lo)/2 // subtraction form avoids overflow
+        if nums[mid] == target {
+            return mid
+        }
+        if nums[mid] < target {
+            lo = mid + 1 // mid and everything left of it is too small
+        } else {
+            hi = mid // mid and everything right of it is too large
+        }
+    }
+    return -1 // empty range → target absent
+}
+```
+
 ```python
 def search(nums, target):
-    lo, hi = 0, len(nums) - 1        # closed interval [lo, hi]
-    while lo <= hi:
-        mid = (lo + hi) // 2
+    lo, hi = 0, len(nums)              # half-open [lo, hi)
+
+    while lo < hi:
+        mid = lo + (hi - lo) // 2      # subtraction form avoids overflow
         if nums[mid] == target:
             return mid
-        elif nums[mid] < target:
-            lo = mid + 1
+        if nums[mid] < target:
+            lo = mid + 1               # left half ruled out
         else:
-            hi = mid - 1
-    return -1
+            hi = mid                   # right half ruled out
+
+    return -1                          # empty range → absent
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each step halves the candidate interval.
+Time **O(log n)** — the candidate count goes `n → n/2 → n/4 → …`, so at most `⌈log₂ n⌉ + 1` iterations. Space **O(1)** — two indices, no recursion.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Guess Number (LeetCode 374)
-Pick a number in `[1, n]`; the `guess(num)` API returns `-1` (too high), `1` (too low), or `0` (correct). Find the picked number.
+A number is picked in `[1, n]`. The API `guess(num)` returns `-1` if your guess is **too high**, `1` if it is **too low**, and `0` if it is correct. Find the picked number using as few calls as possible.
 
 ### Thought Process
-1. The candidate answers `1..n` form a sorted space, so binary search over the value itself.
-2. Call `guess(mid)`: `0` means found; `-1` means the pick is lower, so drop the upper half; `1` means higher, so drop the lower half.
-3. Repeat over the closed interval `[lo, hi]` until `guess` returns `0`.
+1. There is no array here — but the candidate answers `1, 2, …, n` are an ordered space, and `guess` tells you which side of your probe the answer lies on. That is all binary search ever needs.
+2. So run the same loop over **values** instead of indices: `[lo, hi) = [1, n+1)`. The `+1` is because `n` itself is a legal answer and `hi` is exclusive.
+3. `guess(mid) == 0` → return `mid`. `== -1` (too high) → the pick is below `mid`, so `hi = mid`. `== 1` (too low) → `lo = mid + 1`.
+4. Read the API's sign convention carefully — inverting it is the single most common way to fail this problem.
+5. `n` can be as large as 2³¹ − 1, so the overflow-safe midpoint is mandatory, not optional.
 
 ### Dry Run
-`n = 10`, pick = 6
-- lo=1, hi=10, mid=5 → guess(5)=1 (too low) → lo=6
-- lo=6, hi=10, mid=8 → guess(8)=-1 (too high) → hi=7
-- lo=6, hi=7, mid=6 → guess(6)=0 → return 6
+
+Input: `n = 10`, the hidden pick is `7`
+
+| step | `lo` | `hi` | `mid` | `guess(mid)` | meaning | action |
+|------|------|------|-------|--------------|---------|--------|
+| 1 | 1 | 11 | 1 + 5 = **6** | `1` | 6 is too low | `lo = 7` |
+| 2 | 7 | 11 | 7 + 2 = **9** | `-1` | 9 is too high | `hi = 9` |
+| 3 | 7 | 9 | 7 + 1 = **8** | `-1` | 8 is too high | `hi = 8` |
+| 4 | 7 | 8 | 7 + 0 = **7** | `0` | correct | return **7** |
+
+Output: **7** — four calls to `guess` for a space of ten values.
+
+Step 4 shows why `mid` rounding **down** matters: with `lo = 7, hi = 8`, `mid` must equal `lo`, so the last remaining candidate does get probed. Had `mid` rounded up it would equal `hi`, which is outside the range, and the loop would spin forever.
 
 ### Visualization
-```
-input  ──▶ [ apply Classic Binary Search step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+values   1  2  3  4  5  6  7  8  9  10          pick = 7
+         [lo=1 ───────────────────── hi=11)
+                        ↑ mid=6  "too low"   → lo = 7
+
+                        [lo=7 ────── hi=11)
+                                 ↑ mid=9  "too high"  → hi = 9
+
+                        [lo=7 ─ hi=9)
+                              ↑ mid=8  "too high"  → hi = 8
+
+                        [lo=7 hi=8)
+                         ↑ mid=7  ★ correct
+
+the "array" is the value range itself — binary search never required one
 ```
 
 ### Code
+
+```go
+// pick and guess model the API LeetCode provides, so this example runs standalone.
+var pick int
+
+func guess(num int) int {
+    switch {
+    case num == pick:
+        return 0
+    case num > pick:
+        return -1 // too high
+    default:
+        return 1 // too low
+    }
+}
+
+func guessNumber(n int) int {
+    lo, hi := 1, n+1 // half-open over VALUES: n itself must stay reachable
+
+    for lo < hi {
+        mid := lo + (hi-lo)/2 // n can be 2^31-1: the subtraction form is required
+        switch guess(mid) {
+        case 0:
+            return mid
+        case -1:
+            hi = mid // mid is too high → the pick is strictly below it
+        default:
+            lo = mid + 1 // mid is too low → the pick is strictly above it
+        }
+    }
+    return -1 // unreachable for a valid pick
+}
+```
+
 ```python
 def guessNumber(n):
-    lo, hi = 1, n
-    while lo <= hi:
-        mid = (lo + hi) // 2
-        res = guess(mid)             # -1 too high, 1 too low, 0 correct
-        if res == 0:
+    lo, hi = 1, n + 1                  # half-open over VALUES
+
+    while lo < hi:
+        mid = lo + (hi - lo) // 2
+        result = guess(mid)            # -1 too high, 1 too low, 0 correct
+        if result == 0:
             return mid
-        elif res < 0:
-            hi = mid - 1
+        if result == -1:
+            hi = mid                   # pick is strictly below mid
         else:
-            lo = mid + 1
-    return -1                        # unreachable given a valid pick
+            lo = mid + 1               # pick is strictly above mid
+
+    return -1                          # unreachable for a valid pick
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Each `guess` call halves the value range.
+Time **O(log n)** — at most `⌈log₂ n⌉ + 1` calls to `guess`; for `n = 2³¹ − 1` that is 31 calls. Space **O(1)**.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Search Insert (LeetCode 35)
-Given a sorted array of distinct integers and a `target`, return the index where it is (or where it should be inserted to keep the array sorted).
+Given a sorted array of distinct integers and a `target`, return the index of `target` if present, otherwise the index at which it should be inserted to keep the array sorted.
 
 ### Thought Process
-1. This is exactly the lower-bound query: the first index `i` with `nums[i] >= target`.
-2. Use a half-open interval `[lo, hi)` and shrink it: if `nums[mid] < target`, the answer is to the right (`lo = mid+1`); otherwise `hi = mid`.
-3. When `lo == hi` the loop ends and `lo` is the insertion index — it naturally handles a target larger than every element (returns `len`).
+1. Both cases — "found here" and "insert here" — are the same question: **the first index `i` with `nums[i] >= target`**. If the target is present that index holds it; if not, it is the first larger element, which is where the target belongs.
+2. So we no longer want an early return on equality. We want `lo` to *converge* on that boundary. This is the shift from chapter 20's exact search to the boundary searches of chapters 21–24.
+3. Same skeleton, one changed line: when `nums[mid] < target` the answer is strictly right (`lo = mid + 1`); otherwise `mid` is still a candidate, so `hi = mid` — never `mid − 1`.
+4. When the loop ends, `lo == hi` and every index below `lo` was proved `< target` while every index at or above it was proved `>= target`. That is precisely the boundary.
+5. A target larger than everything drives `lo` all the way to `n`, which is the correct "append at the end" answer — no special case needed.
 
 ### Dry Run
-`nums = [1,3,5,6], target = 5`
-- lo=0, hi=4, mid=2 → nums[2]=5, not < 5 → hi=2
-- lo=0, hi=2, mid=1 → nums[1]=3 < 5 → lo=2
-- lo=2, hi=2 → stop → return 2
+
+Input: `nums = [1, 3, 5, 6]`, `target = 5`
+
+| step | `lo` | `hi` | `mid` | `nums[mid]` | `nums[mid] < 5`? | action |
+|------|------|------|-------|-------------|------------------|--------|
+| 1 | 0 | 4 | 0 + 2 = **2** | 5 | no (5 is a candidate) | `hi = 2` |
+| 2 | 0 | 2 | 0 + 1 = **1** | 3 | yes (too small) | `lo = 2` |
+| 3 | — | — | — | — | `lo == hi == 2` | stop, return **2** |
+
+Output: **2** — and `nums[2] == 5`, so the target was found at that index.
+
+Three more targets on the same array, showing every case:
+
+| target | trace | result | why |
+|--------|-------|--------|-----|
+| 2 | `hi=2`, `hi=1`, `lo=1` | **1** | insert between 1 and 3 |
+| 7 | `lo=3`, `lo=4` | **4** | larger than everything → append at index `n` |
+| 0 | `hi=2`, `hi=1`, `hi=0` | **0** | smaller than everything → prepend |
+
+Note step 1: `nums[mid]` *equals* the target and we still do not return. Keeping `mid` as a candidate (`hi = mid`) is what makes this generalise to duplicate values, where the answer must be the **leftmost** match.
 
 ### Visualization
-```
-input  ──▶ [ apply Classic Binary Search step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums = [ 1,   3,   5,   6 ]        target = 5
+index    0    1    2    3    4 ← insertion position n is legal too
+
+         [lo=0 ─────────── hi=4)
+                    ↑ mid=2, nums[2]=5 is NOT < 5 → still a candidate → hi=2
+
+         [lo=0 ─ hi=2)
+               ↑ mid=1, nums[1]=3 < 5 → too small → lo=2
+
+         lo == hi == 2   ★ answer
+
+after the loop:      every index < lo  has nums[i] <  target
+                     every index >= lo has nums[i] >= target
+                                    ↑ that split point IS the answer
 ```
 
 ### Code
+
+```go
+func searchInsert(nums []int, target int) int {
+    lo, hi := 0, len(nums) // half-open [lo, hi); hi == len is a legal answer
+
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] < target {
+            lo = mid + 1 // strictly too small → answer is to the right
+        } else {
+            hi = mid // mid is still a candidate → keep it in range
+        }
+    }
+    return lo // first index with nums[i] >= target
+}
+```
+
 ```python
 def searchInsert(nums, target):
-    lo, hi = 0, len(nums)            # half-open [lo, hi)
+    lo, hi = 0, len(nums)              # half-open; hi == len is a legal answer
+
     while lo < hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2
         if nums[mid] < target:
-            lo = mid + 1
+            lo = mid + 1               # strictly too small → answer is right
         else:
-            hi = mid
-    return lo                        # first index with nums[i] >= target
+            hi = mid                   # mid is still a candidate
+
+    return lo                          # first index with nums[i] >= target
 ```
 
 ### Complexity
-Time O(log n), Space O(1). Lower-bound search over the half-open interval.
+Time **O(log n)** — the range halves every iteration and the loop never returns early. Space **O(1)**.
 
+> This function is the **lower bound**, and it is the ancestor of the next four chapters: 21 (first occurrence) checks `nums[lo] == target` afterwards, 22 (last occurrence) flips the comparison to `<=` and returns `lo - 1`, and 23/24 study the two bounds in their own right.
+
+---
 
 ## 12. LeetCode Practice Set
 

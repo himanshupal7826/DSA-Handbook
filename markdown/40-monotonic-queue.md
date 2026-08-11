@@ -41,32 +41,118 @@ monotonic queue, deque, window max, window min, amortized.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"What is the maximum (or minimum) of every window, without re-scanning the whole window every time it moves?"*
+
+Running example: `nums = [1, 3, -1, -3, 5]`, `k = 3`. There are three windows; report the max of each.
+
 ### Intuition
-Recompute the window extremum or re-traverse levels each step — O(nk) / O(n^2).
+A window of size `k` slides one step at a time. The obvious thing to do is stop at each position and look at all `k` values to find the biggest one. That is correct and takes three lines of code — you just do the same scan again and again.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For every start index `i` from `0` to `n - k`:
+2. Scan `nums[i .. i+k-1]` and remember the largest value seen.
+3. Append that value to the output.
+4. Return the output.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n·k)** — `n - k + 1` windows, each scanned in `k` steps.
+- Space: O(1) beyond the output.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Monotonic Queue pattern is built to use.
+
+Watch the actual comparisons on the running example:
+
+```text
+window 0: [ 1 ,  3 , -1 ]        reads 1, 3, -1   → max 3
+window 1: [ 3 , -1 , -3 ]        reads 3, -1, -3  → max 3
+window 2: [-1 , -3 ,  5 ]        reads -1, -3, 5  → max 5
+                ^^^^^^^
+        3 and -1 are read twice; -1 and -3 are read twice.
+        Only ONE value is new per step, yet we redo all k reads.
+```
+
+- Each step introduces exactly **one** new element and removes exactly **one** old one, but we recompute the answer from all `k` elements anyway.
+- The brute force never exploits an obvious fact: `-3` sits behind the larger `-1`, so `-3` can never be the maximum of any window that still contains `-1`. It is dead weight, and we keep looking at it.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Monotonic Queue invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Keep only the elements that could still become the window's maximum — a value that is smaller than something to its right is already dead, so throw it away forever.**
+
+The Fixed Window chapter taught you to maintain a running *sum*: when an element leaves the window you subtract it, and the sum stays correct in O(1). Try that with a *maximum* and it breaks. If the departing element **was** the max, subtracting it tells you nothing — the new maximum is some value you never recorded, and you are back to scanning. A max cannot be "un-added". That is the exact gap this pattern fills: instead of one running value, keep a short **ordered list of surviving candidates**.
+
+### The thought process
+
+```text
+We need    : max of each k-sized window, all n-k+1 of them
+Obvious way: rescan the k values at every position
+Too slow   : O(n*k) — and only one element actually changed
+Notice     : a sum can be un-added when an element leaves; a MAX cannot,
+             because if the leaver WAS the max the new max is unknown
+Notice     : if nums[j] <= nums[i] and j < i, then j is smaller AND leaves
+             the window earlier — j can never be the max again
+Therefore  : keep a list of indices whose values decrease left→right;
+             every discarded index was provably useless
+Now        : the front of that list is the answer, in O(1)
+```
+
+### Why the monotonic deque works
+
+Store **indices**, not values — you need positions to know when something expires.
+
+Two rules keep the list valid, and each has a one-line proof:
+
+| Rule | When | Why it is safe |
+|------|------|----------------|
+| **Pop the back** while `nums[back] <= v` | before pushing the arriving value `v` at index `i` | `back` sits to the *left* of `i`, so it expires *first*, and its value is *not larger*. Any window containing `back` from now on also contains `i`. It can never be the unique max again → delete it, forever. |
+| **Pop the front** while `front <= i - k` | after pushing | The front is the leftmost surviving candidate. If its index has slid past the window's left edge it is simply not in the window anymore. |
+
+After both rules, the deque holds indices with **strictly decreasing values**, all inside the window. The largest is therefore at the **front** — read it in O(1).
+
+Why the back-pop uses `<=` and not `<`: with equal values, keeping the older duplicate buys nothing (it expires sooner) and complicates nothing to drop. Either comparison is correct for the maximum; `<=` keeps the deque shorter.
+
+**A tiny counterexample if you skip the front-pop.** On `[5,1,1]` with `k = 2`: index 0 (value 5) never gets popped from the back, so at `i = 2` the front is still index 0 and you would report `5` for the window `[1,1]`. The front-pop is what enforces "inside the window".
+
+**Amortised O(1).** Each index is `append`ed exactly once and removed at most once, from either end. Total deque work across the whole scan is ≤ 2n operations, so the inner `for` loops are O(1) *on average* even though a single step can pop many indices.
+
+### Steps
+
+```text
+Step 1 → for each index i with value v:
+Step 2 →   while deque non-empty and nums[deque.back] <= v: pop back
+Step 3 →   push i at the back
+Step 4 →   if deque.front <= i - k: pop front        (it expired)
+Step 5 →   if i >= k-1: emit nums[deque.front]       (window is full)
+```
+
+For the window **minimum**, flip one character: pop the back while `nums[back] >= v`, and the deque becomes increasing.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "maximum/minimum of every subarray of size k", "sliding window max",
+  a DP recurrence of the form dp[i] = nums[i] + max(dp[i-k .. i-1]),
+  or n up to 1e5 with an O(n*k) obvious solution
+        ↓
+Think about...
+  "Can the quantity I track be un-done when an element leaves?"
+  Sums and counts: yes → plain sliding window.
+  Max, min, "best so far": NO → you need surviving candidates.
+        ↓
+Use...
+  a deque of INDICES kept monotone
+    · window maximum      → decreasing deque, pop back while <= v
+    · window minimum      → increasing deque, pop back while >= v
+    · both at once (range constraints, LC 1438) → run two deques
+    · window over prefix sums (LC 862) → increasing deque, pop the front
+      as soon as it satisfies the target; it is optimal and never needed again
+```
 
 ### Visual explanation
 
@@ -91,74 +177,107 @@ A double-ended queue keeps only useful candidates; BFS uses a FIFO to expand fro
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Monotonic Queue   : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [1, 3, -1, -3, 5]   k = 3        (deque holds INDICES)
+
+i=0  v= 1   back-pops: none            deque=[0]        vals=(1)
+i=1  v= 3   1 <= 3 → pop 0             deque=[1]        vals=(3)
+i=2  v=-1   3 <= -1? no                deque=[1,2]      vals=(3,-1)
+            front=1 > i-k=-1, stays    window [1,3,-1]  → max = nums[1] = 3
+i=3  v=-3   -1 <= -3? no               deque=[1,2,3]    vals=(3,-1,-3)
+            front=1 > i-k=0, stays     window [3,-1,-3] → max = nums[1] = 3
+i=4  v= 5   pop 3, 2, 1 (all <= 5)     deque=[4]        vals=(5)
+            front=4 > i-k=1, stays     window [-1,-3,5] → max = nums[4] = 5
+
+output = [3, 3, 5]      pushes: 5, pops: 4  →  linear, not 5*3
 ```
 
 ### Interview explanation
-"This is a Monotonic Queue problem. I'll a double-ended queue keeps only useful candidates; BFS uses a FIFO to expand frontier by frontier. That brings the complexity down to O(n) time and O(k) space — here's the template."
+"A sliding-window sum works because you can subtract the element that leaves, but a maximum can't be undone that way — if the leaver was the max, the new max is unknown. So instead of one number I keep a deque of candidate **indices** whose values are decreasing. When a new value arrives I pop every index at the back whose value is `<=` it, because those elements are both smaller and expire earlier, so they can never win again. Then I pop the front if its index has slid out of the window. The front is always the current maximum, read in O(1). Every index is pushed once and popped once, so the whole thing is O(n) time and O(k) space."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Queues** family template. Adapt the comparison/condition to the specific problem.
+> Keep a deque of indices whose values are monotone; pop the back to preserve order, pop the front to preserve the window.
 
 ```go
-// Sliding window maximum with a monotonic decreasing deque of indices.
-func maxSlidingWindow(nums []int, k int) []int {
-    dq := []int{}      // indices, values decreasing
-    res := []int{}
-    for i, v := range nums {
-        for len(dq) > 0 && nums[dq[len(dq)-1]] < v { dq = dq[:len(dq)-1] }
-        dq = append(dq, i)
-        if dq[0] <= i-k { dq = dq[1:] }          // evict out-of-window
-        if i >= k-1 { res = append(res, nums[dq[0]]) }
-    }
-    return res
+// windowMaximums returns the maximum of every k-sized window of nums.
+// The deque holds indices whose values are strictly decreasing front -> back,
+// so the front is always the maximum of the current window.
+// For window minimums, change the back-pop comparison to `>=`.
+func windowMaximums(nums []int, k int) []int {
+	if k <= 0 || len(nums) < k {
+		return nil
+	}
+	deque := make([]int, 0, len(nums))
+	out := make([]int, 0, len(nums)-k+1)
+	for i, v := range nums {
+		// smaller AND older -> can never be the max again
+		for len(deque) > 0 && nums[deque[len(deque)-1]] <= v {
+			deque = deque[:len(deque)-1]
+		}
+		deque = append(deque, i)
+		if deque[0] <= i-k { // the front slid out of the window
+			deque = deque[1:]
+		}
+		if i >= k-1 { // first full window has formed
+			out = append(out, nums[deque[0]])
+		}
+	}
+	return out
 }
 ```
 
 ```python
 from collections import deque
-def max_sliding_window(nums, k):
-    dq, res = deque(), []          # dq holds indices, values decreasing
+
+
+def window_maximums(nums, k):
+    """Maximum of every k-sized window. Deque holds indices, values decreasing."""
+    if k <= 0 or len(nums) < k:
+        return []
+    dq, out = deque(), []
     for i, v in enumerate(nums):
-        while dq and nums[dq[-1]] < v:
+        while dq and nums[dq[-1]] <= v:      # smaller AND older -> useless
             dq.pop()
         dq.append(i)
-        if dq[0] <= i - k:
+        if dq[0] <= i - k:                   # front slid out of the window
             dq.popleft()
         if i >= k - 1:
-            res.append(nums[dq[0]])
-    return res
+            out.append(nums[dq[0]])
+    return out
 ```
 
 ```java
-int[] maxSlidingWindow(int[] nums, int k) {
+// Deque holds indices whose values decrease from first to last.
+int[] windowMaximums(int[] nums, int k) {
+    if (k <= 0 || nums.length < k) return new int[0];
     Deque<Integer> dq = new ArrayDeque<>();
-    int[] res = new int[nums.length - k + 1];
+    int[] out = new int[nums.length - k + 1];
     for (int i = 0; i < nums.length; i++) {
-        while (!dq.isEmpty() && nums[dq.peekLast()] < nums[i]) dq.pollLast();
+        while (!dq.isEmpty() && nums[dq.peekLast()] <= nums[i]) dq.pollLast();
         dq.offerLast(i);
-        if (dq.peekFirst() <= i - k) dq.pollFirst();
-        if (i >= k - 1) res[i - k + 1] = nums[dq.peekFirst()];
+        if (dq.peekFirst() <= i - k) dq.pollFirst();   // expired
+        if (i >= k - 1) out[i - k + 1] = nums[dq.peekFirst()];
     }
-    return res;
+    return out;
 }
 ```
 
 ```cpp
-vector<int> maxSlidingWindow(vector<int>& nums, int k) {
-    deque<int> dq; vector<int> res;
+// Deque holds indices whose values decrease from front to back.
+vector<int> windowMaximums(const vector<int>& nums, int k) {
+    vector<int> out;
+    if (k <= 0 || (int)nums.size() < k) return out;
+    deque<int> dq;
     for (int i = 0; i < (int)nums.size(); ++i) {
-        while (!dq.empty() && nums[dq.back()] < nums[i]) dq.pop_back();
+        while (!dq.empty() && nums[dq.back()] <= nums[i]) dq.pop_back();
         dq.push_back(i);
-        if (dq.front() <= i - k) dq.pop_front();
-        if (i >= k - 1) res.push_back(nums[dq.front()]);
+        if (dq.front() <= i - k) dq.pop_front();       // expired
+        if (i >= k - 1) out.push_back(nums[dq.front()]);
     }
-    return res;
+    return out;
 }
 ```
 
@@ -244,125 +363,284 @@ vector<int> maxSlidingWindow(vector<int>& nums, int k) {
 ## 9. Solved Example 1
 
 ### Problem — Sliding Window Max (LeetCode 239)
-A representative **Monotonic Queue** problem. The signal: a deque kept monotone yields o(1) window min/max amortized.
+Given an array `nums` and a window size `k`, return the maximum value inside each window as the window slides one position at a time from left to right.
 
 ### Thought Process
-1. Keep a deque of **indices** whose values are strictly decreasing, so the front is always the current window's maximum.
-2. Before appending index `i`, pop from the back every index whose value is `<= nums[i]` — they can never be the max while `nums[i]` is in the window.
-3. Pop from the front once it falls outside the window (`dq[0] <= i - k`); record `nums[dq[0]]` as soon as the first full window forms (`i >= k - 1`).
+1. Rescanning each window is O(n·k); only one element changes per step, so most of that work is repeated.
+2. A running max cannot be repaired when the max itself leaves — so keep **candidates**, not one number.
+3. Keep a deque of **indices** whose values decrease front → back; the front is the window's max.
+4. Before pushing `i`, pop every back index with value `<= nums[i]`: smaller **and** expiring earlier, so provably useless.
+5. After pushing, pop the front if `front <= i - k`; once `i >= k-1`, emit `nums[front]`.
 
 ### Dry Run
-`nums = [1,3,-1,-3,5]`, `k = 3`.
-- i=0 (1): dq=[0].
-- i=1 (3): pop 0 (1<3), dq=[1].
-- i=2 (-1): dq=[1,2]; window full → max=nums[1]=3.
-- i=3 (-3): dq=[1,2,3]; front 1 still in window → max=3.
-- i=4 (5): pop 3,2,1 (all <5), dq=[4]; front 1<4-3? handled → max=nums[4]=5. Result `[3,3,5]`.
+
+Input: `nums = [1,3,-1,-3,5]`, `k = 3`
+
+| i | v | back-pops | deque (indices) | values | front expired? | emit |
+|---|----|-----------|-----------------|--------|----------------|------|
+| 0 | 1 | — | `[0]` | `(1)` | `0 <= -3`? no | — (window not full) |
+| 1 | 3 | pop 0 (`1 <= 3`) | `[1]` | `(3)` | `1 <= -2`? no | — |
+| 2 | -1 | none (`3 > -1`) | `[1,2]` | `(3,-1)` | `1 <= -1`? no | `nums[1] = 3` |
+| 3 | -3 | none (`-1 > -3`) | `[1,2,3]` | `(3,-1,-3)` | `1 <= 0`? no | `nums[1] = 3` |
+| 4 | 5 | pop 3, 2, 1 | `[4]` | `(5)` | `4 <= 1`? no | `nums[4] = 5` |
+
+Output: **`[3,3,5]`**
+
+Row `i=4` is the whole pattern in one line: three back-pops at once, yet those indices were each pushed only once — that is why the amortised cost stays O(1) per element. Row `i=3` shows the other half: index 1 is still the max even though two newer elements arrived, because both are smaller.
 
 ### Visualization
-```
-input  ──▶ [ apply Monotonic Queue step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+                 window
+             ┌──────────────┐
+nums:   1    3   -1   -3    5
+idx :   0    1    2    3    4
+
+deque after each i   (front is the max)
+i=0   [0]                       front→ 1
+i=1   [1]            0 popped: 1 <= 3
+i=2   [1, 2]                    front→ 3   ← emit 3
+i=3   [1, 2, 3]                 front→ 3   ← emit 3
+i=4   [4]            3,2,1 all popped: <= 5
+                                front→ 5   ← emit 5
+
+values along the deque are always DECREASING:  3 > -1 > -3
 ```
 
 ### Code
+
+```go
+// maxSlidingWindow returns the maximum of every k-sized window of nums.
+func maxSlidingWindow(nums []int, k int) []int {
+	if k <= 0 || len(nums) < k {
+		return nil
+	}
+	deque := make([]int, 0, len(nums)) // indices, nums[...] decreasing
+	out := make([]int, 0, len(nums)-k+1)
+	for i, v := range nums {
+		for len(deque) > 0 && nums[deque[len(deque)-1]] <= v {
+			deque = deque[:len(deque)-1] // smaller and older -> never the max again
+		}
+		deque = append(deque, i)
+		if deque[0] <= i-k {
+			deque = deque[1:] // front slid out of the window
+		}
+		if i >= k-1 {
+			out = append(out, nums[deque[0]])
+		}
+	}
+	return out
+}
+```
+
 ```python
 from collections import deque
 
-def maxSlidingWindow(nums, k):
-    dq, res = deque(), []          # dq holds indices, nums decreasing front→back
+
+def max_sliding_window(nums, k):
+    if k <= 0 or len(nums) < k:
+        return []
+    dq, out = deque(), []                    # dq holds indices, values decreasing
     for i, v in enumerate(nums):
         while dq and nums[dq[-1]] <= v:
-            dq.pop()
+            dq.pop()                         # smaller and older -> never the max again
         dq.append(i)
-        if dq[0] <= i - k:         # drop index that left the window
-            dq.popleft()
+        if dq[0] <= i - k:
+            dq.popleft()                     # front slid out of the window
         if i >= k - 1:
-            res.append(nums[dq[0]])
-    return res
+            out.append(nums[dq[0]])
+    return out
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index is pushed and popped from the deque at most once.
+Time O(n) — each index is appended once and removed at most once, so the inner loops do ≤ 2n work in total. Space O(k) — the deque never holds more than one window's worth of indices.
 
 ## 10. Solved Example 2
 
 ### Problem — Shortest Subarray (LeetCode 862)
-A representative **Monotonic Queue** problem. The signal: a deque kept monotone yields o(1) window min/max amortized.
+Given an integer array `nums` (which **may contain negatives**) and an integer `k`, return the length of the shortest non-empty subarray whose sum is at least `k`, or `-1` if none exists.
 
 ### Thought Process
-1. Build prefix sums `P` where `P[j] - P[i]` is the sum of `nums[i:j]`; we want the smallest `j - i` with `P[j] - P[i] >= k` (negatives make plain sliding window fail).
-2. Keep a deque of prefix indices with **increasing** `P`. For each `j`, pop from the front while `P[j] - P[dq[0]] >= k`, recording the length — that front index is optimal and never needed again.
-3. Pop from the back while `P[dq[-1]] >= P[j]`: a later index with a smaller prefix always dominates an earlier larger one.
+1. Write it with prefix sums: `prefix[j] - prefix[i]` is the sum of `nums[i..j-1]`, so we want the smallest `j - i` with `prefix[j] - prefix[i] >= k`.
+2. Negatives kill the plain two-pointer window: growing the window can *shrink* the sum, so "shrink while the sum is too big" is not a valid rule.
+3. For a fixed right end `j`, the best left end is the **smallest** `prefix[i]` among indices we have not used yet — so keep candidate indices with increasing `prefix`.
+4. Pop from the **front** while `prefix[j] - prefix[front] >= k`: that front gives a valid subarray, and any later `j` would only give a longer one, so record the length and discard it forever.
+5. Pop from the **back** while `prefix[back] >= prefix[j]`: `j` is both later and no larger, so it dominates `back` as a left end.
 
 ### Dry Run
-`nums = [2,-1,2]`, `k = 3`. Prefix `P = [0,2,1,3]`.
-- j=0: dq=[0].
-- j=1 (P=2): 2-0<3; dq=[0,1].
-- j=2 (P=1): pop back 1 (2>=1), pop 0? 0<1 keep; dq=[0,2].
-- j=3 (P=3): 3-P[0]=3>=3 → len 3, popleft; 3-P[2]=2<3 stop. Answer `3`.
+
+Input: `nums = [2,-1,2]`, `k = 3` → `prefix = [0,2,1,3]`
+
+| j | prefix[j] | front-pops (record length) | back-pops | deque (indices) | prefix values | best |
+|---|-----------|----------------------------|-----------|-----------------|---------------|------|
+| 0 | 0 | deque empty | none | `[0]` | `(0)` | 4 (∞) |
+| 1 | 2 | `2 - 0 = 2 < 3` stop | `prefix[0]=0 >= 2`? no | `[0,1]` | `(0,2)` | 4 |
+| 2 | 1 | `1 - 0 = 1 < 3` stop | pop 1 (`2 >= 1`) | `[0,2]` | `(0,1)` | 4 |
+| 3 | 3 | `3 - 0 = 3 >= 3` → len `3-0=3`, pop 0; then `3 - 1 = 2 < 3` stop | none | `[2,3]` | `(1,3)` | **3** |
+
+Output: **`3`** (the whole array `[2,-1,2]` sums to 3)
+
+Row `j=2` is the subtle one: `prefix[2] = 1` is *smaller* than `prefix[1] = 2` and comes later, so index 1 could never beat index 2 as a left end — it is popped from the back and never considered again.
 
 ### Visualization
-```
-input  ──▶ [ apply Monotonic Queue step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+prefix:   0    2    1    3
+index :   0    1    2    3
+
+deque must stay INCREASING in prefix value:
+
+ j=1   [0, 1]      (0, 2)  ✓ increasing
+ j=2   push 1 → (0, 2, 1)  ✗ not increasing
+       pop back 1        → (0, 1)   ✓   deque=[0,2]
+ j=3   3 - prefix[0] = 3 ≥ k  → answer candidate len = 3 - 0 = 3
+       index 0 popped from the FRONT: a later j could only be longer
 ```
 
 ### Code
+
+```go
+// shortestSubarray returns the length of the shortest subarray with sum >= k,
+// or -1 when no such subarray exists. nums may contain negative values.
+func shortestSubarray(nums []int, k int) int {
+	n := len(nums)
+	prefix := make([]int, n+1)
+	for i, v := range nums {
+		prefix[i+1] = prefix[i] + v
+	}
+	deque := make([]int, 0, n+1) // indices into prefix, prefix values increasing
+	best := n + 1
+	for j := 0; j <= n; j++ {
+		// front already reaches the target: shortest for this j, retire it
+		for len(deque) > 0 && prefix[j]-prefix[deque[0]] >= k {
+			if j-deque[0] < best {
+				best = j - deque[0]
+			}
+			deque = deque[1:]
+		}
+		// a later index with a smaller prefix dominates an earlier larger one
+		for len(deque) > 0 && prefix[deque[len(deque)-1]] >= prefix[j] {
+			deque = deque[:len(deque)-1]
+		}
+		deque = append(deque, j)
+	}
+	if best <= n {
+		return best
+	}
+	return -1
+}
+```
+
 ```python
 from collections import deque
 
-def shortestSubarray(nums, k):
+
+def shortest_subarray(nums, k):
     n = len(nums)
     prefix = [0] * (n + 1)
     for i, v in enumerate(nums):
         prefix[i + 1] = prefix[i] + v
 
-    dq, best = deque(), n + 1       # dq holds indices with increasing prefix
-    for j, pj in enumerate(prefix):
-        while dq and pj - prefix[dq[0]] >= k:
-            best = min(best, j - dq.popleft())
-        while dq and prefix[dq[-1]] >= pj:
-            dq.pop()
+    dq, best = deque(), n + 1            # dq holds indices with increasing prefix
+    for j in range(n + 1):
+        while dq and prefix[j] - prefix[dq[0]] >= k:
+            best = min(best, j - dq.popleft())   # optimal for this j, retire it
+        while dq and prefix[dq[-1]] >= prefix[j]:
+            dq.pop()                     # later + smaller prefix dominates
         dq.append(j)
     return best if best <= n else -1
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each prefix index enters and leaves the deque once.
+Time O(n) — each prefix index enters the deque once and leaves at most once. Space O(n) — the prefix array plus a deque bounded by `n + 1` indices.
 
 ## 11. Solved Example 3
 
 ### Problem — Limit Diff (LeetCode 1438)
-A representative **Monotonic Queue** problem. The signal: a deque kept monotone yields o(1) window min/max amortized.
+Given an array `nums` and an integer `limit`, return the length of the longest subarray such that the difference between its maximum and its minimum is at most `limit`.
 
 ### Thought Process
-1. Maintain a sliding window `[left, right]` and two deques over its values: `max_dq` (decreasing, front = window max) and `min_dq` (increasing, front = window min).
-2. Extend `right` by pushing `nums[right]` into both deques with the usual monotonic pops.
-3. While `max_dq[0] - min_dq[0] > limit`, shrink from `left`, popping whichever deque front equals `nums[left]`. Track the largest valid window width.
+1. The condition `max - min <= limit` is **monotone**: shrinking a valid window keeps it valid, so a two-pointer window works.
+2. But the check needs both the window max *and* the window min at every step — two extrema that cannot be maintained by adding/subtracting.
+3. Run two monotonic deques over the same window: `maxDq` decreasing (front = max) and `minDq` increasing (front = min). Here we store **values**, since we only ever evict from the left edge.
+4. Extend `right`; while `maxDq[0] - minDq[0] > limit`, advance `left`, popping a deque front only when it equals the value leaving.
+5. Track the largest `right - left + 1` seen.
 
 ### Dry Run
-`nums = [8,2,4,7]`, `limit = 4`.
-- r=0 (8): max=[8] min=[8], diff 0 → best 1.
-- r=1 (2): max=[8,2] min=[2], diff 8-2=6>4 → shrink left=1, drop 8; max=[2] min=[2] → best 1.
-- r=2 (4): max=[4] min=[2,4], diff 2 → best 2.
-- r=3 (7): max=[7] min=[2,4,7], diff 5>4 → shrink: left=2 drops 2, diff 7-4=3 → best 2. Answer `2`.
+
+Input: `nums = [8,2,4,7]`, `limit = 4`
+
+| right | v | maxDq (decreasing) | minDq (increasing) | max−min | shrink? | left | best |
+|-------|---|--------------------|--------------------|---------|---------|------|------|
+| 0 | 8 | `[8]` | `[8]` | `8-8 = 0` | no | 0 | 1 |
+| 1 | 2 | `[8,2]` | `[2]` | `8-2 = 6 > 4` | drop `nums[0]=8` from maxDq | 1 | 1 |
+| 1 | — | `[2]` | `[2]` | `2-2 = 0` | stop | 1 | 1 |
+| 2 | 4 | `[4]` (2 popped) | `[2,4]` | `4-2 = 2` | no | 1 | 2 |
+| 3 | 7 | `[7]` (4 popped) | `[2,4,7]` | `7-2 = 5 > 4` | drop `nums[1]=2` from minDq | 2 | 2 |
+| 3 | — | `[7]` | `[4,7]` | `7-4 = 3` | stop | 2 | 2 |
+
+Output: **`2`** (e.g. `[2,4]` or `[4,7]`)
+
+Note the shrink rows: `left` advances but a deque front is popped *only if it equals the departing value*. At `right=3` the max `7` is not `nums[1]`, so `maxDq` is untouched — the leaving element was already absent from that deque, discarded earlier as dominated.
 
 ### Visualization
-```
-input  ──▶ [ apply Monotonic Queue step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums = [8, 2, 4, 7]   limit = 4
+
+right=1                right=3
+  window [8, 2]          window [2, 4, 7]        7 - 2 = 5 > limit
+  maxDq  8 → 2           maxDq  7                       ↓ shrink left
+  minDq  2               minDq  2 → 4 → 7        window [4, 7]
+  8 - 2 = 6 > 4                                  maxDq  7
+       ↓ shrink left                             minDq  4 → 7
+  window [2]                                     7 - 4 = 3 ≤ 4  ✓ len 2
+                                                 best = 2
+
+maxDq always reads DOWN the values; minDq always reads UP.
 ```
 
 ### Code
+
+```go
+// longestSubarray returns the longest window whose max-min is at most limit.
+func longestSubarray(nums []int, limit int) int {
+	maxDq := make([]int, 0, len(nums)) // values, decreasing: front = window max
+	minDq := make([]int, 0, len(nums)) // values, increasing: front = window min
+	left, best := 0, 0
+	for right, v := range nums {
+		for len(maxDq) > 0 && maxDq[len(maxDq)-1] < v {
+			maxDq = maxDq[:len(maxDq)-1]
+		}
+		maxDq = append(maxDq, v)
+		for len(minDq) > 0 && minDq[len(minDq)-1] > v {
+			minDq = minDq[:len(minDq)-1]
+		}
+		minDq = append(minDq, v)
+
+		for maxDq[0]-minDq[0] > limit { // window too wide in value -> shrink
+			if maxDq[0] == nums[left] {
+				maxDq = maxDq[1:]
+			}
+			if minDq[0] == nums[left] {
+				minDq = minDq[1:]
+			}
+			left++
+		}
+		if right-left+1 > best {
+			best = right - left + 1
+		}
+	}
+	return best
+}
+```
+
 ```python
 from collections import deque
 
-def longestSubarray(nums, limit):
-    max_dq, min_dq = deque(), deque()   # values: decreasing / increasing
+
+def longest_subarray(nums, limit):
+    max_dq, min_dq = deque(), deque()    # values: decreasing / increasing
     left = best = 0
     for right, v in enumerate(nums):
         while max_dq and max_dq[-1] < v:
@@ -371,7 +649,8 @@ def longestSubarray(nums, limit):
         while min_dq and min_dq[-1] > v:
             min_dq.pop()
         min_dq.append(v)
-        while max_dq[0] - min_dq[0] > limit:
+
+        while max_dq[0] - min_dq[0] > limit:     # shrink from the left
             if max_dq[0] == nums[left]:
                 max_dq.popleft()
             if min_dq[0] == nums[left]:
@@ -382,8 +661,9 @@ def longestSubarray(nums, limit):
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each value enters and leaves each deque at most once.
+Time O(n) — each value is pushed into each deque once and popped at most once; `left` only moves forward. Space O(n) — worst case (a strictly increasing array) one deque holds every element.
 
+---
 
 ## 12. LeetCode Practice Set
 

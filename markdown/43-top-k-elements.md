@@ -41,32 +41,127 @@ top k, heap, priority queue, k largest, frequency.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Which are the `k` best items — when `k` is tiny and `n` is enormous?"*
+
+Running example: `nums = [3, 1, 5, 2, 4]`, `k = 2`. Find the 2 largest values (and hence the 2nd largest).
+
 ### Intuition
-Sort everything to get the k best — O(n log n) — or rescan repeatedly.
+Put everything in order, then read off the front. Sorting is one line and obviously correct, so it is the honest first answer in an interview.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Sort `nums` in descending order.
+2. Take the first `k` entries.
+3. The `k`-th largest is the last of them.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n log n)** — the sort dominates.
+- Space: O(n) for a copy, or O(1)–O(log n) if you may sort in place.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Top K Elements pattern is built to use.
+
+Look at what the sort actually computed on the running example:
+
+```text
+input        3   1   5   2   4          k = 2
+sorted desc  5   4   3   2   1
+             ^^^^^^^  ^^^^^^^^^
+             wanted   pure waste
+
+The sort proved that 3 > 2 > 1 — a complete ordering of the three losers.
+We asked for the top 2. Every comparison used to rank 3, 2 and 1 against
+each other is discarded.
+```
+
+- **The exact wasted work:** ordering the `n - k` items you will never return. For `n = 10^6`, `k = 10`, that is ~999 990 items sorted for nothing.
+- **The fact it fails to exploit:** you never need the losers *ranked* — you only need to know that each one is worse than your current `k` survivors. That is a single comparison per item, not a full ordering.
+- The other naive fix, "scan for the max `k` times", is O(n·k) — better when `k` is 2, disastrous when `k` is 1000.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Top K Elements invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Never hold more than `k` items: keep a heap of exactly the `k` best seen so far, and arrange it so the *weakest survivor* is the one sitting at the root, ready to be thrown out in O(log k).**
+
+Imagine a talent show with only `k` seats on stage. Every new contestant walks on, making `k+1`. You immediately send home whoever is worst. To do that quickly you need the worst performer standing at the front — which is why, when you want the `k` **largest** values, you keep a **min**-heap.
+
+### The thought process
+
+```text
+We need    : the k best of n items
+Obvious way: sort everything, take the first k
+Too slow   : O(n log n), and it ranks n-k items we throw away
+Notice     : we never need the losers ordered — just "worse than my k"
+Notice     : the only question we ever ask our survivors is
+             "who is the WEAKEST of you, so I can evict them?"
+Therefore  : store the survivors in a heap whose ROOT is the weakest
+             → k largest  ⇒  MIN-heap        (root = smallest survivor)
+             → k smallest ⇒  MAX-heap        (root = largest survivor)
+Now        : push, and pop when the size exceeds k → O(n log k), O(k) space
+```
+
+### Why the size-k heap is correct (and why the heap type is flipped)
+
+**The invariant:** after processing the first `i` items, the heap contains exactly the `k` largest among those `i` items (or all of them, if `i < k`).
+
+**Why the eviction is safe.** When item `i+1` arrives, the heap momentarily holds `k+1` candidates. The smallest of those `k+1` cannot possibly belong to the `k` largest of the same `k+1` items — there are `k` others that are at least as big. So popping the minimum restores the invariant with zero risk. Induction does the rest; after the last item, the heap is the answer and its root is the `k`-th largest.
+
+**The counter-intuitive rule, stated plainly:**
+
+| You want | Heap type | Root holds | Evict when |
+|----------|-----------|------------|------------|
+| the `k` **largest** | **MIN**-heap | the *smallest* of your `k` survivors | `size > k` → pop the root |
+| the `k` **smallest** | **MAX**-heap | the *largest* of your `k` survivors | `size > k` → pop the root |
+
+Reach for a max-heap to find the largest values and you get O(n log n) and O(n) space — you would be storing everything and popping `k` times at the end. The flip is what caps memory at `k`.
+
+**A tiny check on the running example.** With `k = 2` on `[3,1,5,2,4]`, when `4` arrives the heap holds `{3,5}`. The root is `3`. Since three values (`4`, `5`, and `3` itself) are all ≥ 3, `3` cannot be in the final top-2 — pop it. Root becomes `4`, the 2nd largest.
+
+**Quickselect, the other option.** Partition around a random pivot and recurse into only the side that contains position `k`. It runs in **O(n) average** (O(n²) worst case, made vanishingly unlikely by a random pivot) and O(1) extra space.
+
+| Approach | Time | Space | Use it when |
+|----------|------|-------|-------------|
+| Full sort | O(n log n) | O(n) | `n` is small, or you genuinely need the whole order |
+| **Size-k heap** | **O(n log k)** | **O(k)** | data arrives as a **stream**, `k ≪ n`, you need a *running* answer, or `n` does not fit in memory |
+| Quickselect | O(n) avg | O(1) | the whole array is already in memory, one-shot query, and you may reorder it |
+
+Prefer the heap for anything streaming or online: quickselect must see all `n` items at once and shuffles them, while the heap answers correctly after *every* element and touches each item once.
+
+### Steps
+
+```text
+Step 1 → create an empty MIN-heap (for the k largest)
+Step 2 → for each value v:
+Step 3 →   push v
+Step 4 →   if heap size > k: pop the root (the weakest survivor)
+Step 5 → the root is the k-th largest; the heap contents are the top k
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "k-th largest / smallest", "top k", "k most frequent",
+  "k closest", "n is up to 1e5 and k is up to 100",
+  or a stream / "elements arrive one at a time"
+        ↓
+Think about...
+  "Do I need all n ranked, or only k of them?"
+  Only k → do NOT sort. Cap your storage at k.
+  Then: "Which end of my k do I need to throw away?"
+        ↓
+Use...
+  a size-k heap of the OPPOSITE polarity
+    · k largest values        → min-heap of values
+    · k smallest / k closest  → max-heap keyed by the distance
+    · k most frequent         → count first, then min-heap keyed by count
+    · ties matter (words)     → make the comparator a total order on
+                                (count, tie-break) so the result is stable
+    · one-shot, in memory     → quickselect instead, O(n) average
+```
 
 ### Visual explanation
 
@@ -99,75 +194,124 @@ A heap gives O(1) access to the extreme element and O(log n) updates — perfect
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Top K Elements    : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [3, 1, 5, 2, 4]   k = 2   → MIN-heap of the 2 largest so far
+
+value   after push        size > k ?      after evict     root (k-th largest)
+─────────────────────────────────────────────────────────────────────────────
+  3     [3]               1 > 2 ? no      [3]             —  (fewer than k)
+  1     [1, 3]            2 > 2 ? no      [1, 3]          1
+  5     [1, 3, 5]         3 > 2 ? YES     [3, 5]          3     ← evicted 1
+  2     [2, 3, 5]         3 > 2 ? YES     [3, 5]          3     ← evicted 2
+  4     [3, 5, 4]         3 > 2 ? YES     [4, 5]          4     ← evicted 3
+
+answer: 2nd largest = 4        top-2 = {4, 5}
+
+the heap NEVER holds more than 3 items, whatever n is —
+that is the O(k) space, and each push/pop is log 2, not log n.
 ```
 
 ### Interview explanation
-"This is a Top K Elements problem. I'll a heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians. That brings the complexity down to O(n log k) time and O(k) space — here's the template."
+"Sorting gives O(n log n), but it ranks the `n - k` items I'm going to throw away. Since I only ever need to know which of my survivors is the *weakest*, I keep a heap of size `k` — and here's the part that trips people up: for the `k` **largest** I use a **min**-heap, so the smallest survivor is at the root and costs O(log k) to evict. I push every element, and whenever the heap exceeds size `k` I pop the root; that's safe because the smallest of `k+1` items can never be in the top `k` of those items. At the end the root is the `k`-th largest. It's O(n log k) time and O(k) space. If the whole array were in memory and I only needed one answer I'd mention quickselect for O(n) average, but the heap is what I'd write for a stream."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Heaps** family template. Adapt the comparison/condition to the specific problem.
+> Push everything, pop when you exceed `k`, and flip the heap: **min-heap for the `k` largest**.
 
 ```go
-// Top-K largest with a min-heap of size k (container/heap).
-import "container/heap"
-type MinHeap []int
-func (h MinHeap) Len() int { return len(h) }
-func (h MinHeap) Less(i, j int) bool { return h[i] < h[j] }
-func (h MinHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-func (h *MinHeap) Push(x any) { *h = append(*h, x.(int)) }
-func (h *MinHeap) Pop() any { old := *h; n := len(old); v := old[n-1]; *h = old[:n-1]; return v }
+// kIntHeap is a MIN-heap of ints. Flip Less to `>` to keep the k SMALLEST.
+type kIntHeap []int
 
-func topK(nums []int, k int) []int {
-    h := &MinHeap{}
-    for _, v := range nums {
-        heap.Push(h, v)
-        if h.Len() > k { heap.Pop(h) } // drop smallest, keep k largest
-    }
-    return *h
+func (h kIntHeap) Len() int           { return len(h) }
+func (h kIntHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h kIntHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *kIntHeap) Push(x any)        { *h = append(*h, x.(int)) }
+func (h *kIntHeap) Pop() any {
+	old := *h
+	last := old[len(old)-1]
+	*h = old[:len(old)-1]
+	return last
+}
+
+// kLargest returns the k largest values of nums (in no particular order).
+// The heap holds at most k items, so memory never depends on n.
+func kLargest(nums []int, k int) []int {
+	if k <= 0 {
+		return nil
+	}
+	h := &kIntHeap{}
+	for _, v := range nums {
+		heap.Push(h, v)
+		if h.Len() > k {
+			heap.Pop(h) // the weakest survivor cannot be in the top k
+		}
+	}
+	return *h
 }
 ```
 
 ```python
 import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
+
+
+def k_largest(nums, k):
+    """The k largest values of nums, using a size-k MIN-heap."""
+    if k <= 0:
+        return []
+    heap = []                        # min-heap: root is the weakest survivor
     for v in nums:
         heapq.heappush(heap, v)
         if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
+            heapq.heappop(heap)      # cannot be in the top k
     return heap
+
+
+def k_smallest(nums, k):
+    """The k smallest values — same shape, opposite polarity (negate to invert)."""
+    if k <= 0:
+        return []
+    heap = []                        # max-heap emulated with negated values
+    for v in nums:
+        heapq.heappush(heap, -v)
+        if len(heap) > k:
+            heapq.heappop(heap)
+    return [-v for v in heap]
 ```
 
 ```java
-int[] topK(int[] nums, int k) {
-    PriorityQueue<Integer> heap = new PriorityQueue<>(); // min-heap
+// The k largest values of nums, using a size-k MIN-heap.
+List<Integer> kLargest(int[] nums, int k) {
+    if (k <= 0) return new ArrayList<>();
+    // natural order = min-heap; root is the weakest survivor
+    PriorityQueue<Integer> heap = new PriorityQueue<>();
     for (int v : nums) {
         heap.offer(v);
-        if (heap.size() > k) heap.poll();
+        if (heap.size() > k) heap.poll();   // cannot be in the top k
     }
-    int[] res = new int[k];
-    for (int i = 0; i < k; i++) res[i] = heap.poll();
-    return res;
+    return new ArrayList<>(heap);
 }
+
+// For the k smallest, flip the comparator: new PriorityQueue<>(Comparator.reverseOrder())
 ```
 
 ```cpp
-vector<int> topK(vector<int>& nums, int k) {
-    priority_queue<int, vector<int>, greater<int>> heap; // min-heap
+// The k largest values of nums, using a size-k MIN-heap.
+vector<int> kLargest(const vector<int>& nums, int k) {
+    vector<int> out;
+    if (k <= 0) return out;
+    // greater<int> turns priority_queue into a MIN-heap: top() is the weakest
+    priority_queue<int, vector<int>, greater<int>> heap;
     for (int v : nums) {
         heap.push(v);
-        if ((int)heap.size() > k) heap.pop();
+        if ((int)heap.size() > k) heap.pop();   // cannot be in the top k
     }
-    vector<int> res;
-    while (!heap.empty()) { res.push_back(heap.top()); heap.pop(); }
-    return res;
+    while (!heap.empty()) { out.push_back(heap.top()); heap.pop(); }
+    return out;
 }
+
+// For the k smallest, drop greater<int> so it becomes a max-heap.
 ```
 
 ---
@@ -252,110 +396,345 @@ vector<int> topK(vector<int>& nums, int k) {
 ## 9. Solved Example 1
 
 ### Problem — Kth Largest (LeetCode 215)
-A representative **Top K Elements** problem. The signal: maintain a size-k heap to track the k best elements in o(n log k).
+Given an unsorted array `nums` and an integer `k`, return the `k`-th largest element — that is, the `k`-th value in sorted-descending order, not the `k`-th distinct value.
 
 ### Thought Process
-1. Keep a min-heap holding only the k largest values seen so far; its root is the k-th largest.
-2. Push each number, and whenever the heap exceeds size k, pop the smallest to evict it.
-3. After scanning all numbers, `heap[0]` is the answer.
+1. Sorting answers it in O(n log n) but ranks every element we do not care about.
+2. Only `k` values can ever be the answer, so store only `k`.
+3. Use a **min**-heap: with the `k` largest inside it, the root is the *smallest* of them — precisely the `k`-th largest.
+4. Push each value; if the heap grows to `k+1`, pop the root. The smallest of `k+1` items cannot be among their `k` largest, so the eviction is always safe.
+5. After the last value, return the root.
 
 ### Dry Run
-nums=[3,2,1,5,6,4], k=2. Push 3,2 → [2,3]. Push 1 → pop 1 → [2,3].
-Push 5 → pop 2 → [3,5]. Push 6 → pop 3 → [5,6]. Push 4 → pop 4 → [5,6].
-Root `heap[0]` = `5` → 2nd largest.
+
+Input: `nums = [3,2,1,5,6,4]`, `k = 2`
+
+| v | heap after push | size > 2? | evicted | heap after | root = k-th largest so far |
+|---|-----------------|-----------|---------|------------|-----------------------------|
+| 3 | `{3}` | no | — | `{3}` | — (fewer than k seen) |
+| 2 | `{2, 3}` | no | — | `{2, 3}` | 2 |
+| 1 | `{1, 2, 3}` | yes | **1** | `{2, 3}` | 2 |
+| 5 | `{2, 3, 5}` | yes | **2** | `{3, 5}` | 3 |
+| 6 | `{3, 5, 6}` | yes | **3** | `{5, 6}` | 5 |
+| 4 | `{4, 5, 6}` | yes | **4** | `{5, 6}` | **5** |
+
+Output: **`5`**
+
+(Heap contents are shown as a set; a heap only promises the *root*, not a sorted array.) The last row is the invariant working: `4` arrives, joins the heap, and is immediately identified as the weakest of `{4,5,6}` — two values beat it, so with `k = 2` it can never be an answer. Note the heap never exceeds 3 entries no matter how long `nums` is.
 
 ### Visualization
-```
-input  ──▶ [ apply Top K Elements step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+size-2 MIN-heap; the root is the DOOR — everything leaves through it
+
+after 3,2      after 5              after 6              after 4
+    2              3                    5                    5
+     \              \                    \                    \
+      3              5                    6                    6
+    ^                ^                    ^                    ^
+  root=2          root=3               root=5               root=5
+                (1 and 2 evicted)   (3 evicted)         (4 evicted instantly)
+
+why a MIN-heap for the LARGEST values?
+  the only thing we ever ask is "who is the weakest of my k?"
+  a min-heap puts that answer at index 0, so eviction is O(log k).
 ```
 
 ### Code
+
+```go
+// intMinHeap is a min-heap of ints: the weakest survivor sits at the root.
+type intMinHeap []int
+
+func (h intMinHeap) Len() int           { return len(h) }
+func (h intMinHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h intMinHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *intMinHeap) Push(x any)        { *h = append(*h, x.(int)) }
+func (h *intMinHeap) Pop() any {
+	old := *h
+	last := old[len(old)-1]
+	*h = old[:len(old)-1]
+	return last
+}
+
+// findKthLargest returns the k-th largest value using a size-k MIN-heap.
+func findKthLargest(nums []int, k int) int {
+	survivors := &intMinHeap{}
+	for _, v := range nums {
+		heap.Push(survivors, v)
+		if survivors.Len() > k {
+			heap.Pop(survivors) // smallest of k+1 can't be in their top k
+		}
+	}
+	return (*survivors)[0] // root = smallest survivor = k-th largest
+}
+```
+
 ```python
 import heapq
-def findKthLargest(nums, k):
-    heap = []                        # min-heap of the k largest so far
+
+
+def find_kth_largest(nums, k):
+    survivors = []                       # min-heap of the k largest so far
     for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # drop smallest -> keep k largest
-    return heap[0]                   # k-th largest sits at the root
+        heapq.heappush(survivors, v)
+        if len(survivors) > k:
+            heapq.heappop(survivors)     # smallest of k+1 can't be in their top k
+    return survivors[0]                  # root = k-th largest
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). Each of n pushes/pops on a k-sized heap costs O(log k).
+Time O(n log k) — `n` pushes and up to `n` pops, each on a heap of at most `k+1` entries. Space O(k) — the heap size is capped regardless of `n`, which is what makes this work on a stream.
 
 ## 10. Solved Example 2
 
 ### Problem — Top K Frequent (LeetCode 347)
-A representative **Top K Elements** problem. The signal: maintain a size-k heap to track the k best elements in o(n log k).
+Given an integer array `nums` and an integer `k`, return the `k` most frequently occurring values.
 
 ### Thought Process
-1. Count every number's frequency with a hash map in one pass.
-2. Treat "top k" as a heap-selection over the (num, count) pairs keyed by count.
-3. `heapq.nlargest(k, ...)` keeps only the k highest-count entries — return their keys.
+1. Count occurrences in one pass with a hash map — `O(n)` and unavoidable.
+2. Now it is a top-k problem over the *distinct* values, scored by count.
+3. Same rule as before: for the `k` **highest** counts, keep a size-`k` **min**-heap keyed by count, so the least frequent survivor is at the root.
+4. Push each `(value, count)` pair; pop the root whenever the heap exceeds `k`.
+5. Pop the remaining `k` entries — they come out weakest-first, so fill the output array backwards to get them in descending order.
 
 ### Dry Run
-nums=[1,1,1,2,2,3], k=2. Counts = {1:3, 2:2, 3:1}.
-nlargest(2) by count → picks (1,3) then (2,2).
-Answer → `[1, 2]`.
+
+Input: `nums = [1,1,1,2,2,3]`, `k = 2` → counts `{1: 3, 2: 2, 3: 1}`
+
+| entry pushed | heap after push (by count) | size > 2? | evicted (root) | heap after |
+|--------------|----------------------------|-----------|----------------|------------|
+| `(1, count 3)` | `{1:3}` | no | — | `{1:3}` |
+| `(2, count 2)` | `{1:3, 2:2}` | no | — | `{1:3, 2:2}` |
+| `(3, count 1)` | `{1:3, 2:2, 3:1}` | yes | `(3, count 1)` | `{1:3, 2:2}` |
+
+Draining the heap weakest-first gives `(2, count 2)` then `(1, count 3)`, so filling backwards yields:
+
+Output: **`[1, 2]`**
+
+The map's iteration order is not defined, but the result is: the comparator is a *total* order on `(count, value)`, so the same two entries survive whatever order they arrive in, and the drain always emits them highest-count-first.
 
 ### Visualization
-```
-input  ──▶ [ apply Top K Elements step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+step 1 — count            step 2 — size-2 MIN-heap keyed by COUNT
+
+ 1 → ###   (3)                  push 1:3      [1:3]
+ 2 → ##    (2)                  push 2:3      [2:2, 1:3]   root = 2:2
+ 3 → #     (1)                  push 3:1      [3:1, 1:3, 2:2]  root = 3:1
+                                size 3 > 2 → pop root  ✗ 3:1
+                                              [2:2, 1:3]
+
+drain (weakest first):  2:2 , 1:3
+fill output backwards:  [ _ , 2 ] → [ 1 , 2 ]
+
+the heap is keyed by count, never by value — the value is just cargo.
 ```
 
 ### Code
+
+```go
+type countEntry struct {
+	value int
+	count int
+}
+
+// countHeap is a MIN-heap on count: its root is the least frequent survivor.
+// The value tie-break only exists to make the result deterministic.
+type countHeap []countEntry
+
+func (h countHeap) Len() int { return len(h) }
+func (h countHeap) Less(i, j int) bool {
+	if h[i].count != h[j].count {
+		return h[i].count < h[j].count
+	}
+	return h[i].value > h[j].value
+}
+func (h countHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h *countHeap) Push(x any)   { *h = append(*h, x.(countEntry)) }
+func (h *countHeap) Pop() any {
+	old := *h
+	last := old[len(old)-1]
+	*h = old[:len(old)-1]
+	return last
+}
+
+// topKFrequent returns the k most frequent values, most frequent first.
+func topKFrequent(nums []int, k int) []int {
+	counts := make(map[int]int, len(nums))
+	for _, v := range nums {
+		counts[v]++
+	}
+	survivors := &countHeap{}
+	for value, count := range counts {
+		heap.Push(survivors, countEntry{value: value, count: count})
+		if survivors.Len() > k {
+			heap.Pop(survivors) // least frequent of k+1 can't be in their top k
+		}
+	}
+	out := make([]int, survivors.Len())
+	for i := len(out) - 1; i >= 0; i-- { // drained weakest-first, so fill backwards
+		out[i] = heap.Pop(survivors).(countEntry).value
+	}
+	return out
+}
+```
+
 ```python
 import heapq
 from collections import Counter
-def topKFrequent(nums, k):
+
+
+def top_k_frequent(nums, k):
     counts = Counter(nums)
-    top = heapq.nlargest(k, counts.items(), key=lambda pair: pair[1])
-    return [num for num, _ in top]
+    survivors = []                                  # min-heap of (count, value)
+    for value, count in counts.items():
+        heapq.heappush(survivors, (count, value))
+        if len(survivors) > k:
+            heapq.heappop(survivors)                # least frequent of k+1
+    out = [0] * len(survivors)
+    for i in range(len(out) - 1, -1, -1):           # drained weakest-first
+        out[i] = heapq.heappop(survivors)[1]
+    return out
 ```
 
 ### Complexity
-Time O(n log k), Space O(n). Counting is O(n); the size-k heap selection is O(n log k).
+Time O(n log k) — O(n) to count, then one push (and at most one pop) per *distinct* value on a heap capped at `k+1`. Space O(n) for the count map plus O(k) for the heap.
 
 ## 11. Solved Example 3
 
 ### Problem — Top K Words (LeetCode 692)
-A representative **Top K Elements** problem. The signal: maintain a size-k heap to track the k best elements in o(n log k).
+Given a list of `words` and an integer `k`, return the `k` most frequent words, sorted by frequency from highest to lowest, with ties broken by lexicographical order (smaller word first).
 
 ### Thought Process
-1. Count word frequencies, then rank by higher count first, breaking ties by lexicographically smaller word.
-2. Encode that ordering as the sort key `(-count, word)` so "smallest" means best.
-3. `heapq.nsmallest(k, ...)` on that key returns the k best words already in output order.
+1. Count the words, then it is top-k again — but now "best" is a **two-part** score.
+2. Define the comparison once and stick to it: `a` is *worse* than `b` if `a.count < b.count`, or the counts tie and `a.word > b.word` (later alphabetically loses).
+3. That comparison is a total order on distinct words, so a size-`k` heap ordered "worst at the root" is well defined.
+4. Push every `(word, count)`; whenever the heap exceeds `k`, pop the root — the worst of `k+1` can never be in their top `k`.
+5. Drain the heap (worst first) and fill the output backwards to get best-first order.
 
 ### Dry Run
-words=["i","love","leetcode","i","love","coding"], k=2. Counts = {i:2, love:2, leetcode:1, coding:1}.
-Keys: i→(-2,"i"), love→(-2,"love"). nsmallest(2) → "i" before "love" (tie broken lexicographically).
-Answer → `["i", "love"]`.
+
+Input: `words = ["i","love","leetcode","i","love","coding"]`, `k = 2`
+Counts: `{i: 2, love: 2, leetcode: 1, coding: 1}`
+
+| entry pushed | root after push (the *worst*) | size > 2? | evicted | heap after |
+|--------------|-------------------------------|-----------|---------|------------|
+| `i` (2) | `i` (2) | no | — | `{i:2}` |
+| `love` (2) | `love` (2) — tie on count, `"love" > "i"` so it loses | no | — | `{i:2, love:2}` |
+| `leetcode` (1) | `leetcode` (1) — lowest count | yes | `leetcode` | `{i:2, love:2}` |
+| `coding` (1) | `coding` (1) — lowest count | yes | `coding` | `{i:2, love:2}` |
+
+Draining worst-first gives `love` then `i`; filling backwards yields:
+
+Output: **`["i", "love"]`**
+
+Row 2 is the tie-break rule doing real work: `i` and `love` both appear twice, so count alone cannot separate them. Because `"love"` sorts after `"i"`, `love` becomes the root — and had `k` been `1`, `love` is exactly the one that would have been evicted.
 
 ### Visualization
-```
-input  ──▶ [ apply Top K Elements step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+score = (count, word), compared as:   higher count wins
+                                      tie → smaller word wins
+
+              i (2)   love (2)   leetcode (1)   coding (1)
+  best  ──────────────────────────────────────────────────▶  worst
+
+size-2 heap, WORST at the root:
+
+  push i        [ i:2 ]                       root = i
+  push love     [ love:2 , i:2 ]              root = love   ("love" > "i")
+  push leetcode [ leetcode:1 , i:2 , love:2 ] root = leetcode
+                size 3 > 2 → pop  ✗ leetcode
+  push coding   → same story        → pop  ✗ coding
+
+drain worst-first: love , i     →  fill backwards  →  [ "i" , "love" ]
 ```
 
 ### Code
+
+```go
+type wordEntry struct {
+	word  string
+	count int
+}
+
+// wordHeap puts the WORST entry at the root: lower count first, and on a tie
+// the lexicographically larger word (which loses the tie-break).
+type wordHeap []wordEntry
+
+func (h wordHeap) Len() int { return len(h) }
+func (h wordHeap) Less(i, j int) bool {
+	if h[i].count != h[j].count {
+		return h[i].count < h[j].count
+	}
+	return h[i].word > h[j].word
+}
+func (h wordHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h *wordHeap) Push(x any)   { *h = append(*h, x.(wordEntry)) }
+func (h *wordHeap) Pop() any {
+	old := *h
+	last := old[len(old)-1]
+	*h = old[:len(old)-1]
+	return last
+}
+
+// topKFrequentWords returns the k most frequent words, highest count first,
+// ties broken by the lexicographically smaller word.
+func topKFrequentWords(words []string, k int) []string {
+	counts := make(map[string]int, len(words))
+	for _, w := range words {
+		counts[w]++
+	}
+	survivors := &wordHeap{}
+	for word, count := range counts {
+		heap.Push(survivors, wordEntry{word: word, count: count})
+		if survivors.Len() > k {
+			heap.Pop(survivors) // the worst of k+1 can't be in their top k
+		}
+	}
+	out := make([]string, survivors.Len())
+	for i := len(out) - 1; i >= 0; i-- { // drained worst-first, so fill backwards
+		out[i] = heap.Pop(survivors).(wordEntry).word
+	}
+	return out
+}
+```
+
 ```python
 import heapq
 from collections import Counter
-def topKFrequent(words, k):
+
+
+class Worst:
+    """Wrapper so heapq's min-heap pops the WORST word first."""
+
+    def __init__(self, word, count):
+        self.word, self.count = word, count
+
+    def __lt__(self, other):
+        if self.count != other.count:
+            return self.count < other.count      # lower count is worse
+        return self.word > other.word            # tie: later alphabetically is worse
+
+
+def top_k_frequent_words(words, k):
     counts = Counter(words)
-    # higher frequency first; ties broken by smaller lexicographic word
-    return heapq.nsmallest(k, counts.keys(), key=lambda w: (-counts[w], w))
+    survivors = []
+    for word, count in counts.items():
+        heapq.heappush(survivors, Worst(word, count))
+        if len(survivors) > k:
+            heapq.heappop(survivors)             # the worst of k+1
+    out = [""] * len(survivors)
+    for i in range(len(out) - 1, -1, -1):        # drained worst-first
+        out[i] = heapq.heappop(survivors).word
+    return out
 ```
 
 ### Complexity
-Time O(n log k), Space O(n). Counting is O(n); the size-k selection over unique words is O(n log k).
+Time O(n log k) — O(n) to count `n` words, then one push and at most one pop per distinct word on a heap capped at `k+1`. Space O(n) for the counts plus O(k) for the heap. (A full sort by `(-count, word)` would be O(u log u) over the `u` distinct words — fine offline, but it cannot answer after every element the way the heap can.)
 
+---
 
 ## 12. LeetCode Practice Set
 

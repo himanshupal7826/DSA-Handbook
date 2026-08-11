@@ -41,32 +41,125 @@ distinct, unique, k distinct, without repeating, char set.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"How long can a stretch of the string get before it holds too many different characters?"*
+
+Running example: `s = "eceba"`, at most `k = 2` distinct characters. (Answer: `"ece"`, length 3.)
+
 ### Intuition
-Enumerate all subarrays/substrings and evaluate each — O(n^2) or O(n^3).
+"How many different characters are in here?" is a question about a *set*. So take every possible start, walk right, drop each character into a set, and stop the moment the set grows past `k`. Whatever the longest surviving stretch was, that's the answer.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each start index `i` from `0` to `n − 1`:
+2. &nbsp;&nbsp;Create an empty set `seen`.
+3. &nbsp;&nbsp;For each end index `j` from `i` forward: add `s[j]` to `seen`.
+4. &nbsp;&nbsp;If `len(seen) > k`, stop extending this start.
+5. &nbsp;&nbsp;Otherwise record `j − i + 1` if it beats the best so far.
+6. Return the best length.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n²)** — `n` starts, each scanning up to `n` characters. (Rebuilding a fresh set per start rather than reusing one makes it O(n²) even though each inner step is O(1).)
+- Space: O(k) for the set — at most `k + 1` characters live in it.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Distinct Character Window pattern is built to use.
+- Look at what happens on `"eceba"` with `k = 2`. Start `i = 0` builds the set `{e} → {e,c} → {e,c}` before dying at `'b'`. Start `i = 1` then rebuilds `{c} → {c,e} → {c,e}` — **the exact same characters, counted again from scratch**.
+- Every start re-reads the tail of the string that the previous start already read. Positions `1` and `2` get scanned by start `0`, start `1`, *and* start `2`.
+- The brute force refuses to exploit one fact: when start `i` fails at position `j`, moving to start `i + 1` does not change the characters in `[i+1, j]` at all. It only removes `s[i]`. We are throwing away a valid, already-computed window just to rebuild 99% of it.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Distinct Character Window invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Keep a count map of exactly the characters inside the window — then `len(map)` *is* the distinct count, free, at every step.**
+
+Think of a small tray with one labelled bin per character. Adding a character bumps its bin; removing one lowers it. The question "how many different characters do I have?" becomes "how many bins are on the tray?" — which you never have to compute, because it is just the map's size. The whole pattern is: push the right edge out, and if the tray has too many bins, pull the left edge in until it doesn't.
+
+### The thought process
+
+```text
+We need    : the longest stretch with at most k distinct characters.
+Obvious way: try every start, extend until the set gets too big.
+Too slow   : O(n^2) — each start rebuilds a set the previous start already had.
+Notice     : moving the start from i to i+1 only removes ONE character.
+Notice too : "number of distinct chars" = number of keys in a count map.
+Therefore  : keep one map alive and edit it at both edges instead of rebuilding.
+Now        : each index enters once and leaves once → O(n).
+```
+
+### Why `len(map)` only tells the truth if you delete zeroed keys
+
+This is the whole chapter in one rule, and it is the single most common bug in it.
+
+The map serves two jobs at once:
+
+```text
+count[ch]   → how many copies of ch are in the window   (needed to know when ch is gone)
+len(count)  → how many DISTINCT chars are in the window (the thing we are bounding)
+```
+
+The second job only works if a key exists **exactly when** its character is present. A key sitting at `0` is a character that has already left the window but is still occupying a slot on the tray.
+
+Concretely, on `s = "aab"` with `k = 2`, if you decrement without deleting:
+
+```text
+window "aab"   count = {a:2, b:1}   len = 3?  no — len = 2, fine so far
+shrink 'a'     count = {a:1, b:1}   len = 2   window "ab"   ✓
+shrink 'a'     count = {a:0, b:1}   len = 2   window "b"    ✗ WRONG
+                                              the window holds ONE distinct char,
+                                              but len(count) still reports 2
+```
+
+That inflated `2` makes the shrink loop stop too early on some inputs and never stop on others — and worse, it silently reports a smaller answer rather than crashing. So the shrink step is always three lines, never one:
+
+```text
+count[left char]--          decrement
+if it hit 0 → delete it     keep the key set honest
+left++                      then move the edge
+```
+
+The symmetric mistake is deleting on `> 0` or checking `< 0` — decrement first, compare to `0` exactly, and the invariant holds forever.
+
+### Why shrinking with `while` (not `if`) is still O(n)
+
+Each character is added by the right edge exactly once and removed by the left edge at most once. `left` never moves backwards. So across the entire run the inner `while` body executes at most `n` times *in total*, not per step — that is why a loop nested inside a loop is still linear.
+
+### Steps
+
+```text
+Step 1 → left = 0, best = 0, count = empty map.
+Step 2 → For right = 0 .. n-1:
+Step 3 →     count[s[right]]++            (character enters)
+Step 4 →     while len(count) > k:        (too many distinct)
+Step 5 →         count[s[left]]--
+Step 6 →         if count[s[left]] == 0 → delete the key
+Step 7 →         left++
+Step 8 →     best = max(best, right-left+1)
+Step 9 → Return best.
+```
+
+For "all characters distinct" (LeetCode 3), the same code runs with the invalidity test `len(count) < right-left+1` — i.e. some character has a count above 1.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "at most k distinct", "at most two distinct", "no repeating characters"
+  "longest substring such that ..." where the condition counts CHARACTER KINDS
+  a character/alphabet constraint rather than a numeric one
+        ↓
+Think about...
+  "Is my window's validity a statement about how many DIFFERENT things it holds?"
+        ↓
+Use...
+  a count map as the window state, len(map) as the distinct count
+  ├─ at most k distinct   → shrink while len(count) > k
+  ├─ all distinct         → shrink while len(count) < windowLength
+  └─ exactly k distinct   → atMost(k) - atMost(k-1)
+  and ALWAYS delete a key when its count reaches 0
+```
 
 ### Visual explanation
 
@@ -97,81 +190,137 @@ A window with incrementally maintained aggregates means each element enters and 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Distinct Character: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+s = "eceba", k = 2
+
+right  char  count map        len  action                    window   best
+-----  ----  ---------------  ---  ------------------------  -------  ----
+  0     e    {e:1}             1   ok                        "e"       1
+  1     c    {e:1,c:1}         2   ok                        "ec"      2
+  2     e    {e:2,c:1}         2   ok                        "ece"     3
+  3     b    {e:2,c:1,b:1}     3   too many → shrink
+             drop 'e' (idx 0)  {e:1,c:1,b:1}  len 3, still too many
+             drop 'c' (idx 1)  {e:1,b:1}      len 2, stop.   "eb"      3
+  4     a    {e:1,b:1,a:1}     3   too many → shrink
+             drop 'e' (idx 2)  {b:1,a:1}      len 2, stop.   "ba"      3
+
+answer: 3
 ```
 
+Notice row `right = 3`: dropping `'e'` at index 0 left `e:1` behind, because index 2 is still inside the window. Only when a count truly reaches zero does the key vanish — that is exactly the distinction `len(map)` depends on.
+
 ### Interview explanation
-"This is a Distinct Character Window problem. I'll a window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n). That brings the complexity down to O(n) time and O(k) space — here's the template."
+"The condition here counts *kinds* of characters, so I make the window's state a character-count map: `len(map)` is then the distinct count, available for free at every step. I expand the right edge, incrementing the entering character's count, and while the map has more than `k` keys I shrink from the left — decrementing, and crucially **deleting the key when its count hits zero**, otherwise a character that has already left the window keeps inflating `len(map)` and the answer comes out wrong. Each index enters and leaves at most once, so despite the nested loop it's O(n) time and O(k) space."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Sliding Window** family template. Adapt the comparison/condition to the specific problem.
+> Count map = window state. `len(map)` = distinct count. Delete at zero, or the count lies.
 
 ```go
-// Variable-size window: longest subarray satisfying a constraint.
-func longestWindow(s string) int {
-    count := map[byte]int{}
+// LongestAtMostKDistinct returns the length of the longest substring of s
+// containing at most k distinct characters.
+func LongestAtMostKDistinct(s string, k int) int {
+    if k <= 0 {
+        return 0
+    }
+    count := make(map[byte]int)
     left, best := 0, 0
+
     for right := 0; right < len(s); right++ {
-        count[s[right]]++
-        for windowInvalid(count) { // shrink until valid
-            count[s[left]]--
-            if count[s[left]] == 0 { delete(count, s[left]) }
+        count[s[right]]++ // character enters the window
+
+        for len(count) > k { // len(count) IS the distinct count
+            leftChar := s[left]
+            count[leftChar]--
+            if count[leftChar] == 0 {
+                delete(count, leftChar) // or len(count) would lie
+            }
             left++
         }
-        if right-left+1 > best { best = right - left + 1 }
+
+        if right-left+1 > best {
+            best = right - left + 1
+        }
     }
     return best
 }
 ```
 
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
+def longest_at_most_k_distinct(s, k):
+    """Length of the longest substring of s with at most k distinct characters."""
+    if k <= 0:
+        return 0
+    count = {}
     left = best = 0
+
     for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
+        count[ch] = count.get(ch, 0) + 1      # character enters
+
+        while len(count) > k:                 # len(count) IS the distinct count
+            left_char = s[left]
+            count[left_char] -= 1
+            if count[left_char] == 0:
+                del count[left_char]          # or len(count) would lie
             left += 1
+
         best = max(best, right - left + 1)
     return best
 ```
 
 ```java
-int longestWindow(String s) {
-    Map<Character,Integer> count = new HashMap<>();
-    int left = 0, best = 0;
-    for (int right = 0; right < s.length(); right++) {
-        count.merge(s.charAt(right), 1, Integer::sum);
-        while (windowInvalid(count)) {
-            char c = s.charAt(left++);
-            if (count.merge(c, -1, Integer::sum) == 0) count.remove(c);
+import java.util.*;
+
+public class DistinctWindow {
+    // Longest substring of s with at most k distinct characters.
+    public static int longestAtMostKDistinct(String s, int k) {
+        if (k <= 0) return 0;
+        Map<Character, Integer> count = new HashMap<>();
+        int left = 0, best = 0;
+
+        for (int right = 0; right < s.length(); right++) {
+            count.merge(s.charAt(right), 1, Integer::sum);   // enters
+
+            while (count.size() > k) {                       // size() IS the distinct count
+                char leftChar = s.charAt(left);
+                if (count.merge(leftChar, -1, Integer::sum) == 0) {
+                    count.remove(leftChar);                  // or size() would lie
+                }
+                left++;
+            }
+
+            best = Math.max(best, right - left + 1);
         }
-        best = Math.max(best, right - left + 1);
+        return best;
     }
-    return best;
 }
 ```
 
 ```cpp
-int longestWindow(const string& s) {
-    unordered_map<char,int> count;
+#include <string>
+#include <unordered_map>
+using namespace std;
+
+// Longest substring of s with at most k distinct characters.
+int longestAtMostKDistinct(const string& s, int k) {
+    if (k <= 0) return 0;
+    unordered_map<char, int> count;
     int left = 0, best = 0;
+
     for (int right = 0; right < (int)s.size(); ++right) {
-        ++count[s[right]];
-        while (windowInvalid(count)) {
-            if (--count[s[left]] == 0) count.erase(s[left]);
+        ++count[s[right]];                     // enters
+
+        while ((int)count.size() > k) {        // size() IS the distinct count
+            char leftChar = s[left];
+            if (--count[leftChar] == 0) {
+                count.erase(leftChar);         // or size() would lie
+            }
             ++left;
         }
-        best = max(best, right - left + 1);
+
+        if (right - left + 1 > best) best = right - left + 1;
     }
     return best;
 }
@@ -259,123 +408,301 @@ int longestWindow(const string& s) {
 ## 9. Solved Example 1
 
 ### Problem — Longest Substring (LeetCode 3)
-Find the length of the longest substring of `s` with **no repeating characters**.
+Return the length of the longest substring of `s` that contains **no repeating characters**.
 
 ### Thought Process
-1. Keep a map `last` from a character to the most recent index where it appeared.
-2. Expand `right` over the string; when the current char was seen inside the window, jump `left` to `last[ch] + 1` so the window stays all-unique.
-3. After each step the window `[left, right]` has all distinct chars — record its length.
+1. "No repeating characters" means: every character in the window is distinct — i.e. the number of *distinct* characters equals the window's *length*.
+2. That is exactly the state this chapter maintains: `len(count)` is the distinct count, `right - left + 1` is the length.
+3. So the window is invalid precisely when `len(count) < right - left + 1`, and we shrink from the left until they agree again.
+4. Shrinking must delete a key when its count reaches zero — otherwise `len(count)` stays too high and the loop exits before the duplicate is actually gone.
+5. Record the length after every shrink.
+
+> Chapter 14 solves this same problem with a `lastSeen` map and a **jump** (`left = lastSeen[ch] + 1`), and chapter 15 with a "some count exceeded 1" test. Same answer, three lenses. The count-map lens below is the one that generalises to "at most k distinct" without any change of shape.
 
 ### Dry Run
-`s = "abcabcbb"`
-- r=0 'a' → window "a", best 1; r=1 'b' → "ab", best 2; r=2 'c' → "abc", best 3.
-- r=3 'a': last['a']=0 ≥ left → left=1, window "bca", best 3.
-- r=4 'b': last['b']=1 ≥ left → left=2, window "cab", best 3.
-- Continues at length 3 → answer **3**.
+
+Input: `s = "pwwkew"`
+
+| right | char | count map after add | `len(count)` | window len | valid? | shrink actions | window | best |
+|-------|------|---------------------|--------------|------------|--------|----------------|--------|------|
+| 0 | `p` | `{p:1}` | 1 | 1 | yes | — | `"p"` | 1 |
+| 1 | `w` | `{p:1, w:1}` | 2 | 2 | yes | — | `"pw"` | 2 |
+| 2 | `w` | `{p:1, w:2}` | 2 | 3 | **no** | drop `p` → **delete** → `{w:2}`, len 1 vs 2 still no; drop `w` → `{w:1}`, len 1 vs 1 ok | `"w"` | 2 |
+| 3 | `k` | `{w:1, k:1}` | 2 | 2 | yes | — | `"wk"` | 2 |
+| 4 | `e` | `{w:1, k:1, e:1}` | 3 | 3 | yes | — | `"wke"` | **3** |
+| 5 | `w` | `{w:2, k:1, e:1}` | 3 | 4 | **no** | drop `w` → `{w:1,…}`, len 3 vs 3 ok | `"kew"` | 3 |
+
+Output: **3** (`"wke"` or `"kew"`)
+
+Row `right = 2` is the one to study. The first shrink removes `'p'`, whose count hits `0` — the key is **deleted**, so `len(count)` drops from 2 to 1. Had we left `p:0` in the map, `len(count)` would still read 2, equal to the window length 2, and the loop would have stopped with `"ww"` declared valid.
 
 ### Visualization
-```
-"abcabcbb": window slides right; on a repeat, left jumps past the prior copy.
+
+```text
+s =  p  w  w  k  e  w
+     0  1  2  3  4  5
+
+     └──┘                 "pw"    distinct 2 = len 2   ok
+        └──┘              "ww"    distinct 1 < len 2   shrink!
+           └───────┘      "wke"   distinct 3 = len 3   ★ best = 3
+              └──────┘    "kew"   distinct 3 = len 3   also 3
+
+rule: window is valid  ⟺  len(count) == right - left + 1
 ```
 
 ### Code
+
+```go
+func lengthOfLongestSubstring(s string) int {
+    count := make(map[byte]int)
+    left, best := 0, 0
+
+    for right := 0; right < len(s); right++ {
+        count[s[right]]++
+
+        // Invalid while some character appears twice, i.e. distinct < length.
+        for len(count) < right-left+1 {
+            leftChar := s[left]
+            count[leftChar]--
+            if count[leftChar] == 0 {
+                delete(count, leftChar) // keep len(count) honest
+            }
+            left++
+        }
+
+        if right-left+1 > best {
+            best = right - left + 1
+        }
+    }
+    return best
+}
+```
+
 ```python
-def length_of_longest_substring(s):
-    last = {}
+def lengthOfLongestSubstring(s):
+    count = {}
     left = best = 0
+
     for right, ch in enumerate(s):
-        if ch in last and last[ch] >= left:
-            left = last[ch] + 1
-        last[ch] = right
+        count[ch] = count.get(ch, 0) + 1
+
+        # Invalid while some character appears twice, i.e. distinct < length.
+        while len(count) < right - left + 1:
+            left_char = s[left]
+            count[left_char] -= 1
+            if count[left_char] == 0:
+                del count[left_char]       # keep len(count) honest
+            left += 1
+
         best = max(best, right - left + 1)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(min(n, alphabet)). Each index is visited once; the map holds at most one entry per distinct char.
+Time **O(n)** — `right` advances `n` times and `left` advances at most `n` times in total. Space **O(min(n, alphabet))** — the map holds one key per distinct character in the window.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — K Distinct (LeetCode 340)
-Find the length of the longest substring of `s` that contains **at most `k` distinct** characters.
+Return the length of the longest substring of `s` containing **at most `k` distinct** characters.
 
 ### Thought Process
-1. Maintain a frequency `count` of chars in the current window plus a `left` pointer.
-2. Expand `right`, incrementing `count[ch]`; the window is invalid while it holds more than `k` distinct keys.
-3. Shrink from `left`, decrementing counts and deleting keys that hit zero, until `len(count) <= k`; record the window length each step.
+1. This is the pattern in its purest form: the window's validity is literally `len(count) <= k`.
+2. Expand `right`, incrementing the entering character's count.
+3. While `len(count) > k`, shrink from `left`: decrement, delete on zero, advance.
+4. Because we shrink only when invalid, the window is as long as it can be for the current `right` — record `right - left + 1` each step.
+5. Guard `k == 0`: no substring can hold zero distinct characters, so the answer is `0`.
 
 ### Dry Run
-`s = "eceba", k = 2`
-- r=0 'e' {e:1}; r=1 'c' {e:1,c:1}; r=2 'e' {e:2,c:1} → best 3 ("ece").
-- r=3 'b' {e:2,c:1,b:1} → 3 distinct > 2, shrink: drop 'e'→{e:1,c:1,b:1} still 3, drop 'c'→{e:1,b:1}, left=3.
-- r=4 'a' {e:1,b:1,a:1} > 2, shrink drop 'e','b' → {a:1}, left=... best stays **3**.
+
+Input: `s = "eceba"`, `k = 2`
+
+| right | char | count map after add | `len` | shrink? | count after shrink | left | window | best |
+|-------|------|---------------------|-------|---------|--------------------|------|--------|------|
+| 0 | `e` | `{e:1}` | 1 | no | — | 0 | `"e"` | 1 |
+| 1 | `c` | `{e:1, c:1}` | 2 | no | — | 0 | `"ec"` | 2 |
+| 2 | `e` | `{e:2, c:1}` | 2 | no | — | 0 | `"ece"` | **3** |
+| 3 | `b` | `{e:2, c:1, b:1}` | 3 | **yes** | drop `e` → `{e:1,c:1,b:1}` len 3, *still* > 2; drop `c` → **delete** → `{e:1,b:1}` len 2 | 2 | `"eb"` | 3 |
+| 4 | `a` | `{e:1, b:1, a:1}` | 3 | **yes** | drop `e` → **delete** → `{b:1,a:1}` len 2 | 3 | `"ba"` | 3 |
+
+Output: **3** (`"ece"`)
+
+Row `right = 3` shows both halves of the rule in one step. Removing the `'e'` at index 0 leaves `e:1` because the `'e'` at index 2 is still inside the window — so the key must **stay**, and the shrink loop correctly runs again. Removing `'c'` takes its count to `0` — so the key must **go**, and only then does `len(count)` fall to 2.
 
 ### Visualization
-```
-"eceba", k=2: shrink left whenever the count map has more than k keys.
+
+```text
+s =  e  c  e  b  a          k = 2
+     0  1  2  3  4
+
+     └────────┘            "ece"  map {e:2, c:1}   2 keys   ★ best = 3
+           └──┘            "eb"   map {e:1, b:1}   2 keys
+              └──┘         "ba"   map {b:1, a:1}   2 keys
+
+left only ever moves right → each index leaves the window at most once
 ```
 
 ### Code
+
+```go
+func lengthOfLongestSubstringKDistinct(s string, k int) int {
+    if k <= 0 {
+        return 0
+    }
+    count := make(map[byte]int)
+    left, best := 0, 0
+
+    for right := 0; right < len(s); right++ {
+        count[s[right]]++ // enters
+
+        for len(count) > k { // too many distinct characters
+            leftChar := s[left]
+            count[leftChar]--
+            if count[leftChar] == 0 {
+                delete(count, leftChar) // the character is truly gone now
+            }
+            left++
+        }
+
+        if right-left+1 > best {
+            best = right - left + 1
+        }
+    }
+    return best
+}
+```
+
 ```python
-def length_of_longest_substring_k_distinct(s, k):
-    if k == 0:
+def lengthOfLongestSubstringKDistinct(s, k):
+    if k <= 0:
         return 0
     count = {}
     left = best = 0
+
     for right, ch in enumerate(s):
-        count[ch] = count.get(ch, 0) + 1
-        while len(count) > k:
-            lc = s[left]
-            count[lc] -= 1
-            if count[lc] == 0:
-                del count[lc]
+        count[ch] = count.get(ch, 0) + 1       # enters
+
+        while len(count) > k:                  # too many distinct characters
+            left_char = s[left]
+            count[left_char] -= 1
+            if count[left_char] == 0:
+                del count[left_char]           # truly gone now
             left += 1
+
         best = max(best, right - left + 1)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(k). Each index enters and leaves the window once; the map holds at most k+1 keys.
+Time **O(n)** — every index is added once and removed at most once. Space **O(k)** — the map never exceeds `k + 1` keys.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Two Distinct (LeetCode 159)
-Find the length of the longest substring of `s` with **at most two distinct** characters.
+Return the length of the longest substring of `s` containing **at most two distinct** characters.
 
 ### Thought Process
-1. This is the k-distinct problem fixed at `k = 2`, so track only a tiny map `last` of char → its most recent index (at most 3 keys live).
-2. Expand `right`; when a third distinct char appears, find the other char whose last-seen index is smallest — that char must fully leave the window.
-3. Set `left` to that evicted char's index + 1 and delete it, keeping exactly two distinct chars; record the length.
+1. This is example 2 with `k` nailed to `2`, so the algorithm is unchanged — but it lets us show the array version of the same state.
+2. When the alphabet is fixed (128 ASCII codes), swap the map for a plain array `counts[128]`. Array indexing is faster and allocation-free.
+3. **But an array has no "size".** `len(counts)` is always 128. So you must maintain the distinct count by hand.
+4. The rule is exactly what `delete`-on-zero was doing for you: bump `distinct` when a count goes `0 → 1`, and drop it when a count goes `1 → 0`. Nothing else changes `distinct`.
+5. Shrink while `distinct > 2`, and record the length each step.
 
 ### Dry Run
-`s = "ccaabbb"`
-- "cc" last{c}; "cca" last{c:1,a:2}; "ccaa" best 4.
-- r=4 'b': third char → evict 'c' (smallest last idx 1), left=2, window "aab", last{a,b}.
-- r=5,6 'b': window "aabbb" best **5**.
+
+Input: `s = "ccaabbb"`
+
+| right | char | count change | `distinct` | shrink? | left | window | best |
+|-------|------|--------------|------------|---------|------|--------|------|
+| 0 | `c` | c 0→1 | 1 (`0→1`, bump) | no | 0 | `"c"` | 1 |
+| 1 | `c` | c 1→2 | 1 (no change) | no | 0 | `"cc"` | 2 |
+| 2 | `a` | a 0→1 | 2 (bump) | no | 0 | `"cca"` | 3 |
+| 3 | `a` | a 1→2 | 2 | no | 0 | `"ccaa"` | **4** |
+| 4 | `b` | b 0→1 | 3 (bump) | **yes**: drop `c` (c 2→1, *no* change to distinct); drop `c` (c 1→0, distinct → 2) | 2 | `"aab"` | 4 |
+| 5 | `b` | b 1→2 | 2 | no | 2 | `"aabb"` | 4 |
+| 6 | `b` | b 2→3 | 2 | no | 2 | `"aabbb"` | **5** |
+
+Output: **5** (`"aabbb"`)
+
+Row `right = 4` is the payoff: the first shrink takes `c` from 2 to 1 and `distinct` **must not** move, because a `'c'` is still in the window. Only the second shrink, `1 → 0`, is allowed to decrement it. That is the array-shaped restatement of "delete the key when it hits zero".
 
 ### Visualization
-```
-"ccaabbb": on a 3rd char, drop the char whose last index is furthest left.
+
+```text
+s =  c  c  a  a  b  b  b
+     0  1  2  3  4  5  6
+
+     └────────┘                  "ccaa"    {c,a}   distinct 2   len 4
+              (add 'b' → {c,a,b}, distinct 3 → shrink both c's)
+           └──────────────┘      "aabbb"   {a,b}   distinct 2   ★ len 5
+
+counts[]:  no .size() available  →  distinct is maintained by hand
+           0 → 1 : distinct++        1 → 0 : distinct--
 ```
 
 ### Code
+
+```go
+func lengthOfLongestSubstringTwoDistinct(s string) int {
+    const k = 2
+    var counts [128]int // fixed ASCII alphabet: array instead of a map
+    distinct, left, best := 0, 0, 0
+
+    for right := 0; right < len(s); right++ {
+        in := s[right]
+        if counts[in] == 0 {
+            distinct++ // 0 -> 1: a new character kind appeared
+        }
+        counts[in]++
+
+        for distinct > k {
+            out := s[left]
+            counts[out]--
+            if counts[out] == 0 {
+                distinct-- // 1 -> 0: that character kind is gone
+            }
+            left++
+        }
+
+        if right-left+1 > best {
+            best = right - left + 1
+        }
+    }
+    return best
+}
+```
+
 ```python
-def length_of_longest_substring_two_distinct(s):
-    last = {}          # char -> most recent index, at most 2 kept
-    left = best = 0
+def lengthOfLongestSubstringTwoDistinct(s):
+    K = 2
+    counts = [0] * 128           # fixed ASCII alphabet: list instead of a dict
+    distinct = left = best = 0
+
     for right, ch in enumerate(s):
-        last[ch] = right
-        if len(last) > 2:
-            evict = min(last, key=last.get)   # char last seen furthest back
-            left = last[evict] + 1
-            del last[evict]
+        i = ord(ch)
+        if counts[i] == 0:
+            distinct += 1        # 0 -> 1: a new character kind appeared
+        counts[i] += 1
+
+        while distinct > K:
+            j = ord(s[left])
+            counts[j] -= 1
+            if counts[j] == 0:
+                distinct -= 1    # 1 -> 0: that character kind is gone
+            left += 1
+
         best = max(best, right - left + 1)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(1). The `last` map never exceeds three entries, so each step is constant work.
+Time **O(n)** — one pass, each index entering and leaving once. Space **O(1)** — a fixed 128-slot array regardless of input size (versus O(k) for the map version).
 
+---
 
 ## 12. LeetCode Practice Set
 

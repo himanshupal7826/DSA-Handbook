@@ -41,32 +41,114 @@ rotated, pivot, sorted rotated, binary search, find min.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"The array was sorted, then somebody cut it and swapped the two halves — can I still search it in O(log n)?"*
+
+Running example: `nums = [4, 5, 6, 7, 0, 1, 2]`, `target = 0`. This is `[0,1,2,4,5,6,7]` rotated so that it now starts at `4`.
+
 ### Intuition
-Linear scan checks each candidate — O(n).
+Plain binary search needs a globally sorted array, and this one isn't — `7` is followed by `0`. The safe move is to give up on the structure entirely and just look at every element until you find the target.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For `i = 0 .. n-1`:
+2. &nbsp;&nbsp;If `nums[i] == target`, return `i`.
+3. Return `-1`.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n)** — the target may be the last element examined.
+- Space: O(1)
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Search in Rotated Array pattern is built to use.
+- On `[4,5,6,7,0,1,2]` looking for `0`, the scan reads `4, 5, 6, 7, 0` — five reads to find an element binary search reaches in three.
+- The fact being ignored: **the array is still sorted almost everywhere.** There is exactly one "cliff" (`7 → 0`). Everything else is ascending order that the linear scan pays no attention to. One broken link should not cost you the whole logarithm.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Search in Rotated Array invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Wherever you place `mid`, at least one of the two halves is completely sorted — figure out which one, and you can decide in O(1) whether the target lives there.**
+
+There is only one cliff in the array. A cliff cannot be in two places at once, so it sits in the left half or the right half — never both. Whichever half does *not* contain it is an untouched slice of the original sorted array, and inside a sorted slice a single range check (`is target between the two endpoints?`) settles everything.
+
+### The thought process
+
+```text
+We need    : the index of target in a rotated sorted array, in O(log n).
+Obvious way: scan every element.
+Too slow   : O(n) — throws away the sortedness that survived the rotation.
+Notice     : rotation introduces exactly ONE descent (the pivot).
+Notice too : that one descent lands in only one half of [lo..mid..hi],
+             so the OTHER half is perfectly sorted.
+Therefore  : identify the sorted half, and range-check the target against it.
+Now        : if target is inside it, search there; otherwise search the other
+             half. Either way one half dies → O(log n).
+```
+
+### Why `nums[lo] <= nums[mid]` identifies the sorted half
+
+That single comparison is the entire trick, so it is worth proving.
+
+```text
+If nums[lo] <= nums[mid]  →  no cliff between lo and mid  →  LEFT half sorted
+If nums[lo] >  nums[mid]  →  the cliff is inside the left →  RIGHT half sorted
+```
+
+A cliff is the only way values can go *down* as the index goes up. So if `nums[lo] <= nums[mid]`, no descent happened between `lo` and `mid`, and `nums[lo..mid]` is ascending. If instead `nums[lo] > nums[mid]`, a descent must have happened on the left — and since there is only one, the right side `nums[mid..hi]` is clean.
+
+Concretely, with `lo=0, mid=3` on `[4,5,6,7,0,1,2]`: `nums[0]=4 <= nums[3]=7`, so `[4,5,6,7]` is sorted. Target `0` is not in `[4, 7]`, so it cannot be on the left — move right.
+
+Two details that are easy to get wrong:
+
+- **Use `<=`, not `<`.** When the window narrows to two elements, `mid == lo`, so `nums[lo] == nums[mid]`. A single element *is* sorted, and `<=` correctly says so. With `<` you would wrongly declare the right half sorted and could search the wrong side.
+- **Range-check with the right strictness.** For a sorted left half we ask `nums[lo] <= target < nums[mid]` — `mid` itself was already compared for equality, so it is excluded. Symmetrically on the right: `nums[mid] < target <= nums[hi]`.
+
+### Caveat: duplicates degrade the guarantee to O(n)
+
+The comparison `nums[lo] <= nums[mid]` is only informative when values are distinct. With duplicates you can hit
+
+```text
+nums = [1, 0, 1, 1, 1],  lo=0, mid=2, hi=4
+        ↑     ↑        ↑
+       1  ==  1   ==   1     which half is sorted? impossible to say
+```
+
+Both `[1,0,1]` and `[1,1,1]` are consistent with what you can see. The only sound repair is to shrink the window by one on each side (`lo++`, `hi--`) and retry — which costs O(n) in the worst case (an array of all-equal values with one odd element). Say this out loud in an interview: **distinct values → O(log n) guaranteed; duplicates → O(log n) typical, O(n) worst case.**
+
+### Steps
+
+```text
+Step 1 → lo = 0, hi = n-1 (closed interval, loop while lo <= hi).
+Step 2 → mid = lo + (hi-lo)/2; if nums[mid] == target, done.
+Step 3 → if nums[lo] <= nums[mid]:            // LEFT half is sorted
+Step 4 →     if nums[lo] <= target < nums[mid]  → hi = mid - 1
+Step 5 →     else                               → lo = mid + 1
+Step 6 → else:                                 // RIGHT half is sorted
+Step 7 →     if nums[mid] < target <= nums[hi]  → lo = mid + 1
+Step 8 →     else                               → hi = mid - 1
+Step 9 → loop ends without a hit → return -1.
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "sorted array rotated at some unknown pivot"
+  "find target / find the minimum", "O(log n) required"
+  an array that ascends, drops once, then ascends again
+        ↓
+Think about...
+  "Which half of [lo..mid..hi] does the single cliff fall in?
+   The other half is ordinary sorted territory."
+        ↓
+Use...
+  binary search + the nums[lo] <= nums[mid] test
+    ├─ searching for a target  → range-check it against the sorted half
+    ├─ searching for the MIN   → compare nums[mid] with nums[hi] instead
+    └─ duplicates present      → add the lo++/hi-- escape, note O(n) worst
+```
 
 ### Visual explanation
 
@@ -94,30 +176,71 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Search in Rotated : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [4, 5, 6, 7, 0, 1, 2]   target = 0
+ idx      0  1  2  3  4  5  6                    the cliff is 7 → 0
+
+step 1   lo=0            mid=3            hi=6
+         [4  5  6  7] │ [0  1  2]
+          └── sorted ──┘   nums[0]=4 <= nums[3]=7 → LEFT is sorted
+          is 0 in [4,7)? NO  → discard the left, lo = 4
+
+step 2                        lo=4  mid=5  hi=6
+                              [0  1] │ [2]
+                              nums[4]=0 <= nums[5]=1 → LEFT is sorted
+                              is 0 in [0,1)? YES → discard the right, hi = 4
+
+step 3                        lo=hi=mid=4
+                              nums[4] == 0  → return 4  ✓
 ```
 
 ### Interview explanation
-"This is a Search in Rotated Array problem. I'll if the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration. That brings the complexity down to O(log n) time and O(1) space — here's the template."
+"Rotation introduces exactly one descent in the array, so at any `mid` that descent can only be in one half — which means the other half is a perfectly ordinary sorted range. I test `nums[lo] <= nums[mid]` to see whether the left half is the clean one, then ask whether the target falls between that half's two endpoints. If it does I recurse into it, otherwise into the other half; either way I discard half the array, so it's O(log n) time and O(1) space. I use `<=` rather than `<` so that a one-element half is still treated as sorted. If the array can contain duplicates that test becomes ambiguous when `nums[lo] == nums[mid] == nums[hi]`, and the fallback of shrinking both ends makes the worst case O(n)."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Binary Search** family template. Adapt the comparison/condition to the specific problem.
+> One comparison names the sorted half; one range check decides whether to go there.
 
 ```go
-// Lower bound: first index with a[i] >= target. Half-open invariant [lo, hi).
-func lowerBound(a []int, target int) int {
-    lo, hi := 0, len(a)
+// SearchRotated finds target in a rotated sorted array of DISTINCT values.
+// Returns its index, or -1.
+func SearchRotated(nums []int, target int) int {
+    lo, hi := 0, len(nums)-1
+    for lo <= hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] == target {
+            return mid
+        }
+        if nums[lo] <= nums[mid] { // left half [lo..mid] is sorted
+            if nums[lo] <= target && target < nums[mid] {
+                hi = mid - 1 // target lies inside the sorted left
+            } else {
+                lo = mid + 1
+            }
+        } else { // right half [mid..hi] is sorted
+            if nums[mid] < target && target <= nums[hi] {
+                lo = mid + 1 // target lies inside the sorted right
+            } else {
+                hi = mid - 1
+            }
+        }
+    }
+    return -1
+}
+
+// FindRotationPivot returns the index of the smallest element — i.e. how far
+// the array was rotated. Compares with nums[hi], never nums[lo]: on a
+// non-rotated array nums[lo] <= nums[mid] holds and would send us the wrong way.
+func FindRotationPivot(nums []int) int {
+    lo, hi := 0, len(nums)-1
     for lo < hi {
-        mid := lo + (hi-lo)/2     // avoids overflow
-        if a[mid] < target {
-            lo = mid + 1
+        mid := lo + (hi-lo)/2
+        if nums[mid] > nums[hi] {
+            lo = mid + 1 // the cliff, and the minimum, are to the right
         } else {
-            hi = mid
+            hi = mid // mid could itself be the minimum — keep it
         }
     }
     return lo
@@ -125,36 +248,99 @@ func lowerBound(a []int, target int) int {
 ```
 
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def search_rotated(nums, target):
+    """Index of target in a rotated sorted array of distinct values, else -1."""
+    lo, hi = 0, len(nums) - 1
+    while lo <= hi:
+        mid = lo + (hi - lo) // 2
+        if nums[mid] == target:
+            return mid
+        if nums[lo] <= nums[mid]:                  # left half is sorted
+            if nums[lo] <= target < nums[mid]:
+                hi = mid - 1                       # target is inside it
+            else:
+                lo = mid + 1
+        else:                                      # right half is sorted
+            if nums[mid] < target <= nums[hi]:
+                lo = mid + 1                       # target is inside it
+            else:
+                hi = mid - 1
+    return -1
+
+
+def find_rotation_pivot(nums):
+    """Index of the minimum. Compare with nums[hi]: nums[lo] misleads when
+    the array was never rotated."""
+    lo, hi = 0, len(nums) - 1
     while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        mid = lo + (hi - lo) // 2
+        if nums[mid] > nums[hi]:
+            lo = mid + 1                           # cliff is to the right
         else:
-            hi = mid
-    return lo                     # first index with a[i] >= target
+            hi = mid                               # mid may be the minimum
+    return lo
 ```
 
 ```java
-int lowerBound(int[] a, int target) {
-    int lo = 0, hi = a.length;
-    while (lo < hi) {
-        int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+public class RotatedSearch {
+    /** Index of target in a rotated sorted array of distinct values, else -1. */
+    public static int searchRotated(int[] nums, int target) {
+        int lo = 0, hi = nums.length - 1;
+        while (lo <= hi) {
+            int mid = lo + (hi - lo) / 2;
+            if (nums[mid] == target) return mid;
+            if (nums[lo] <= nums[mid]) {                       // left sorted
+                if (nums[lo] <= target && target < nums[mid]) hi = mid - 1;
+                else lo = mid + 1;
+            } else {                                           // right sorted
+                if (nums[mid] < target && target <= nums[hi]) lo = mid + 1;
+                else hi = mid - 1;
+            }
+        }
+        return -1;
     }
-    return lo;
+
+    /** Index of the minimum; compare against nums[hi], not nums[lo]. */
+    public static int findRotationPivot(int[] nums) {
+        int lo = 0, hi = nums.length - 1;
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;
+            if (nums[mid] > nums[hi]) lo = mid + 1;   // cliff is to the right
+            else hi = mid;                            // mid may be the minimum
+        }
+        return lo;
+    }
 }
 ```
 
 ```cpp
-int lowerBound(vector<int>& a, int target) {
-    int lo = 0, hi = (int)a.size();
+#include <vector>
+using namespace std;
+
+// Index of target in a rotated sorted array of distinct values, else -1.
+int searchRotated(const vector<int>& nums, int target) {
+    int lo = 0, hi = (int)nums.size() - 1;
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
+        if (nums[mid] == target) return mid;
+        if (nums[lo] <= nums[mid]) {                          // left sorted
+            if (nums[lo] <= target && target < nums[mid]) hi = mid - 1;
+            else lo = mid + 1;
+        } else {                                              // right sorted
+            if (nums[mid] < target && target <= nums[hi]) lo = mid + 1;
+            else hi = mid - 1;
+        }
+    }
+    return -1;
+}
+
+// Index of the minimum; compare against nums[hi], not nums[lo].
+int findRotationPivot(const vector<int>& nums) {
+    int lo = 0, hi = (int)nums.size() - 1;
     while (lo < hi) {
         int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+        if (nums[mid] > nums[hi]) lo = mid + 1;   // cliff is to the right
+        else hi = mid;                            // mid may be the minimum
     }
     return lo;
 }
@@ -242,88 +428,194 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Search Rotated (LeetCode 33)
-Given a rotated sorted array of **distinct** values and a `target`, return its index or `-1`. Do it in O(log n).
+A sorted array of **distinct** integers was rotated at an unknown pivot. Given the rotated array and a `target`, return the target's index, or `-1`. Required: O(log n).
 
 ### Thought Process
-1. Take `mid`. At least one half `[lo..mid]` or `[mid..hi]` is fully sorted — detect which by comparing `nums[lo] <= nums[mid]`.
-2. If the sorted half contains `target` (within its endpoint range), move into it; otherwise move to the other half.
-3. Standard closed-interval binary search with `lo <= hi`; return `mid` on a direct hit.
+1. Rotation creates exactly one descent, so at any `mid` one half is guaranteed sorted.
+2. `nums[lo] <= nums[mid]` ⇒ the left half `[lo..mid]` is the sorted one; otherwise the right half `[mid..hi]` is.
+3. A sorted half is defined entirely by its two endpoints, so `target` belongs there iff it lies strictly between them (with `mid` excluded, since we already tested it for equality).
+4. In the half, or not in the half — either answer discards the other half. That is the O(log n).
+5. Use a closed interval `[lo, hi]` with `lo <= hi`, because we want to return `mid` on a direct hit.
 
 ### Dry Run
-`nums=[4,5,6,7,0,1,2], target=0`
-- lo=0,hi=6,mid=3 → nums[3]=7≠0. Left `[4..7]` sorted; 0∉[4,7] → lo=4.
-- lo=4,hi=6,mid=5 → nums[5]=1≠0. Left `[0..1]` sorted; 0∈[0,1] → hi=4.
-- lo=4,hi=4,mid=4 → nums[4]=0 → return **4**.
+
+Input: `nums = [4, 5, 6, 7, 0, 1, 2]`, `target = 0`
+
+| step | lo | hi | mid | nums[mid] | `nums[lo] <= nums[mid]`? | sorted half | target inside it? | move |
+|------|----|----|-----|-----------|--------------------------|-------------|-------------------|------|
+| 1 | 0 | 6 | 3 | 7 | 4 ≤ 7 → yes | left `[4 … 7]` | 0 ∉ [4, 7) → no | `lo = 4` |
+| 2 | 4 | 6 | 5 | 1 | 0 ≤ 1 → yes | left `[0 … 1]` | 0 ∈ [0, 1) → yes | `hi = 4` |
+| 3 | 4 | 4 | 4 | **0** | — | — | direct hit | return **4** |
+
+Output: **4**
+
+Row 2 is where the subtlety lives. The window `[4..6]` holds `[0,1,2]`, which contains no cliff at all — and the test still behaves: `nums[4] <= nums[5]` says "left sorted", and the range check `0 ∈ [0, 1)` correctly steers left. The algorithm never needs to know *where* the pivot is, only which side of `mid` is clean.
 
 ### Visualization
-```
-sorted half found ──▶ target in its range? go there : go other half
+
+```text
+idx    0   1   2   3   4   5   6
+nums   4   5   6   7 │ 0   1   2        cliff between idx 3 and 4
+                     ↑
+
+step 1   lo=0 ─────── mid=3 ─────── hi=6      target 0
+         └─ sorted 4..7 ─┘  0 not in [4,7) → go right
+step 2               lo=4 ─ mid=5 ─ hi=6
+                     └ 0..1 ┘  0 in [0,1)  → go left
+step 3               lo=hi=4  nums[4]=0 = target  ✓
+
+each step halves the window:  7 → 3 → 1
 ```
 
 ### Code
+
+```go
+func search(nums []int, target int) int {
+    lo, hi := 0, len(nums)-1
+    for lo <= hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] == target {
+            return mid
+        }
+        // <= not <: when the window is 2 wide, mid == lo, and a single
+        // element counts as sorted.
+        if nums[lo] <= nums[mid] { // left half [lo..mid] is sorted
+            if nums[lo] <= target && target < nums[mid] {
+                hi = mid - 1 // target must be in the sorted left
+            } else {
+                lo = mid + 1 // so it is in the messy right
+            }
+        } else { // right half [mid..hi] is sorted
+            if nums[mid] < target && target <= nums[hi] {
+                lo = mid + 1 // target must be in the sorted right
+            } else {
+                hi = mid - 1 // so it is in the messy left
+            }
+        }
+    }
+    return -1
+}
+```
+
 ```python
 def search(nums, target):
     lo, hi = 0, len(nums) - 1
     while lo <= hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2
         if nums[mid] == target:
             return mid
-        if nums[lo] <= nums[mid]:          # left half sorted
+        if nums[lo] <= nums[mid]:               # left half is sorted
             if nums[lo] <= target < nums[mid]:
-                hi = mid - 1
+                hi = mid - 1                    # target is in the sorted left
             else:
-                lo = mid + 1
-        else:                              # right half sorted
+                lo = mid + 1                    # so it is in the messy right
+        else:                                   # right half is sorted
             if nums[mid] < target <= nums[hi]:
-                lo = mid + 1
+                lo = mid + 1                    # target is in the sorted right
             else:
-                hi = mid - 1
+                hi = mid - 1                    # so it is in the messy left
     return -1
 ```
 
 ### Complexity
-Time O(log n), Space O(1) — one half is discarded each iteration.
+Time O(log n) — every iteration provably eliminates one half, whether or not the target was in the sorted side. Space O(1).
 
 ## 10. Solved Example 2
 
 ### Problem — Search Rotated II (LeetCode 81)
-Same as LC33 but the array may contain **duplicates**. Return `True`/`False` for whether `target` exists.
+The same rotated array, but values may **repeat**. Return `true`/`false` for whether `target` is present.
 
 ### Thought Process
-1. Duplicates break the "which half is sorted" test when `nums[lo] == nums[mid] == nums[hi]` — you can't tell which side to keep.
-2. In that ambiguous case, shrink both ends (`lo += 1; hi -= 1`) and retry — this is what makes the worst case O(n).
-3. Otherwise fall back to the LC33 logic: find the sorted half and decide by target's range.
+1. Reuse the LC33 logic — it is still correct whenever the sorted-half test is *informative*.
+2. It stops being informative in exactly one situation: `nums[lo] == nums[mid] == nums[hi]`. Then both halves look identical from the endpoints and either could hold the cliff.
+3. In that case no half can be safely discarded, so shrink the window by one on each side (`lo++`, `hi--`) and try again. This is safe because `nums[lo]` and `nums[hi]` both equal `nums[mid]`, which we already know is not the target.
+4. That escape hatch is what costs the guarantee: `[1,1,1,…,1,0,1,…,1]` forces one-step shrinking, so the worst case is O(n).
+5. Everything else is unchanged.
 
 ### Dry Run
-`nums=[2,5,6,0,0,1,2], target=0`
-- lo=0,hi=6,mid=3 → nums[3]=0 → return **True**.
 
-`nums=[1,0,1,1,1], target=0`
-- lo=0,hi=4,mid=2 → nums[lo]=nums[mid]=nums[hi]=1 → shrink: lo=1,hi=3.
-- lo=1,hi=3,mid=2 → nums[2]=1; left `[0..1]` sorted, 0∈[0,1) → hi=1 → nums[1]=0 → **True**.
+Input: `nums = [1, 0, 1, 1, 1]`, `target = 0`
+
+| step | lo | hi | mid | nums[lo], nums[mid], nums[hi] | situation | move |
+|------|----|----|-----|-------------------------------|-----------|------|
+| 1 | 0 | 4 | 2 | 1, 1, 1 | all equal → **ambiguous** | `lo = 1`, `hi = 3` |
+| 2 | 1 | 3 | 2 | 0, 1, 1 | 0 ≤ 1 → left `[0 … 1]` sorted; 0 ∈ [0, 1) | `hi = 1` |
+| 3 | 1 | 1 | 1 | nums[1] = **0** | direct hit | return **true** |
+
+Output: **true**
+
+Row 1 is the whole point of this variant. Seeing `1, 1, 1` at the three probes, the window `[1,0,1,1,1]` is indistinguishable from `[1,1,1,0,1]` — discarding either half could throw away the `0`. Dropping just one element from each end is the only move that is guaranteed not to lose the answer.
 
 ### Visualization
-```
-nums[lo]==nums[mid]==nums[hi] ──▶ ambiguous, shrink both ends (O(n) worst)
+
+```text
+nums = 1   0   1   1   1        target = 0
+idx    0   1   2   3   4
+       ↑       ↑       ↑
+      lo      mid      hi
+       1   ==  1   ==  1   → which side holds the cliff? unknowable
+
+       shrink both ends:  lo++ , hi--
+           1   0   1   1   1
+               └──────┘          window [1..3] = [0,1,1]
+               lo  mid  hi
+               0 <= 1 → left [0..1] sorted, 0 ∈ [0,1) → hi = 1 → hit ✓
+
+worst case: [1,1,1,1,1,1,0,1] — every step shrinks by 2 → O(n)
 ```
 
 ### Code
+
+```go
+func searchWithDuplicates(nums []int, target int) bool {
+    lo, hi := 0, len(nums)-1
+    for lo <= hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] == target {
+            return true
+        }
+        if nums[lo] == nums[mid] && nums[mid] == nums[hi] {
+            // Both halves look identical from the endpoints. Neither can be
+            // discarded, but the two ends equal nums[mid] != target, so
+            // dropping them loses nothing. This is the O(n) worst case.
+            lo++
+            hi--
+        } else if nums[lo] <= nums[mid] { // left half is sorted
+            if nums[lo] <= target && target < nums[mid] {
+                hi = mid - 1
+            } else {
+                lo = mid + 1
+            }
+        } else { // right half is sorted
+            if nums[mid] < target && target <= nums[hi] {
+                lo = mid + 1
+            } else {
+                hi = mid - 1
+            }
+        }
+    }
+    return false
+}
+```
+
 ```python
-def search(nums, target):
+def searchWithDuplicates(nums, target):
     lo, hi = 0, len(nums) - 1
     while lo <= hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2
         if nums[mid] == target:
             return True
-        if nums[lo] == nums[mid] == nums[hi]:   # can't tell which half
+        if nums[lo] == nums[mid] == nums[hi]:
+            # Ambiguous: neither half can be ruled out. The two ends equal
+            # nums[mid] != target, so dropping them is safe. O(n) worst case.
             lo += 1
             hi -= 1
-        elif nums[lo] <= nums[mid]:             # left half sorted
+        elif nums[lo] <= nums[mid]:             # left half is sorted
             if nums[lo] <= target < nums[mid]:
                 hi = mid - 1
             else:
                 lo = mid + 1
-        else:                                   # right half sorted
+        else:                                   # right half is sorted
             if nums[mid] < target <= nums[hi]:
                 lo = mid + 1
             else:
@@ -332,46 +624,88 @@ def search(nums, target):
 ```
 
 ### Complexity
-Time O(log n) average, **O(n)** worst case when duplicates force one-step shrinking; Space O(1).
+Time O(log n) on typical input, **O(n) worst case** when duplicates force one-step shrinking (e.g. all values equal). Space O(1).
 
 ## 11. Solved Example 3
 
 ### Problem — Find Min (LeetCode 153)
-Return the minimum value in a rotated sorted array of **distinct** values, in O(log n).
+Return the **minimum** value of a rotated sorted array of distinct values, in O(log n).
 
 ### Thought Process
-1. The minimum is the pivot — the only element smaller than its predecessor. Compare `mid` to `hi` instead of a fixed target.
-2. If `nums[mid] > nums[hi]`, the pivot lies to the right → `lo = mid + 1`.
-3. Otherwise the min is at `mid` or to its left → `hi = mid`. Use half-open `lo < hi`; `nums[lo]` is the answer.
+1. The minimum is the element immediately after the cliff — so finding the min is finding the cliff.
+2. There is no target to compare against, so compare `nums[mid]` with an endpoint instead. Use `nums[hi]`.
+3. `nums[mid] > nums[hi]` means a descent exists somewhere in `(mid, hi]`, so the minimum is strictly right → `lo = mid + 1`.
+4. Otherwise `nums[mid] <= nums[hi]` means `[mid..hi]` is clean, so the minimum is `mid` or to its left → `hi = mid` (never `mid - 1`; `mid` is still a candidate).
+5. Half-open convergence with `lo < hi`; when they meet, `nums[lo]` is the answer.
 
 ### Dry Run
-`nums=[4,5,6,7,0,1,2]`
-- lo=0,hi=6,mid=3 → nums[3]=7 > nums[6]=2 → lo=4.
-- lo=4,hi=6,mid=5 → nums[5]=1 < nums[6]=2 → hi=5.
-- lo=4,hi=5,mid=4 → nums[4]=0 < nums[5]=1 → hi=4.
-- lo==hi=4 → return nums[4] = **0**.
+
+Input: `nums = [4, 5, 6, 7, 0, 1, 2]`
+
+| step | lo | hi | mid | nums[mid] | nums[hi] | `nums[mid] > nums[hi]`? | meaning | move |
+|------|----|----|-----|-----------|----------|-------------------------|---------|------|
+| 1 | 0 | 6 | 3 | 7 | 2 | yes | cliff is right of `mid` | `lo = 4` |
+| 2 | 4 | 6 | 5 | 1 | 2 | no | `[1,2]` is clean | `hi = 5` |
+| 3 | 4 | 5 | 4 | 0 | 1 | no | `[0,1]` is clean | `hi = 4` |
+| 4 | 4 | 4 | — | loop ends | | | | return `nums[4]` |
+
+Output: **0**
+
+Rows 2 and 3 use `hi = mid`, not `hi = mid - 1`. In row 3 `mid = 4` *is* the minimum — subtracting one would step over the answer and return `nums[5] = 1`.
 
 ### Visualization
-```
-nums[mid] > nums[hi] ──▶ min is right of mid : min at mid or left
+
+```text
+idx    0   1   2   3   4   5   6
+nums   4   5   6   7 │ 0   1   2
+                     ↑ minimum = 0 = first element after the cliff
+
+step 1   lo=0 ─────── mid=3 ─────── hi=6    7 > 2 → cliff to the right
+step 2                     lo=4 mid=5 hi=6  1 ≤ 2 → clean, keep left half
+step 3                     lo=4 hi=5, mid=4 0 ≤ 1 → clean, keep mid itself
+step 4                     lo=hi=4          nums[4] = 0  ✓
+
+Why nums[hi] and not nums[lo]?  On a NON-rotated array [1,2,3]:
+   nums[lo]=1 <= nums[mid]=2  would read as "cliff on the right" — wrong.
+   nums[mid]=2 <= nums[hi]=3  correctly reads as "clean, go left".
 ```
 
 ### Code
+
+```go
+func findMin(nums []int) int {
+    lo, hi := 0, len(nums)-1
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] > nums[hi] {
+            // A descent exists in (mid, hi], so the minimum is strictly right.
+            lo = mid + 1
+        } else {
+            // [mid..hi] is ascending, so the minimum is at mid or left of it.
+            // hi = mid, never mid-1: mid itself may be the minimum.
+            hi = mid
+        }
+    }
+    return nums[lo]
+}
+```
+
 ```python
 def findMin(nums):
     lo, hi = 0, len(nums) - 1
     while lo < hi:
-        mid = (lo + hi) // 2
-        if nums[mid] > nums[hi]:      # pivot to the right
-            lo = mid + 1
-        else:                         # min at mid or left
-            hi = mid
+        mid = lo + (hi - lo) // 2
+        if nums[mid] > nums[hi]:
+            lo = mid + 1        # a descent lies in (mid, hi] - go right
+        else:
+            hi = mid            # [mid..hi] is clean; mid may BE the minimum
     return nums[lo]
 ```
 
 ### Complexity
-Time O(log n), Space O(1) — each step discards the half that cannot contain the pivot.
+Time O(log n) — one endpoint comparison discards half the window each step. Space O(1). With duplicates (LeetCode 154) the `nums[mid] == nums[hi]` tie forces `hi--` and the worst case becomes O(n), for the same reason as example 2.
 
+---
 
 ## 12. LeetCode Practice Set
 

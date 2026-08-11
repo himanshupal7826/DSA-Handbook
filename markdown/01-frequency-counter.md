@@ -80,7 +80,7 @@ Without any bookkeeping, the only way to know whether `t` has "the right number 
 
 ### Core idea
 
-Here is the whole idea in one sentence:
+One sentence:
 
 > **Stop searching for characters. Count them once, then just read the counts.**
 

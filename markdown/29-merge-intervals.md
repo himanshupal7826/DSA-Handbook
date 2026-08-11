@@ -41,32 +41,126 @@ intervals, merge, overlap, sort by start, union.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Which of these ranges are really the same range?"*
+
+Running example: `[[1,3], [2,6], [8,10], [15,18]]`. Two intervals overlap when neither ends before the other begins; `[1,3]` and `[2,6]` overlap and should become `[1,6]`.
+
 ### Intuition
-Compare every pair of intervals for overlap — O(n^2).
+Overlap is a property of a *pair*, so check every pair. When a pair overlaps, fuse it into one interval — but that new interval may now overlap something you already looked at, so you have to start over. Repeat until a full pass changes nothing.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Repeat until a pass makes no change:
+2. &nbsp;&nbsp;For every pair `(i, j)`:
+3. &nbsp;&nbsp;&nbsp;&nbsp;If they overlap (`a[i].start <= a[j].end` and `a[j].start <= a[i].end`):
+4. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Replace them with `[min(starts), max(ends)]` and restart the pass.
+5. Return whatever is left.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n³)** in the worst case — O(n²) pairs per pass and up to O(n) passes (each pass may fuse only one pair).
+- Space: O(n)
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Merge Intervals pattern is built to use.
+- On the running example the first pass compares `[1,3]` against `[2,6]`, `[8,10]` and `[15,18]`, even though the last two start *after* `[1,3]` has long finished. In the given order the comparison `[8,10]` vs `[15,18]` is made and re-made on every pass.
+- The fact being ignored: **intervals live on a line, and a line has an order.** If you walked left to right, an interval that starts at 15 would obviously not need checking against one that ended at 3 — but unordered input forces every comparison to be made explicitly.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Merge Intervals invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Sort by start time, and then the only interval that can possibly overlap the one in your hand is the last one you emitted — so a single left-to-right pass is enough.**
+
+Think of merging calendar blocks by hand. If the meetings are shuffled you keep flipping back and forth through the pile. If you first lay them out in start order, you just run your finger down the page: either the next block begins before the current block ended (stretch the current one) or it begins after (start a new one).
+
+### The shared move for every interval problem: SORT FIRST, then sweep
+
+Every chapter in this family opens the same way — **sort, then make one pass**. What changes from problem to problem is the *sort key*, and choosing it wrong is the single biggest source of wrong answers:
+
+| Goal | Sort by | The sweep rule |
+|------|---------|----------------|
+| **Merge / union overlapping ranges** | **start** | extend the last block: `end = max(end, cur.end)` |
+| **Insert one interval into a sorted set** | already sorted by **start** | three phases: copy-left, absorb-overlaps, copy-right |
+| **Most non-overlapping intervals (greedy)** | **end** | keep it if `cur.start >= lastKeptEnd` |
+| **Fewest rooms / peak concurrency** | split into **+1 / −1 events** by time | running counter; answer is its maximum |
+
+This chapter is row 1: **sort by start.**
+
+### The thought process
+
+```text
+We need    : the union of a pile of ranges, as few disjoint ranges as possible.
+Obvious way: compare every pair, fuse, repeat.
+Too slow   : O(n^3), and most comparisons are between ranges that are nowhere
+             near each other.
+Notice     : intervals sit on a number line, and merging is a LOCAL operation.
+Notice too : if we visit them in start order, everything already emitted lies
+             entirely to the left of where we are now.
+Therefore  : only the most recently emitted block can still be touched.
+Now        : one comparison per interval → O(n) sweep, O(n log n) with the sort.
+```
+
+### Why comparing against only the last block is safe
+
+This is the step that turns O(n²) into O(n), so it deserves a proof.
+
+After sorting, we process intervals in non-decreasing start order and keep a result list of **disjoint** blocks, in left-to-right order. Let `L` be the last block in that list and `B` any earlier one. Because the blocks are disjoint and ordered, `B.end < L.start`.
+
+Now take the current interval `[s, e]`. Its start `s` is at least the start of every interval processed so far, and `L.start` came from one of those — so `s >= L.start`. Chain it together:
+
+```text
+s  >=  L.start  >  B.end        ⇒   s > B.end   ⇒   no overlap with B
+```
+
+So the current interval **cannot** reach back past `L`. Checking `L` alone is not a heuristic; it is complete.
+
+### Why the merge must use `max` — the mistake that quietly corrupts output
+
+When the current interval overlaps `L`, the new end is `max(L.end, e)`, **never** just `e`:
+
+```text
+sorted input : [1,10]  [2,3]
+                 └──── contains ────┘
+
+with max :  [1,10] then 2 <= 10 → end = max(10, 3) = 10  →  [[1,10]]   ✓
+without  :  [1,10] then 2 <= 10 → end = 3               →  [[1,3]]     ✗ !!
+```
+
+Sorting by start says nothing about the ends. A short interval nested inside a long one arrives *after* it and would shrink the block. `max` is what makes a contained interval a no-op.
+
+One more decision to make explicitly: **do touching intervals merge?** `[1,3]` and `[3,5]` share only the point 3. Using `s <= L.end` merges them into `[1,5]`; using `s < L.end` keeps them separate. LeetCode 56 wants them merged. Say which convention you are using before you write the comparison.
+
+### Steps
+
+```text
+Step 1 → Sort the intervals by start.
+Step 2 → result = [ first interval ]  (a copy, so we never mutate the input)
+Step 3 → For each remaining interval [s, e]:
+Step 4 →     last = result[len(result)-1]
+Step 5 →     if s <= last.end:  last.end = max(last.end, e)   // overlap → fuse
+Step 6 →     else:              append [s, e]                 // gap → new block
+Step 7 → Return result.
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "merge overlapping intervals", "union of ranges", "combine time slots"
+  "remove covered intervals", "employee free time", "total covered length"
+  input shaped [[start, end], ...] with no ordering promised
+        ↓
+Think about...
+  "If I lay these on a number line in start order, does one pass solve it?"
+        ↓
+Use...
+  sort by START, sweep, compare only against the last emitted block
+    ├─ overlapping (s <= lastEnd) → lastEnd = max(lastEnd, e)   ← max, always
+    ├─ disjoint    (s >  lastEnd) → start a new block
+    └─ different goal? re-pick the sort key from the table above
+```
 
 ### Visual explanation
 
@@ -95,72 +189,128 @@ Sorting linearizes the geometry so a single left-to-right sweep resolves all ove
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Merge Intervals   : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+input (already in start order): [1,3]  [2,6]  [8,10]  [15,18]
+
+  0    2    4    6    8   10   12   14   16   18
+  ├────┼────┼────┼────┼────┼────┼────┼────┼────┤
+   ▓▓▓▓▓                                          [1,3]
+     ▓▓▓▓▓▓▓▓▓▓                                   [2,6]   2 <= 3 → fuse
+                  ▓▓▓▓▓                           [8,10]  8 >  6 → new block
+                                      ▓▓▓▓▓▓      [15,18] 15 > 10 → new block
+
+result:
+   ████████████                                   [1,6]
+                  █████                           [8,10]
+                                      ██████      [15,18]
+
+one finger moving right — never a backward glance
 ```
 
 ### Interview explanation
-"This is a Merge Intervals problem. I'll sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps. That brings the complexity down to O(n log n) time and O(n) space — here's the template."
+"I'd sort by start time first, because that makes merging a local operation. Once the intervals are in start order, every block I've already emitted lies entirely to the left of where I am, so the only one the current interval can still overlap is the most recent — I never need to look further back. For each interval I check whether its start is at most the last block's end; if so I extend that block's end to the *maximum* of the two ends, which matters because a short interval nested inside a long one would otherwise shrink it. Otherwise there's a gap and I open a new block. That's O(n log n) for the sort and O(n) for the sweep, with O(n) output space."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Intervals** family template. Adapt the comparison/condition to the specific problem.
+> Sort by start. Compare only with the last block. Extend with `max`, never with the new end.
 
 ```go
-// Merge overlapping intervals.
-func merge(intervals [][]int) [][]int {
-    sort.Slice(intervals, func(i, j int) bool { return intervals[i][0] < intervals[j][0] })
-    res := [][]int{}
-    for _, in := range intervals {
-        n := len(res)
-        if n > 0 && in[0] <= res[n-1][1] {
-            if in[1] > res[n-1][1] { res[n-1][1] = in[1] } // extend
+// MergeIntervals returns the union of the given [start, end] intervals as a
+// minimal set of disjoint intervals, in increasing order.
+// Touching intervals ([1,3] and [3,5]) are merged; use `<` for `<=` to keep
+// them apart.
+func MergeIntervals(intervals [][]int) [][]int {
+    if len(intervals) == 0 {
+        return [][]int{}
+    }
+    sort.Slice(intervals, func(i, j int) bool {
+        return intervals[i][0] < intervals[j][0] // sort by START
+    })
+
+    result := [][]int{{intervals[0][0], intervals[0][1]}} // copy, don't alias
+    for _, cur := range intervals[1:] {
+        last := result[len(result)-1]
+        if cur[0] <= last[1] {
+            // Overlap. max is essential: cur may be nested inside last,
+            // in which case last[1] must not shrink.
+            last[1] = max(last[1], cur[1])
         } else {
-            res = append(res, in)
+            result = append(result, []int{cur[0], cur[1]}) // gap → new block
         }
     }
-    return res
+    return result
 }
 ```
 
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
+def merge_intervals(intervals):
+    """Union of [start, end] intervals as a minimal disjoint set, in order.
+    Touching intervals are merged; use `<` instead of `<=` to keep them apart."""
+    if not intervals:
+        return []
+    intervals = sorted(intervals, key=lambda iv: iv[0])      # sort by START
+
+    result = [list(intervals[0])]                            # copy, don't alias
+    for start, end in intervals[1:]:
+        last = result[-1]
+        if start <= last[1]:
+            # Overlap. max is essential: this interval may be nested inside
+            # the last one, and last[1] must not shrink.
+            last[1] = max(last[1], end)
         else:
-            res.append([s, e])
-    return res
+            result.append([start, end])                      # gap -> new block
+    return result
 ```
 
 ```java
-int[][] merge(int[][] intervals) {
-    Arrays.sort(intervals, (a, b) -> Integer.compare(a[0], b[0]));
-    List<int[]> res = new ArrayList<>();
-    for (int[] in : intervals) {
-        if (!res.isEmpty() && in[0] <= res.get(res.size()-1)[1])
-            res.get(res.size()-1)[1] = Math.max(res.get(res.size()-1)[1], in[1]);
-        else res.add(in);
+import java.util.*;
+
+public class IntervalMerger {
+    /** Union of [start, end] intervals as a minimal disjoint set, in order. */
+    public static int[][] mergeIntervals(int[][] intervals) {
+        if (intervals.length == 0) return new int[0][];
+        Arrays.sort(intervals, (a, b) -> Integer.compare(a[0], b[0]));  // by START
+
+        List<int[]> result = new ArrayList<>();
+        result.add(new int[]{intervals[0][0], intervals[0][1]});        // copy
+        for (int i = 1; i < intervals.length; i++) {
+            int[] last = result.get(result.size() - 1);
+            if (intervals[i][0] <= last[1]) {
+                // max is essential: intervals[i] may be nested inside last.
+                last[1] = Math.max(last[1], intervals[i][1]);
+            } else {
+                result.add(new int[]{intervals[i][0], intervals[i][1]});
+            }
+        }
+        return result.toArray(new int[0][]);
     }
-    return res.toArray(new int[0][]);
 }
 ```
 
 ```cpp
-vector<vector<int>> merge(vector<vector<int>>& intervals) {
-    sort(intervals.begin(), intervals.end());
-    vector<vector<int>> res;
-    for (auto& in : intervals) {
-        if (!res.empty() && in[0] <= res.back()[1])
-            res.back()[1] = max(res.back()[1], in[1]);
-        else res.push_back(in);
+#include <algorithm>
+#include <vector>
+using namespace std;
+
+// Union of [start, end] intervals as a minimal disjoint set, in order.
+vector<vector<int>> mergeIntervals(vector<vector<int>> intervals) {
+    if (intervals.empty()) return {};
+    sort(intervals.begin(), intervals.end(),
+         [](const vector<int>& a, const vector<int>& b) { return a[0] < b[0]; });
+
+    vector<vector<int>> result{{intervals[0][0], intervals[0][1]}};  // copy
+    for (size_t i = 1; i < intervals.size(); ++i) {
+        vector<int>& last = result.back();
+        if (intervals[i][0] <= last[1]) {
+            // max is essential: intervals[i] may be nested inside last.
+            last[1] = max(last[1], intervals[i][1]);
+        } else {
+            result.push_back({intervals[i][0], intervals[i][1]});
+        }
     }
-    return res;
+    return result;
 }
 ```
 
@@ -246,128 +396,303 @@ vector<vector<int>> merge(vector<vector<int>>& intervals) {
 ## 9. Solved Example 1
 
 ### Problem — Merge Intervals (LeetCode 56)
-Given an array of intervals, merge all overlapping ones and return the non-overlapping intervals that cover the same ranges.
+Given an array of intervals `[start, end]`, merge every group of overlapping intervals and return the minimal set of disjoint intervals covering exactly the same points.
 
 ### Thought Process
-1. Sort intervals by start so any interval that overlaps the running one comes immediately after it.
-2. Keep the last interval in the result; for each new interval, if its start is ≤ the last end, extend the last end to the max of the two.
-3. Otherwise there is a gap, so push the new interval as a fresh block.
+1. Sort by **start**. This is row 1 of the sort-key table: merging is a union, and unions are built left to right.
+2. Seed the result with a *copy* of the first interval, so the input is never mutated behind the caller's back.
+3. For each subsequent interval, compare only with the last emitted block — sorting proves nothing earlier can still be reached.
+4. Overlap (`start <= last.end`) → extend with `last.end = max(last.end, end)`. Gap → append a new block.
+5. `max` is not cosmetic: a nested interval would otherwise shorten the block.
 
 ### Dry Run
-Input `[[1,3],[2,6],[8,10],[15,18]]` (already sorted by start).
-- `[1,3]` → res `[[1,3]]`.
-- `[2,6]`: 2 ≤ 3, extend → res `[[1,6]]`.
-- `[8,10]`: 8 > 6, new block → `[[1,6],[8,10]]`.
-- `[15,18]`: 15 > 10, new block → `[[1,6],[8,10],[15,18]]`.
+
+Input: `[[1,3], [2,6], [8,10], [15,18]]` (already in start order)
+
+| step | interval | last block | `start <= last.end`? | action | result so far |
+|------|----------|-----------|----------------------|--------|---------------|
+| 1 | `[1,3]` | — | — | seed | `[[1,3]]` |
+| 2 | `[2,6]` | `[1,3]` | 2 ≤ 3 → yes | `end = max(3, 6) = 6` | `[[1,6]]` |
+| 3 | `[8,10]` | `[1,6]` | 8 ≤ 6 → no | new block | `[[1,6],[8,10]]` |
+| 4 | `[15,18]` | `[8,10]` | 15 ≤ 10 → no | new block | `[[1,6],[8,10],[15,18]]` |
+
+Output: **`[[1,6],[8,10],[15,18]]`**
+
+Now the run that exposes the `max` rule — input `[[1,4], [2,3]]`:
+
+| step | interval | last block | `start <= last.end`? | with `max` | with plain `= end` |
+|------|----------|-----------|----------------------|------------|--------------------|
+| 1 | `[1,4]` | — | — | `[[1,4]]` | `[[1,4]]` |
+| 2 | `[2,3]` | `[1,4]` | 2 ≤ 4 → yes | `end = max(4,3) = 4` → `[[1,4]]` ✓ | `end = 3` → `[[1,3]]` ✗ |
+
+`[2,3]` is entirely *inside* `[1,4]`, so merging it must change nothing. Sorting by start gives no promise at all about ends, which is exactly why the ends need `max`.
 
 ### Visualization
-```
-input  ──▶ [ apply Merge Intervals step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+  1    3    5    7    9   11   13   15   17   19
+  ├────┼────┼────┼────┼────┼────┼────┼────┼────┤
+  ▓▓▓▓▓                                            [1,3]
+    ▓▓▓▓▓▓▓▓▓▓                                     [2,6]   overlap → fuse
+                  ▓▓▓▓▓                            [8,10]  gap    → new
+                                      ▓▓▓▓▓▓▓      [15,18] gap    → new
+
+  ███████████                                      [1,6]
+                  █████                            [8,10]
+                                      ███████      [15,18]
+
+nesting case:
+  ▓▓▓▓▓▓▓▓▓▓  [1,4]
+    ▓▓▓▓▓     [2,3]   ← inside; max(4,3)=4 keeps the block at [1,4]
+  ██████████  [1,4]
 ```
 
 ### Code
+
+```go
+func mergeIntervals(intervals [][]int) [][]int {
+    if len(intervals) == 0 {
+        return [][]int{}
+    }
+    sort.Slice(intervals, func(i, j int) bool {
+        return intervals[i][0] < intervals[j][0] // sort by START
+    })
+
+    result := [][]int{{intervals[0][0], intervals[0][1]}} // copy, never alias
+    for _, cur := range intervals[1:] {
+        last := result[len(result)-1]
+        if cur[0] <= last[1] {
+            // Overlap (or touch). max, because cur may be nested inside last.
+            last[1] = max(last[1], cur[1])
+        } else {
+            result = append(result, []int{cur[0], cur[1]}) // gap → new block
+        }
+    }
+    return result
+}
+```
+
 ```python
 def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
+    if not intervals:
+        return []
+    intervals = sorted(intervals, key=lambda iv: iv[0])   # sort by START
+
+    result = [list(intervals[0])]                         # copy, never alias
+    for start, end in intervals[1:]:
+        last = result[-1]
+        if start <= last[1]:
+            # Overlap (or touch). max, because this may be nested inside last.
+            last[1] = max(last[1], end)
         else:
-            res.append([s, e])
-    return res
+            result.append([start, end])                   # gap -> new block
+    return result
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; the sweep is O(n).
+Time O(n log n) — the sort dominates; the sweep is a single O(n) pass with one comparison per interval. Space O(n) for the output (O(log n) auxiliary if the sort is in place).
 
 ## 10. Solved Example 2
 
 ### Problem — Insert Interval (LeetCode 57)
-Given a sorted list of non-overlapping intervals, insert a new interval and merge if necessary, keeping the list sorted and non-overlapping.
+Given a list of non-overlapping intervals **already sorted by start**, insert a new interval and merge where necessary, returning the still-sorted, still-disjoint result.
 
 ### Thought Process
-1. The list is already sorted, so walk it once in three phases instead of re-sorting.
-2. Copy every interval that ends before the new one starts (no overlap, strictly left).
-3. Absorb every interval that overlaps the new one by widening the new interval's start/end, then push it; finally copy the remaining right-side intervals.
+1. The input is already sorted, so re-sorting would be wasted work — this is O(n), not O(n log n).
+2. Sorted order splits the list into exactly three consecutive regions relative to the new interval: entirely left, overlapping, entirely right.
+3. **Left**: `intervals[i].end < new.start` → copy through untouched.
+4. **Overlapping**: `intervals[i].start <= new.end` → absorb by widening `new` to `[min(starts), max(ends)]`. Push `new` once the absorbing stops.
+5. **Right**: copy the rest through. Three simple `while` loops, no branching inside a single loop.
 
 ### Dry Run
-`intervals=[[1,3],[6,9]]`, `newInterval=[2,5]`.
-- `[1,3]`: 3 ≥ 2, overlaps → new becomes `[min(1,2),max(3,5)] = [1,5]`.
-- `[6,9]`: 6 > 5, right side → after pushing new `[1,5]`, append `[6,9]`.
-- Result `[[1,5],[6,9]]`.
+
+Input: `intervals = [[1,3], [6,9]]`, `newInterval = [2,5]`
+
+| phase | interval examined | test | outcome | `new` is now | result so far |
+|-------|-------------------|------|---------|--------------|---------------|
+| left | `[1,3]` | `3 < 2`? no | phase ends immediately | `[2,5]` | `[]` |
+| absorb | `[1,3]` | `1 <= 5`? yes | widen | `[min(2,1), max(5,3)] = [1,5]` | `[]` |
+| absorb | `[6,9]` | `6 <= 5`? no | phase ends | `[1,5]` | `[]` |
+| push | — | — | emit `new` | — | `[[1,5]]` |
+| right | `[6,9]` | — | copy through | — | `[[1,5],[6,9]]` |
+
+Output: **`[[1,5],[6,9]]`**
+
+The absorb row is where `min` earns its place. The new interval starts at 2, but it swallowed `[1,3]`, which starts at **1** — so the merged block must begin at 1, not 2. Widening happens on *both* sides.
 
 ### Visualization
-```
-input  ──▶ [ apply Merge Intervals step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+  0    2    4    6    8   10
+  ├────┼────┼────┼────┼────┤
+  ▓▓▓▓▓▓                        [1,3]   existing
+                ▓▓▓▓▓▓▓▓        [6,9]   existing
+     ░░░░░░░░░░                 [2,5]   new
+
+  phase 1 (left)   : nothing — [1,3] does not end before 2
+  phase 2 (absorb) : [1,3] overlaps → new = [1,5]
+                     [6,9] starts at 6 > 5 → stop
+  phase 3 (right)  : copy [6,9]
+
+  ████████████                  [1,5]
+                ████████        [6,9]
+
+           left        overlapping        right
+     ├──────────────┤├───────────────┤├────────────┤
+     end < new.start   start <= new.end   the rest
 ```
 
 ### Code
+
+```go
+func insertInterval(intervals [][]int, newInterval []int) [][]int {
+    result := [][]int{}
+    start, end := newInterval[0], newInterval[1]
+    i, n := 0, len(intervals)
+
+    // Phase 1: everything that finishes before the new interval begins.
+    for i < n && intervals[i][1] < start {
+        result = append(result, intervals[i])
+        i++
+    }
+
+    // Phase 2: everything that overlaps — absorb it by widening BOTH ends.
+    for i < n && intervals[i][0] <= end {
+        start = min(start, intervals[i][0])
+        end = max(end, intervals[i][1])
+        i++
+    }
+    result = append(result, []int{start, end})
+
+    // Phase 3: everything that starts after the widened interval ends.
+    for i < n {
+        result = append(result, intervals[i])
+        i++
+    }
+    return result
+}
+```
+
 ```python
 def insert(intervals, newInterval):
-    res, i, n = [], 0, len(intervals)
-    s, e = newInterval
-    while i < n and intervals[i][1] < s:      # strictly left
-        res.append(intervals[i]); i += 1
-    while i < n and intervals[i][0] <= e:     # overlapping
-        s = min(s, intervals[i][0])
-        e = max(e, intervals[i][1]); i += 1
-    res.append([s, e])
-    while i < n:                              # strictly right
-        res.append(intervals[i]); i += 1
-    return res
+    result = []
+    start, end = newInterval
+    i, n = 0, len(intervals)
+
+    # Phase 1: everything that finishes before the new interval begins.
+    while i < n and intervals[i][1] < start:
+        result.append(intervals[i])
+        i += 1
+
+    # Phase 2: everything that overlaps - absorb it, widening BOTH ends.
+    while i < n and intervals[i][0] <= end:
+        start = min(start, intervals[i][0])
+        end = max(end, intervals[i][1])
+        i += 1
+    result.append([start, end])
+
+    # Phase 3: everything that starts after the widened interval ends.
+    while i < n:
+        result.append(intervals[i])
+        i += 1
+    return result
 ```
 
 ### Complexity
-Time O(n), Space O(n). Single linear pass over already-sorted intervals.
+Time O(n) — each interval is examined by exactly one of the three loops. Space O(n) for the output. No sort is needed because the input already carries the order this pattern would have created.
 
 ## 11. Solved Example 3
 
 ### Problem — Interval Intersection (LeetCode 986)
-Given two lists of sorted, disjoint intervals, return the list of their pairwise intersections.
+Given two lists of closed intervals, each sorted and internally disjoint, return the list of all their pairwise **intersections**.
 
 ### Thought Process
-1. Both lists are sorted, so advance two pointers together across them.
-2. The intersection of the current pair is `[max(starts), min(ends)]`; keep it only if that range is valid (lo ≤ hi).
-3. Discard whichever interval ends first (smaller end) by advancing its pointer, since it can't intersect anything further right.
+1. Both lists are already in start order, so a two-pointer sweep replaces the O(m·n) pairwise comparison.
+2. For the pair currently under the pointers, the overlap is `[max(startA, startB), min(endA, endB)]`.
+3. That range is real only if `lo <= hi`; otherwise the two intervals miss each other entirely and nothing is emitted.
+4. Then advance the pointer of whichever interval **ends first** — it can never intersect anything further right, because every remaining interval in the other list starts at or after the current one.
+5. Stop when either list runs out.
 
 ### Dry Run
-`A=[[0,2],[5,10]]`, `B=[[1,5],[8,12]]`.
-- `[0,2]`&`[1,5]`: `[max(0,1),min(2,5)]=[1,2]` valid → add; A ends first, i→1.
-- `[5,10]`&`[1,5]`: `[5,5]` valid → add; B ends first, j→1.
-- `[5,10]`&`[8,12]`: `[8,10]` valid → add; A ends first, i→2 → stop.
-- Result `[[1,2],[5,5],[8,10]]`.
+
+Input: `A = [[0,2], [5,10]]`, `B = [[1,5], [8,12]]`
+
+| step | A[i] | B[j] | `lo = max(starts)` | `hi = min(ends)` | `lo <= hi`? | emit | ends first → advance |
+|------|------|------|--------------------|------------------|-------------|------|----------------------|
+| 1 | `[0,2]` | `[1,5]` | max(0,1) = 1 | min(2,5) = 2 | yes | `[1,2]` | A (2 < 5) → `i = 1` |
+| 2 | `[5,10]` | `[1,5]` | max(5,1) = 5 | min(10,5) = 5 | yes | `[5,5]` | B (5 ≤ 10) → `j = 1` |
+| 3 | `[5,10]` | `[8,12]` | max(5,8) = 8 | min(10,12) = 10 | yes | `[8,10]` | A (10 < 12) → `i = 2` |
+| 4 | — | — | `i` past the end | — | — | — | loop ends |
+
+Output: **`[[1,2],[5,5],[8,10]]`**
+
+Step 2 produces the degenerate interval `[5,5]` — a single shared point. These are closed intervals, so `lo <= hi` (not `lo < hi`) is the correct validity test and `[5,5]` is a legitimate answer. Step 2 also shows the discard rule: `B[0] = [1,5]` ends at 5, and every remaining interval of `A` starts at 5 or later, so `[1,5]` has nothing left to meet and can be retired.
 
 ### Visualization
-```
-input  ──▶ [ apply Merge Intervals step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+   0    2    4    6    8   10   12
+   ├────┼────┼────┼────┼────┼────┤
+A  ▓▓▓▓▓▓                            [0,2]
+A            ▓▓▓▓▓▓▓▓▓▓▓             [5,10]
+B     ░░░░░░░░░░                     [1,5]
+B                  ░░░░░░░░░░        [8,12]
+
+        ██                           [1,2]   = max(0,1) .. min(2,5)
+             ▪                       [5,5]   = single shared point
+                   ██████            [8,10]  = max(5,8) .. min(10,12)
+
+advance rule: retire the interval that ENDS first —
+              nothing further right can still reach back to it
 ```
 
 ### Code
+
+```go
+func intervalIntersection(a [][]int, b [][]int) [][]int {
+    result := [][]int{}
+    i, j := 0, 0
+    for i < len(a) && j < len(b) {
+        // The overlap of two intervals is [later start, earlier end].
+        lo := max(a[i][0], b[j][0])
+        hi := min(a[i][1], b[j][1])
+        if lo <= hi { // closed intervals, so a single point counts
+            result = append(result, []int{lo, hi})
+        }
+        // Retire whichever ends first: every remaining interval on the other
+        // side starts at or after the current one, so it can meet nothing more.
+        if a[i][1] < b[j][1] {
+            i++
+        } else {
+            j++
+        }
+    }
+    return result
+}
+```
+
 ```python
 def intervalIntersection(A, B):
-    res, i, j = [], 0, 0
+    result = []
+    i = j = 0
     while i < len(A) and j < len(B):
+        # The overlap of two intervals is [later start, earlier end].
         lo = max(A[i][0], B[j][0])
         hi = min(A[i][1], B[j][1])
-        if lo <= hi:
-            res.append([lo, hi])
+        if lo <= hi:                 # closed intervals: a single point counts
+            result.append([lo, hi])
+        # Retire whichever ends first - it can meet nothing further right.
         if A[i][1] < B[j][1]:
             i += 1
         else:
             j += 1
-    return res
+    return result
 ```
 
 ### Complexity
-Time O(m + n), Space O(1) extra. One synchronized pass over both sorted lists.
+Time O(m + n) — every iteration retires exactly one interval, so the pointers advance a combined `m + n` times. Space O(1) beyond the output. No sort is needed; both inputs arrive sorted.
 
+---
 
 ## 12. LeetCode Practice Set
 

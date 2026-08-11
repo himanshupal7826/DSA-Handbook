@@ -41,32 +41,120 @@ grid dp, paths, min path sum, 2d dp, robot.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"How many ways / what is the best way to walk from one corner of a grid to the other, when each step only goes right or down?"*
+
+Running example: count the paths from the top-left to the bottom-right of a 3×3 grid.
+
 ### Intuition
-Naive recursion recomputes overlapping subproblems — exponential time.
+Stand on a cell and try both legal moves. Recurse from each. When you fall off the grid the branch is dead; when you land on the goal you found one path.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. `walk(r, c)` = number of paths from `(r, c)` to the bottom-right corner.
+2. If `r` or `c` is out of bounds, return 0.
+3. If `(r, c)` is the corner, return 1.
+4. Return `walk(r+1, c) + walk(r, c+1)`.
+5. Answer is `walk(0, 0)`.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(2^(m+n))** — a binary branch at every one of the `m+n-2` steps.
+- Space: O(m + n) recursion stack.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the DP on Grids pattern is built to use.
+- Different move orders land on the same cell, and the recursion re-derives that cell's answer from scratch every time. In a 3×3 grid, `walk(1,1)` is reached from `(0,0)` two ways:
+
+```text
+(0,0) --right--> (0,1) --down--> (1,1)
+(0,0) --down---> (1,0) --right-> (1,1)     ← same cell, recomputed
+```
+
+  In a 10×10 grid the centre cell is reached tens of thousands of times, and its answer is identical every single time.
+- The brute force ignores the one fact that trivialises the problem: **how you arrived at a cell is irrelevant — only which cell you are on matters.** There are only `m·n` cells, so there are only `m·n` distinct questions.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the DP on Grids invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **A cell can only be entered from the cell above it or the cell to its left, so its answer is a one-line combination of exactly those two — and if you fill the grid in reading order, both are already computed when you get there.**
+
+It is the way water fills a terraced field. You never need to look ahead; each terrace is determined by the two terraces feeding into it. Sweep top-to-bottom, left-to-right, and the information flows with you.
+
+### The thought process
+
+```text
+We need    : an aggregate (count / min / max) over all corner-to-corner paths.
+Obvious way: enumerate paths recursively.
+Too slow   : 2^(m+n) — the branch count explodes.
+Notice     : the recursion's arguments are just (row, col).
+Notice too : arrival history never affects the future, only position does.
+Therefore  : one number per cell. dp[i][j] combines dp[i-1][j] and dp[i][j-1].
+Now        : O(m*n) time, and the memory collapses to a single row.
+```
+
+### Why the rolling 1-D row works (the aliasing trick)
+
+The 2-D table is easy but wasteful: row `i` only ever reads row `i-1`. So keep **one** array `dp` of length `n` and overwrite it in place. The subtle part is what `dp[j]` and `dp[j-1]` actually mean at the instant you use them.
+
+Sweep the row **left to right**. You are at column `j`:
+
+```text
+dp[0] dp[1] ... dp[j-1] | dp[j] dp[j+1] ... dp[n-1]
+└── already overwritten ─┘ └── not touched yet ─────┘
+    = values for ROW i        = values for ROW i-1
+
+so, at this exact moment:
+    dp[j]    is still ROW i-1 at column j   ==  the cell ABOVE
+    dp[j-1]  is already ROW i at column j-1 ==  the cell to the LEFT
+```
+
+That is the whole trick. `dp[j] = dp[j] + dp[j-1]` reads *above* on the left-hand side of the `+` and *left* on the right-hand side, in a single statement, with no extra buffer.
+
+**And it only works left-to-right.** Watch it break. Unique paths, 3×3, row 1, starting from `dp = [1, 1, 1]` (row 0):
+
+```text
+left-to-right (correct)                right-to-left (WRONG)
+  j=1: dp[1] = dp[1] + dp[0]             j=2: dp[2] = dp[2] + dp[1]
+             =  1(above) + 1(left) = 2              =  1(above) + 1(ALSO above) = 2
+  j=2: dp[2] = dp[2] + dp[1]             j=1: dp[1] = dp[1] + dp[0]
+             =  1(above) + 2(left) = 3              =  1(above) + 1(left)  = 2
+  dp = [1, 2, 3]   ✓                     dp = [1, 2, 2]   ✗ (dp[2] should be 3)
+```
+
+Going right-to-left, `dp[j-1]` has *not* been overwritten yet, so it is still the row above — the code silently computes "above + above-left", which is a different (wrong) recurrence. No crash, just a wrong number.
+
+> **Rule of thumb:** if the recurrence reads `dp[j-1]` you must sweep **forward** so that slot already holds the current row. If it reads `dp[j+1]` (as in the triangle problem) forward is still fine, because `j+1` is untouched and *should* be the previous row. Write down which row you want each slot to be from, then pick the direction that delivers it.
+
+### Steps
+
+```text
+Step 1 → State: dp[i][j] = the answer for standing on cell (i, j).
+Step 2 → Recurrence: combine the two cells that can reach (i, j).
+Step 3 → Base: fill row 0 and column 0 — they have exactly one incoming path.
+Step 4 → Sweep rows top to bottom, columns left to right.
+Step 5 → (Optional) collapse to one array; keep the sweep left to right.
+Step 6 → Answer is the bottom-right cell.
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "robot / path / grid", moves restricted to right+down (or down+diagonal),
+  "how many ways", "minimum cost path", "largest square", obstacles
+        ↓
+Think about...
+  "Which cells can step INTO this cell?"
+  That set of predecessors IS the recurrence.
+        ↓
+Use...
+  count problems  -> dp[i][j] = dp[i-1][j] + dp[i][j-1]
+  cost problems   -> dp[i][j] = grid[i][j] + min(dp[i-1][j], dp[i][j-1])
+  obstacles       -> force dp[i][j] = 0 on a blocked cell
+  then collapse the table to one rolling row, sweeping LEFT TO RIGHT
+```
 
 ### Visual explanation
 
@@ -95,61 +183,184 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-DP on Grids       : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+Unique paths on a 3x3 grid, one rolling row.
+
+  start        row 0 has exactly one path to each cell (all rights)
+  dp = [ 1  1  1 ]
+
+  row 1        dp[j] += dp[j-1]     "above + left"
+       dp[1] = 1 + 1 = 2
+       dp[2] = 1 + 2 = 3
+  dp = [ 1  2  3 ]
+
+  row 2
+       dp[1] = 2 + 1 = 3
+       dp[2] = 3 + 3 = 6
+  dp = [ 1  3  6 ]            answer = dp[n-1] = 6
+
+full table, for comparison — the rolling row is its last snapshot:
+
+        1   1   1
+        1   2   3
+        1   3  [6]
 ```
 
 ### Interview explanation
-"This is a DP on Grids problem. I'll optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it. That brings the complexity down to O(states × transitions) time and O(states) space — here's the template."
+"Grid DP is the observation that a cell's answer depends only on the cell itself, not on the route taken to it. Since moves are right and down, a cell can only be entered from above or from the left, so `dp[i][j]` is a one-line combination of `dp[i-1][j]` and `dp[i][j-1]` — a sum for counting problems, a min plus the cell's own cost for cheapest-path problems. The base cases are the first row and first column, which have exactly one way in. Filling top-to-bottom and left-to-right guarantees both predecessors are ready, so it's O(m·n) time. Because a row only reads the row above, I keep a single array and update it in place left-to-right: at column `j`, `dp[j]` is still the previous row (the cell above) while `dp[j-1]` is already the current row (the cell to the left). That gets space down to O(n)."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Dynamic Programming** family template. Adapt the comparison/condition to the specific problem.
+> One rolling row, swept left to right: `dp[j]` is the cell above, `dp[j-1]` is the cell to the left.
 
 ```go
-// 0/1 Knapsack, space-optimized to 1D. dp[w] = best value at capacity w.
-func knapsack(weights, values []int, cap int) int {
-    dp := make([]int, cap+1)
-    for i := range weights {
-        for w := cap; w >= weights[i]; w-- {  // reverse: each item once
-            if dp[w-weights[i]]+values[i] > dp[w] {
-                dp[w] = dp[w-weights[i]] + values[i]
-            }
+// CountGridPaths counts right/down paths across an m x n grid.
+// dp[j] = number of paths to the current row's column j.
+func CountGridPaths(m, n int) int {
+    if m <= 0 || n <= 0 {
+        return 0
+    }
+    dp := make([]int, n)
+    for j := range dp {
+        dp[j] = 1 // row 0: a single all-rights path reaches every cell
+    }
+
+    for i := 1; i < m; i++ {
+        // dp[0] stays 1: column 0 is reachable only by going straight down.
+        for j := 1; j < n; j++ {
+            // dp[j] is still row i-1 (ABOVE); dp[j-1] is already row i (LEFT).
+            dp[j] += dp[j-1]
         }
     }
-    return dp[cap]
+    return dp[n-1]
+}
+
+// MinGridPathCost returns the cheapest right/down path cost through grid.
+// dp[j] = cheapest cost to reach the current row's column j.
+func MinGridPathCost(grid [][]int) int {
+    if len(grid) == 0 || len(grid[0]) == 0 {
+        return 0
+    }
+    m, n := len(grid), len(grid[0])
+
+    dp := make([]int, n)
+    dp[0] = grid[0][0]
+    for j := 1; j < n; j++ {
+        dp[j] = dp[j-1] + grid[0][j] // row 0: only rightward moves
+    }
+
+    for i := 1; i < m; i++ {
+        dp[0] += grid[i][0] // column 0: only downward moves
+        for j := 1; j < n; j++ {
+            above, left := dp[j], dp[j-1]
+            if left < above {
+                above = left
+            }
+            dp[j] = grid[i][j] + above
+        }
+    }
+    return dp[n-1]
 }
 ```
 
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def count_grid_paths(m, n):
+    """dp[j] = number of right/down paths to column j of the current row."""
+    if m <= 0 or n <= 0:
+        return 0
+    dp = [1] * n                       # row 0: one all-rights path per cell
+
+    for _ in range(1, m):
+        # dp[0] stays 1: column 0 is reached only by going straight down.
+        for j in range(1, n):          # LEFT TO RIGHT, so dp[j-1] is this row
+            dp[j] += dp[j - 1]         # dp[j] = above, dp[j-1] = left
+    return dp[n - 1]
+
+
+def min_grid_path_cost(grid):
+    """dp[j] = cheapest cost to reach column j of the current row."""
+    if not grid or not grid[0]:
+        return 0
+    m, n = len(grid), len(grid[0])
+
+    dp = [0] * n
+    dp[0] = grid[0][0]
+    for j in range(1, n):              # row 0: only rightward moves
+        dp[j] = dp[j - 1] + grid[0][j]
+
+    for i in range(1, m):
+        dp[0] += grid[i][0]            # column 0: only downward moves
+        for j in range(1, n):
+            dp[j] = grid[i][j] + min(dp[j], dp[j - 1])   # above vs left
+    return dp[n - 1]
 ```
 
 ```java
-int knapsack(int[] weights, int[] values, int cap) {
-    int[] dp = new int[cap + 1];
-    for (int i = 0; i < weights.length; i++)
-        for (int w = cap; w >= weights[i]; w--)
-            dp[w] = Math.max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+public class GridDP {
+    // dp[j] = number of right/down paths to column j of the current row.
+    public static int countGridPaths(int m, int n) {
+        if (m <= 0 || n <= 0) return 0;
+        int[] dp = new int[n];
+        java.util.Arrays.fill(dp, 1);          // row 0
+
+        for (int i = 1; i < m; i++)
+            for (int j = 1; j < n; j++)        // left to right
+                dp[j] += dp[j - 1];            // dp[j] = above, dp[j-1] = left
+        return dp[n - 1];
+    }
+
+    // dp[j] = cheapest cost to reach column j of the current row.
+    public static int minGridPathCost(int[][] grid) {
+        if (grid.length == 0 || grid[0].length == 0) return 0;
+        int m = grid.length, n = grid[0].length;
+
+        int[] dp = new int[n];
+        dp[0] = grid[0][0];
+        for (int j = 1; j < n; j++) dp[j] = dp[j - 1] + grid[0][j];  // row 0
+
+        for (int i = 1; i < m; i++) {
+            dp[0] += grid[i][0];                                     // column 0
+            for (int j = 1; j < n; j++)
+                dp[j] = grid[i][j] + Math.min(dp[j], dp[j - 1]);     // above/left
+        }
+        return dp[n - 1];
+    }
 }
 ```
 
 ```cpp
-int knapsack(vector<int>& weights, vector<int>& values, int cap) {
-    vector<int> dp(cap + 1, 0);
-    for (size_t i = 0; i < weights.size(); ++i)
-        for (int w = cap; w >= weights[i]; --w)
-            dp[w] = max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+#include <algorithm>
+#include <vector>
+using namespace std;
+
+// dp[j] = number of right/down paths to column j of the current row.
+int countGridPaths(int m, int n) {
+    if (m <= 0 || n <= 0) return 0;
+    vector<int> dp(n, 1);                       // row 0
+
+    for (int i = 1; i < m; ++i)
+        for (int j = 1; j < n; ++j)             // left to right
+            dp[j] += dp[j - 1];                 // dp[j]=above, dp[j-1]=left
+    return dp[n - 1];
+}
+
+// dp[j] = cheapest cost to reach column j of the current row.
+int minGridPathCost(vector<vector<int>>& grid) {
+    if (grid.empty() || grid[0].empty()) return 0;
+    int m = (int)grid.size(), n = (int)grid[0].size();
+
+    vector<int> dp(n, 0);
+    dp[0] = grid[0][0];
+    for (int j = 1; j < n; ++j) dp[j] = dp[j - 1] + grid[0][j];   // row 0
+
+    for (int i = 1; i < m; ++i) {
+        dp[0] += grid[i][0];                                       // column 0
+        for (int j = 1; j < n; ++j)
+            dp[j] = grid[i][j] + min(dp[j], dp[j - 1]);            // above/left
+    }
+    return dp[n - 1];
 }
 ```
 
@@ -235,116 +446,311 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — Unique Paths (LeetCode 62)
-Count the number of distinct paths a robot can take from the top-left to the bottom-right of an `m × n` grid, moving only right or down.
+A robot starts at the top-left of an `m × n` grid and may move only right or down. Count the distinct paths to the bottom-right corner.
 
 ### Thought Process
-1. Let `dp[i][j]` = number of paths reaching cell `(i, j)`. A cell is entered either from above or from the left, so `dp[i][j] = dp[i-1][j] + dp[i][j-1]`.
-2. Base case: the first row and first column have exactly one path each (only rights, or only downs), so initialize them to 1.
-3. Roll the 2D table down to a single row: `row[j] += row[j-1]` sweeps left-to-right, reusing the previous row in place.
+1. **What does `dp[i][j]` mean?** *The number of distinct right/down paths that start at the top-left corner and end standing on cell `(i, j)`.*
+2. **How do we compute it?** The last move into `(i, j)` was either a *down* step from `(i-1, j)` or a *right* step from `(i, j-1)`. Those two sets of paths are disjoint (they differ in the final move) and together they are all of them, so `dp[i][j] = dp[i-1][j] + dp[i][j-1]` — a plain sum, no `min`, no `max`.
+3. **What is the base case?** `dp[0][j] = 1` and `dp[i][0] = 1`. On the top row the only way in is a run of rights; on the left column the only way in is a run of downs. Exactly one path each. (`dp[0][0] = 1`: the empty path.)
+4. **Why this direction?** Both reads are *above* and *left*, so sweeping rows top-to-bottom and columns left-to-right always finds them finished. Collapsed to one array, the sweep must stay left-to-right so that `dp[j]` is still the row above while `dp[j-1]` is already this row.
+5. Answer is `dp[m-1][n-1]`.
 
 ### Dry Run
-For `m=3, n=3`, start with `row = [1, 1, 1]` (top row).
-- After row 2: `row[1]+=row[0]→2`, `row[2]+=row[1]→3` ⇒ `[1, 2, 3]`.
-- After row 3: `row[1]→1+2=3`, `row[2]→3+3=6` ⇒ `[1, 3, 6]`.
-- Answer = `row[-1] = 6` paths.
+
+Input: `m = 3, n = 3`
+
+Start with the top row: `dp = [1, 1, 1]`.
+
+| row `i` | col `j` | `dp[j]` before (= **above**) | `dp[j-1]` (= **left**) | `dp[j]` after | array after |
+|---------|---------|------------------------------|-------------------------|---------------|-------------|
+| 1 | 1 | 1 | 1 | `1 + 1` = **2** | `[1, 2, 1]` |
+| 1 | 2 | 1 | 2 | `1 + 2` = **3** | `[1, 2, 3]` |
+| 2 | 1 | 2 | 1 | `2 + 1` = **3** | `[1, 3, 3]` |
+| 2 | 2 | 3 | 3 | `3 + 3` = **6** | `[1, 3, 6]` |
+
+Output: **6**
+
+Look at row 2, column 2. `dp[2]` read `3`, which is the value column 2 had at the end of *row 1* — the cell above. `dp[1]` read `3`, which was written one line earlier in *this* row — the cell to the left. Same array, two different rows, and the only thing keeping them straight is the left-to-right order.
 
 ### Visualization
-```
-input  ──▶ [ fill dp[i][j] = dp[i-1][j] + dp[i][j-1] ]
-state  ──▶ each cell = paths into it, built from top row/left column
-output ──▶ dp[m-1][n-1]
+
+```text
+full table                     the six paths, as move strings
+   1   1   1                     RRDD   RDRD   RDDR
+   1   2   3                     DRRD   DRDR   DDRR
+   1   3  [6]                    (6 of them — matches dp[2][2])
+
+how each cell is born:
+
+        (i-1, j)
+           |  down
+           v
+(i, j-1) --+--> (i, j)     dp[i][j] = dp[i-1][j] + dp[i][j-1]
+    right
+
+rolling row, snapshots after each row:
+
+  row 0 : [ 1  1  1 ]
+  row 1 : [ 1  2  3 ]
+  row 2 : [ 1  3  6 ]  <- answer in the last slot
 ```
 
 ### Code
+
+```go
+// uniquePaths counts right/down paths across an m x n grid using one rolling
+// row. dp[j] = paths to column j of the row being processed.
+func uniquePaths(m int, n int) int {
+    dp := make([]int, n)
+    for j := range dp {
+        dp[j] = 1 // row 0: exactly one all-rights path per cell
+    }
+
+    for i := 1; i < m; i++ {
+        // dp[0] stays 1: column 0 is only reachable by going straight down.
+        for j := 1; j < n; j++ {
+            // dp[j] is still row i-1 (ABOVE), dp[j-1] is already row i (LEFT).
+            dp[j] += dp[j-1]
+        }
+    }
+    return dp[n-1]
+}
+```
+
 ```python
 def uniquePaths(m, n):
-    row = [1] * n                      # paths for the top row are all 1
+    dp = [1] * n                     # row 0: one all-rights path per cell
+
     for _ in range(1, m):
-        for j in range(1, n):
-            row[j] += row[j - 1]       # from above (row[j]) + from left (row[j-1])
-    return row[-1]
+        # dp[0] stays 1: column 0 is reached only by going straight down.
+        for j in range(1, n):        # LEFT TO RIGHT keeps the aliasing correct
+            dp[j] += dp[j - 1]       # dp[j] = above, dp[j-1] = left
+    return dp[n - 1]
 ```
 
 ### Complexity
-Time O(m·n), Space O(n) using a single rolling row.
+Time O(m·n) — one addition per cell. Space O(n) — a single rolling row instead of the full table.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Min Path Sum (LeetCode 64)
-Given an `m × n` grid of non-negative numbers, find a path from top-left to bottom-right, moving only right or down, that minimizes the sum of the numbers along the path.
+Given an `m × n` grid of non-negative numbers, find the right/down path from top-left to bottom-right whose numbers sum to the smallest total.
 
 ### Thought Process
-1. Let `dp[i][j]` = minimum sum to reach cell `(i, j)`. You arrive from above or from the left, so `dp[i][j] = grid[i][j] + min(dp[i-1][j], dp[i][j-1])`.
-2. Seed the first row and first column as running prefix sums (only one way to reach them).
-3. Compress to a rolling row: `row[j] = grid[i][j] + min(row[j] (above), row[j-1] (left))`.
+1. **What does `dp[i][j]` mean?** *The smallest possible sum along any right/down path from the top-left corner to cell `(i, j)`, counting `grid[i][j]` itself.*
+2. **How do we compute it?** You must pay `grid[i][j]` no matter how you arrive, and you arrive from above or from the left. So take the cheaper of the two arrivals and add the toll: `dp[i][j] = grid[i][j] + min(dp[i-1][j], dp[i][j-1])`. Nothing else can influence the cell — this is optimal substructure in one line.
+3. **What is the base case?** `dp[0][0] = grid[0][0]`. The top row has no cell above it, so it is a running prefix sum: `dp[0][j] = dp[0][j-1] + grid[0][j]`. Symmetrically the left column accumulates downward. Seeding them explicitly is cleaner than sprinkling bounds checks into the `min`.
+4. **Why this direction?** Same up/left dependency, so rows forward and columns forward. In the rolling row, `dp[j]` before assignment is the cell **above**, `dp[j-1]` is the cell **left** — and `dp[0] += grid[i][0]` maintains the left column.
+5. Answer is `dp[m-1][n-1]`.
 
 ### Dry Run
-For `grid = [[1,3,1],[1,5,1],[4,2,1]]`, first row prefix ⇒ `row = [1, 4, 5]`.
-- Row 1: `row[0]=1+1=2`; `row[1]=5+min(4,2)=7`; `row[2]=1+min(5,7)=6` ⇒ `[2, 7, 6]`.
-- Row 2: `row[0]=2+4=6`; `row[1]=2+min(7,6)=8`; `row[2]=1+min(6,8)=7` ⇒ `[6, 8, 7]`.
-- Answer = `row[-1] = 7` (path 1→3→1→1→1).
+
+Input:
+```text
+grid =  1  3  1
+        1  5  1
+        4  2  1
+```
+
+Top row prefix sums: `dp = [1, 4, 5]`.
+
+| row `i` | col `j` | `grid[i][j]` | above `dp[j]` | left `dp[j-1]` | `dp[j]` = grid + min | array after |
+|---------|---------|--------------|---------------|-----------------|----------------------|-------------|
+| 1 | 0 | 1 | — | — | `1 + 1` = **2** (column rule) | `[2, 4, 5]` |
+| 1 | 1 | 5 | 4 | 2 | `5 + min(4,2)` = **7** | `[2, 7, 5]` |
+| 1 | 2 | 1 | 5 | 7 | `1 + min(5,7)` = **6** | `[2, 7, 6]` |
+| 2 | 0 | 4 | — | — | `2 + 4` = **6** (column rule) | `[6, 7, 6]` |
+| 2 | 1 | 2 | 7 | 6 | `2 + min(7,6)` = **8** | `[6, 8, 6]` |
+| 2 | 2 | 1 | 6 | 8 | `1 + min(6,8)` = **7** | `[6, 8, 7]` |
+
+Output: **7** — the path `1 → 3 → 1 → 1 → 1`.
+
+Row `i=1, j=1` is instructive: the cell above holds `4`, the cell to the left holds `2`, so the algorithm commits to arriving from the left and never reconsiders. That is safe precisely because the future cost from `(1,1)` onward does not depend on how you got there.
 
 ### Visualization
-```
-input  ──▶ [ dp[i][j] = grid[i][j] + min(top, left) ]
-state  ──▶ each cell = cheapest cost to reach it
-output ──▶ dp[m-1][n-1]
+
+```text
+grid                cheapest-arrival table (the full 2-D version)
+ 1  3  1              1   4   5
+ 1  5  1              2   7   6
+ 4  2  1              6   8  [7]
+
+the winning path                one cell's decision, zoomed in
+
+ [1]->[3]->[1]                        dp[0][1] = 4
+             |                            |  (above)
+             v                            v
+  1    5    [1]           dp[1][0] = 2 --> [ 5 + min(4, 2) = 7 ]
+             |               (left)
+             v
+  4    2    [1]           the left arrival (2) wins, so dp[1][1] = 7
+
+ 1 + 3 + 1 + 1 + 1 = 7
 ```
 
 ### Code
+
+```go
+// minPathSum returns the cheapest right/down path total through grid.
+// dp[j] = cheapest cost to reach column j of the row being processed.
+func minPathSum(grid [][]int) int {
+    if len(grid) == 0 || len(grid[0]) == 0 {
+        return 0
+    }
+    m, n := len(grid), len(grid[0])
+
+    dp := make([]int, n)
+    dp[0] = grid[0][0]
+    for j := 1; j < n; j++ {
+        dp[j] = dp[j-1] + grid[0][j] // top row: only rightward arrivals
+    }
+
+    for i := 1; i < m; i++ {
+        dp[0] += grid[i][0] // left column: only downward arrivals
+        for j := 1; j < n; j++ {
+            above, left := dp[j], dp[j-1] // dp[j] = row i-1, dp[j-1] = row i
+            if left < above {
+                above = left
+            }
+            dp[j] = grid[i][j] + above
+        }
+    }
+    return dp[n-1]
+}
+```
+
 ```python
 def minPathSum(grid):
+    if not grid or not grid[0]:
+        return 0
     m, n = len(grid), len(grid[0])
-    row = [0] * n
-    row[0] = grid[0][0]
-    for j in range(1, n):              # first row: only move right
-        row[j] = row[j - 1] + grid[0][j]
+
+    dp = [0] * n
+    dp[0] = grid[0][0]
+    for j in range(1, n):
+        dp[j] = dp[j - 1] + grid[0][j]        # top row: rightward only
+
     for i in range(1, m):
-        row[0] += grid[i][0]           # first column: only move down
+        dp[0] += grid[i][0]                   # left column: downward only
         for j in range(1, n):
-            row[j] = grid[i][j] + min(row[j], row[j - 1])
-    return row[-1]
+            # dp[j] is still row i-1 (above); dp[j-1] is already row i (left).
+            dp[j] = grid[i][j] + min(dp[j], dp[j - 1])
+    return dp[n - 1]
 ```
 
 ### Complexity
-Time O(m·n), Space O(n) using a single rolling row.
+Time O(m·n) — one comparison and one addition per cell. Space O(n) for the rolling row.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Triangle (LeetCode 120)
-Given a triangle array, find the minimum path sum from top to bottom, where each step moves to an adjacent number on the row below (index `i` goes to `i` or `i+1`).
+Given a triangular array of numbers, find the minimum top-to-bottom path sum, where from index `j` on a row you may step to index `j` or `j+1` on the row below.
 
 ### Thought Process
-1. Work bottom-up: let `dp[j]` = min path sum from cell `j` of the current row down to the base. The last row's values are their own totals.
-2. For each higher row, `dp[j] = triangle[i][j] + min(dp[j], dp[j+1])`, since from `(i, j)` you may descend to `(i+1, j)` or `(i+1, j+1)`.
-3. After processing the top row, `dp[0]` holds the answer, and one 1D array suffices.
+1. **What does `dp[j]` mean?** *The smallest sum of any path that starts on cell `j` of the row currently being processed and walks all the way down to the bottom row.* Note the direction: this state looks **downward**, not back to the apex.
+2. **How do we compute it?** From `(i, j)` the two legal next cells are `(i+1, j)` and `(i+1, j+1)`, so `dp[j] = triangle[i][j] + min(dp[j], dp[j+1])`, where `dp` currently holds row `i+1`'s answers.
+3. **What is the base case?** `dp = triangle[last]` — from a bottom cell there is nowhere to go, so its best downward total is its own value.
+4. **Why bottom-up?** Because the recurrence reads row `i+1`. Going top-down with this state definition would need answers that don't exist yet. (Top-down is possible with the *other* state — "best sum from the apex to here" — but then every row grows and you must special-case both edges. Bottom-up needs no edge cases at all, because `dp[j+1]` is always in range for a row of length `j+1 <` the row below.) Within a row, sweeping `j` forward is safe: writing `dp[j]` only destroys a value that no later `j` will read, since later cells read `dp[j']` and `dp[j'+1]` for `j' > j`.
+5. Answer is `dp[0]` after processing the apex.
 
 ### Dry Run
-For `triangle = [[2],[3,4],[6,5,7],[4,1,8,3]]`, start `dp = [4, 1, 8, 3]` (last row).
-- Row `[6,5,7]`: `dp=[6+min(4,1), 5+min(1,8), 7+min(8,3)] = [7, 6, 10]`.
-- Row `[3,4]`: `dp=[3+min(7,6), 4+min(6,10)] = [9, 10]`.
-- Row `[2]`: `dp=[2+min(9,10)] = [11]` ⇒ answer `11` (path 2→3→5→1).
+
+Input:
+```text
+triangle = [ [2],
+             [3, 4],
+             [6, 5, 7],
+             [4, 1, 8, 3] ]
+```
+
+Base: `dp = [4, 1, 8, 3]` (the bottom row).
+
+| row processed | `j` | `triangle[i][j]` | `dp[j]` (below, same index) | `dp[j+1]` (below, one right) | new `dp[j]` | array after row |
+|---------------|-----|------------------|------------------------------|-------------------------------|-------------|-----------------|
+| `[6,5,7]` | 0 | 6 | 4 | 1 | `6 + 1` = **7** | |
+| `[6,5,7]` | 1 | 5 | 1 | 8 | `5 + 1` = **6** | |
+| `[6,5,7]` | 2 | 7 | 8 | 3 | `7 + 3` = **10** | `[7, 6, 10, 3]` |
+| `[3,4]` | 0 | 3 | 7 | 6 | `3 + 6` = **9** | |
+| `[3,4]` | 1 | 4 | 6 | 10 | `4 + 6` = **10** | `[9, 10, 10, 3]` |
+| `[2]` | 0 | 2 | 9 | 10 | `2 + 9` = **11** | `[11, 10, 10, 3]` |
+
+Output: **11** — the path `2 → 3 → 5 → 1`.
+
+Only the first `i+1` slots of `dp` are meaningful after processing row `i`; the tail is stale leftovers, and that is fine because nothing above ever reads that far right.
 
 ### Visualization
-```
-input  ──▶ [ bottom-up: dp[j] = tri[i][j] + min(dp[j], dp[j+1]) ]
-state  ──▶ dp shrinks by one each row toward the apex
-output ──▶ dp[0]
+
+```text
+        2                    dp after each row (live cells in brackets)
+
+      3   4                  bottom : [4] [1] [8] [3]
+                             row 2  : [7] [6][10]  3
+    6   5   7                row 1  : [9][10] 10   3
+                             row 0  :[11] 10  10   3
+  4   1   8   3
+                             answer = dp[0] = 11
+
+the winning path, and why each step was chosen:
+
+   2      min(9, 10) -> go to index 0
+   |
+   3      min(7, 6)  -> go to index 1
+    \
+      5   min(1, 8)  -> go to index 1
+      |
+      1   bottom row
+                     2 + 3 + 5 + 1 = 11
 ```
 
 ### Code
+
+```go
+// minimumTotal returns the minimum top-to-bottom path sum of a triangle.
+// dp[j] = best total from cell j of the current row down to the bottom.
+func minimumTotal(triangle [][]int) int {
+    if len(triangle) == 0 {
+        return 0
+    }
+
+    last := len(triangle) - 1
+    dp := make([]int, len(triangle[last]))
+    copy(dp, triangle[last]) // base: a bottom cell's best total is itself
+
+    for i := last - 1; i >= 0; i-- { // rows below are already final
+        for j := 0; j < len(triangle[i]); j++ {
+            down, downRight := dp[j], dp[j+1]
+            if downRight < down {
+                down = downRight
+            }
+            dp[j] = triangle[i][j] + down
+        }
+    }
+    return dp[0]
+}
+```
+
 ```python
 def minimumTotal(triangle):
-    dp = triangle[-1][:]               # start from the bottom row
-    for i in range(len(triangle) - 2, -1, -1):
+    if not triangle:
+        return 0
+
+    dp = triangle[-1][:]                    # base: bottom cells stand alone
+
+    for i in range(len(triangle) - 2, -1, -1):    # rows below are final
         for j in range(len(triangle[i])):
+            # dp[j] and dp[j+1] both still describe row i+1.
             dp[j] = triangle[i][j] + min(dp[j], dp[j + 1])
     return dp[0]
 ```
 
 ### Complexity
-Time O(n²) for a triangle of n rows, Space O(n) using one rolling array.
+Time O(n²) for a triangle with `n` rows — that is one O(1) step per cell, and a triangle has `n(n+1)/2` cells. Space O(n) using a single array the width of the bottom row.
 
+---
 
 ## 12. LeetCode Practice Set
 

@@ -41,32 +41,129 @@ reverse, linked list, pointers, prev curr next, iterative.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Can I turn this list around without allocating a second copy of it?"*
+
+Running example: reverse `1 → 2 → 3`.
+
 ### Intuition
-Copy to an array, manipulate, rebuild — O(n) extra space.
+A linked list only lets you walk forward, so the easy fix is to stop using it as a list.
+Copy the values into an array, reverse the array, then walk the list again and write the
+values back. No pointer surgery at all.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Walk the list and append every `Val` to a slice → `[1, 2, 3]`.
+2. Reverse the slice → `[3, 2, 1]`.
+3. Walk the list a second time, writing the slice back into the nodes in order.
+4. Return the original `head` (the *nodes* never moved, only the numbers inside them).
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n)** — three passes, but still linear.
+- Space: **O(n)** — the slice is as long as the list.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Reverse Linked List pattern is built to use.
+- The O(n) buffer buys nothing. For a 10-million-node list you allocate 10 million ints
+  just to reorder pointers you already own.
+- **It reverses the values, not the list.** Anything else holding a pointer to a specific
+  node now sees a different number in it. In an LRU cache or a free-list — the places real
+  linked lists live — that is a bug, not an optimization.
+- It ignores the one fact that makes lists cheap: *a list is defined entirely by its
+  `Next` pointers*. Flipping those pointers is the whole job, and there are only n of them.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Reverse Linked List invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Walk the list once and flip each node's `Next` to point at the node you just came from.**
+
+Think of a line of people, each with a hand on the shoulder of the person in front. To
+reverse the line nobody has to move — each person just lets go and puts their hand on the
+shoulder of the person *behind* them. Same people, same positions, opposite direction.
+
+You need exactly three pointers to do it: `prev` (the part already reversed), `curr` (the
+node being flipped right now), and `next` (a temporary hold on the part not yet reversed).
+
+### The thought process
+
+```text
+We need    : the same nodes, linked in the opposite order, no extra memory.
+Obvious way: copy the values out, reverse, copy back.
+Too costly : O(n) buffer, and it mutates values instead of links.
+Notice     : a list IS its Next pointers. Reversing the list = flipping each
+             Next once. There are only n of them.
+Therefore  : walk once; at each node set curr.Next = prev.
+Now        : one pass, three pointers, O(1) space.
+```
+
+### Why you must save `next` **before** rewiring
+
+This is the single line beginners drop, so look at what happens without it.
+
+At `curr = 1`, the only thing in the whole program that knows where `2` lives is `1.Next`.
+If you overwrite it first:
+
+```text
+curr.Next = prev        →   1.Next = nil
+curr      = curr.Next   →   curr = nil        ← you meant "go to 2"
+```
+
+You just cut the rope you were standing on. Nodes `2` and `3` are still in memory, but no
+variable points at them any more — the rest of the list is gone, permanently. The fix is
+one line, moved one line earlier:
+
+```text
+next = curr.Next        ← hold the rest of the list FIRST
+curr.Next = prev        ← now it is safe to destroy curr.Next
+prev = curr
+curr = next
+```
+
+**Rule:** save the pointer you are about to overwrite, then overwrite it.
+
+### Why the loop is correct
+
+The invariant, true before every iteration:
+
+> `prev` is the head of the correctly-reversed part; `curr` is the head of the
+> untouched part; every node is in exactly one of the two.
+
+Each iteration moves exactly one node across the boundary and restores the invariant.
+When `curr` becomes `nil` the untouched part is empty, so `prev` is the reversed whole
+list — which is why you **return `prev`, not `head`**. (`head` is now the *tail*, pointing
+at `nil`.)
+
+### Steps
+
+```text
+Step 1 → prev = nil, curr = head
+Step 2 → while curr != nil:
+Step 3 →     next = curr.Next      (save the rest of the list)
+Step 4 →     curr.Next = prev      (flip this one link)
+Step 5 →     prev = curr           (grow the reversed part)
+Step 6 →     curr = next           (advance into the untouched part)
+Step 7 → return prev               (the old tail is the new head)
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "reverse a linked list", "reverse in place", "O(1) extra space"
+  "palindrome list", "reorder list", "reverse nodes in k-groups"
+  any problem where a sublist must come out backwards
+        ↓
+Think about...
+  "Can I just flip Next pointers instead of moving data?"
+        ↓
+Use...
+  prev/curr/next, saving next FIRST, and return prev
+    · whole list          → the loop as written
+    · a sublist [l, r]    → dummy node + walk to l-1, then flip r-l links
+    · fixed blocks of k   → reverse a block, stitch tail to the next block
+```
 
 ### Visual explanation
 
@@ -98,32 +195,69 @@ Most list problems are pointer-rewiring; a dummy sentinel removes head edge case
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Reverse Linked Lis: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+start   prev=nil                curr=1 → 2 → 3
+
+iter 1  next=2
+        1.Next=nil              prev=1              curr=2 → 3
+        reversed: 1             remaining: 2 → 3
+
+iter 2  next=3
+        2.Next=1                prev=2              curr=3
+        reversed: 2 → 1         remaining: 3
+
+iter 3  next=nil
+        3.Next=2                prev=3              curr=nil
+        reversed: 3 → 2 → 1     remaining: (empty)
+
+curr == nil  →  return prev = 3 → 2 → 1
 ```
 
 ### Interview explanation
-"This is a Reverse Linked List problem. I'll most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure. That brings the complexity down to O(n) time and O(1) space — here's the template."
+"I'll reverse it in place with three pointers. `prev` starts at nil, `curr` at the head.
+At each node I first save `curr.Next` — that's essential, because the next line destroys
+it — then point `curr.Next` back at `prev`, and slide both pointers forward. The invariant
+is that `prev` always heads the reversed prefix and `curr` heads the untouched suffix, so
+when `curr` hits nil, `prev` is the new head and that's what I return. One pass, O(n) time,
+O(1) space — and no values are moved, only links."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Linked Lists** family template. Adapt the comparison/condition to the specific problem.
+> Save `next`, flip `curr.Next` to `prev`, slide both forward, return `prev`.
 
 ```go
-// Reverse a singly linked list in place.
-type ListNode struct { Val int; Next *ListNode }
-func reverseList(head *ListNode) *ListNode {
+type ListNode struct {
+    Val  int
+    Next *ListNode
+}
+
+// ReverseList reverses a singly linked list in place and returns the new head.
+func ReverseList(head *ListNode) *ListNode {
     var prev *ListNode
-    for head != nil {
-        next := head.Next   // save
-        head.Next = prev    // reverse pointer
-        prev = head         // advance prev
-        head = next         // advance head
+    curr := head
+    for curr != nil {
+        next := curr.Next // 1. hold the rest of the list BEFORE overwriting
+        curr.Next = prev  // 2. flip this link
+        prev = curr       // 3. reversed part grows by one node
+        curr = next       // 4. step into the untouched part
     }
-    return prev
+    return prev // old tail is the new head
+}
+
+// ReverseSegment reverses exactly n nodes starting at head and returns
+// (newHead, oldHead). oldHead is the segment's new tail — stitch it yourself.
+func ReverseSegment(head *ListNode, n int) (*ListNode, *ListNode) {
+    var prev *ListNode
+    curr := head
+    for i := 0; i < n && curr != nil; i++ {
+        next := curr.Next
+        curr.Next = prev
+        prev = curr
+        curr = next
+    }
+    return prev, head
 }
 ```
 
@@ -132,41 +266,64 @@ class ListNode:
     def __init__(self, val=0, nxt=None):
         self.val, self.next = val, nxt
 
+
 def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+    """Reverse a singly linked list in place; return the new head."""
+    prev, curr = None, head
+    while curr:
+        nxt = curr.next      # 1. hold the rest of the list BEFORE overwriting
+        curr.next = prev     # 2. flip this link
+        prev = curr          # 3. reversed part grows by one node
+        curr = nxt           # 4. step into the untouched part
+    return prev              # old tail is the new head
+
+
+def reverse_segment(head, n):
+    """Reverse n nodes from head; return (new_head, new_tail)."""
+    prev, curr, i = None, head, 0
+    while curr and i < n:
+        nxt = curr.next
+        curr.next = prev
+        prev, curr, i = curr, nxt, i + 1
+    return prev, head
 ```
 
 ```java
-class ListNode { int val; ListNode next; ListNode(int v){val=v;} }
+class ListNode {
+    int val;
+    ListNode next;
+    ListNode(int v) { val = v; }
+}
+
 ListNode reverseList(ListNode head) {
-    ListNode prev = null;
-    while (head != null) {
-        ListNode next = head.next;
-        head.next = prev;
-        prev = head;
-        head = next;
+    ListNode prev = null, curr = head;
+    while (curr != null) {
+        ListNode next = curr.next; // 1. hold the rest of the list
+        curr.next = prev;          // 2. flip this link
+        prev = curr;               // 3. grow the reversed part
+        curr = next;               // 4. advance
     }
-    return prev;
+    return prev;                   // old tail is the new head
 }
 ```
 
 ```cpp
-struct ListNode { int val; ListNode* next; ListNode(int v):val(v),next(nullptr){} };
+struct ListNode {
+    int val;
+    ListNode* next;
+    ListNode(int v) : val(v), next(nullptr) {}
+};
+
 ListNode* reverseList(ListNode* head) {
     ListNode* prev = nullptr;
-    while (head) {
-        ListNode* next = head->next;
-        head->next = prev;
-        prev = head;
-        head = next;
+    ListNode* curr = head;
+    while (curr) {
+        ListNode* next = curr->next; // 1. hold the rest of the list
+        curr->next = prev;           // 2. flip this link
+        prev = curr;                 // 3. grow the reversed part
+        curr = next;                 // 4. advance
     }
-    return prev;
+    return prev;                     // old tail is the new head
 }
 ```
 
@@ -252,120 +409,293 @@ ListNode* reverseList(ListNode* head) {
 ## 9. Solved Example 1
 
 ### Problem — Reverse List (LeetCode 206)
-A representative **Reverse Linked List** problem. The signal: rewire next-pointers with prev/curr/next to reverse in o(n), o(1).
+Given the head of a singly linked list, reverse it and return the head of the reversed
+list. The nodes must be re-linked in place — you may not build a new list.
 
 ### Thought Process
-1. Keep a `prev` pointer, starting at `None` — it will become the new head.
-2. Walk `curr` down the list; for each node save its `next`, then point the node back at `prev`.
-3. Slide `prev` and `curr` forward one step. When `curr` runs off the end, `prev` is the reversed head.
+1. `prev` starts at `nil`; it will grow into the reversed list and end up as the new head.
+2. For the node under `curr`, **first** save `curr.Next` — the next line destroys it.
+3. Point `curr.Next` back at `prev`. That single assignment is the whole reversal.
+4. Slide `prev` and `curr` forward one node each.
+5. When `curr` is `nil` every node has been flipped, so return `prev`.
 
 ### Dry Run
-Input `1→2→3`, prev=None, curr=1.
-- node1: nxt=2, 1.next=None, prev=1, curr=2
-- node2: nxt=3, 2.next=1, prev=2, curr=3
-- node3: nxt=None, 3.next=2, prev=3, curr=None → return `3→2→1`
+
+Input: `1 → 2 → 3`
+
+Every pointer, after every statement of every iteration:
+
+| iter | `next = curr.Next` | `curr.Next = prev` | `prev = curr` | `curr = next` | list state |
+|------|--------------------|--------------------|---------------|---------------|------------|
+| —    | (start) `prev=nil`, `curr=1` | — | — | — | `1→2→3` |
+| 1    | `next=2`           | `1.Next=nil`       | `prev=1`      | `curr=2`      | reversed `1` · rest `2→3` |
+| 2    | `next=3`           | `2.Next=1`         | `prev=2`      | `curr=3`      | reversed `2→1` · rest `3` |
+| 3    | `next=nil`         | `3.Next=2`         | `prev=3`      | `curr=nil`    | reversed `3→2→1` · rest empty |
+
+Loop guard `curr != nil` now fails.
+
+Output: **`3 → 2 → 1`**
+
+Look at iteration 1. The moment `1.Next` becomes `nil`, the only remaining route to nodes
+`2` and `3` is the `next` variable saved in the previous column. Swap those two columns and
+the answer becomes `1` — a one-node list, with the rest leaked.
 
 ### Visualization
-```
-input  ──▶ [ apply Reverse Linked List step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+             prev        curr
+              ↓           ↓
+before      [nil]      [1]→[2]→[3]
+
+after iter1  [1]→nil    [2]→[3]          prev=1   curr=2
+after iter2  [2]→[1]→nil  [3]            prev=2   curr=3
+after iter3  [3]→[2]→[1]→nil  (nil)      prev=3   curr=nil
+              ↑
+            new head (returned)
 ```
 
 ### Code
+
+```go
+func reverseList(head *ListNode) *ListNode {
+    var prev *ListNode // reversed part; also the answer
+    curr := head       // untouched part
+    for curr != nil {
+        next := curr.Next // MUST come first: the next line overwrites curr.Next
+        curr.Next = prev  // flip the link backwards
+        prev = curr       // reversed part grows
+        curr = next       // advance into the untouched part
+    }
+    return prev // the old tail
+}
+```
+
 ```python
 def reverseList(head):
-    prev = None
-    curr = head
+    prev, curr = None, head
     while curr:
-        nxt = curr.next      # save next
-        curr.next = prev     # reverse pointer
-        prev = curr          # advance prev
-        curr = nxt           # advance curr
-    return prev
+        nxt = curr.next      # MUST come first: the next line overwrites curr.next
+        curr.next = prev     # flip the link backwards
+        prev = curr          # reversed part grows
+        curr = nxt           # advance into the untouched part
+    return prev              # the old tail
 ```
 
 ### Complexity
-Time O(n), Space O(1). Single pass, in-place pointer rewiring.
+Time O(n) — each node is visited once and one pointer is written per node.
+Space O(1) — three pointer variables, regardless of list length.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Reverse II (LeetCode 92)
-A representative **Reverse Linked List** problem. The signal: rewire next-pointers with prev/curr/next to reverse in o(n), o(1).
+Reverse only the nodes from position `left` to position `right` (1-indexed) and leave the
+rest of the list untouched. One pass.
 
 ### Thought Process
-1. Use a dummy node so reversing that starts at the head has no special case; walk `prev` to the node just before position `left`.
-2. Repeatedly take the node after `curr` and splice it to the front of the sublist (head-insertion), `right - left` times.
-3. Everything outside `[left, right]` stays untouched; return `dummy.next`.
+1. `left` may be `1`, so the head itself can move — put a **dummy** node in front and the
+   head stops being a special case.
+2. Walk `prev` to the node just *before* position `left`. It never moves again; it is the
+   anchor the reversed block hangs off.
+3. Instead of a separate reverse-then-stitch, repeatedly **head-insert**: unhook the node
+   after `curr` and splice it directly behind `prev`.
+4. Do that exactly `right - left` times — each move drags one node to the front of the block.
+5. `curr` naturally drifts to the back of the block and stays connected to the tail, so
+   nothing needs re-stitching. Return `dummy.Next`.
 
 ### Dry Run
-Input `1→2→3→4→5`, left=2, right=4. prev=node1, curr=node2.
-- move 3 to front: `1→3→2→4→5`
-- move 4 to front: `1→4→3→2→5` → answer
+
+Input: `1 → 2 → 3 → 4 → 5`, `left = 2`, `right = 4`
+
+Setup: `prev = node1` (the node before position 2), `curr = node2`, moves `= right-left = 2`.
+
+| move | `nxt = curr.Next` | `curr.Next = nxt.Next` | `nxt.Next = prev.Next` | `prev.Next = nxt` | list after |
+|------|-------------------|------------------------|------------------------|-------------------|------------|
+| 1    | `nxt=3`           | `2.Next=4`             | `3.Next=2`             | `1.Next=3`        | `1→3→2→4→5` |
+| 2    | `nxt=4`           | `2.Next=5`             | `4.Next=3`             | `1.Next=4`        | `1→4→3→2→5` |
+
+Output: **`1 → 4 → 3 → 2 → 5`**
+
+Notice `curr` stays pinned to node `2` the entire time — it starts as the block's head and
+ends as the block's tail, which is exactly why `2 → 5` is already correct at the end.
 
 ### Visualization
-```
-input  ──▶ [ apply Reverse Linked List step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+            prev  curr
+              ↓    ↓
+start    1 →  [2 → 3 → 4] → 5        block to reverse
+
+move 1   pull 3 out, insert after prev
+         1 → 3 → 2 → 4 → 5
+
+move 2   pull 4 out, insert after prev
+         1 → 4 → 3 → 2 → 5
+              └───────┘
+              block reversed; curr(=2) still points at 5
 ```
 
+With `left = 1` the anchor is the dummy itself, so `dummy.Next` is rewritten instead of a
+real node's `Next` — the same four lines, no `if` needed.
+
 ### Code
+
+```go
+func reverseBetween(head *ListNode, left, right int) *ListNode {
+    dummy := &ListNode{Next: head} // left may be 1: dummy removes that special case
+    prev := dummy
+    for i := 0; i < left-1; i++ { // stop just before position `left`
+        prev = prev.Next
+    }
+    curr := prev.Next             // block head now, block tail at the end
+    for i := 0; i < right-left; i++ {
+        nxt := curr.Next          // node to pull to the front
+        curr.Next = nxt.Next      // unhook it
+        nxt.Next = prev.Next      // it now leads the block
+        prev.Next = nxt           // anchor points at the new block head
+    }
+    return dummy.Next
+}
+```
+
 ```python
 def reverseBetween(head, left, right):
-    dummy = ListNode(0, head)
+    dummy = ListNode(0, head)        # left may be 1: dummy removes that special case
     prev = dummy
-    for _ in range(left - 1):          # node before the sublist
+    for _ in range(left - 1):        # stop just before position `left`
         prev = prev.next
-    curr = prev.next
-    for _ in range(right - left):      # head-insert next node
-        nxt = curr.next
-        curr.next = nxt.next
-        nxt.next = prev.next
-        prev.next = nxt
+    curr = prev.next                 # block head now, block tail at the end
+    for _ in range(right - left):
+        nxt = curr.next              # node to pull to the front
+        curr.next = nxt.next         # unhook it
+        nxt.next = prev.next         # it now leads the block
+        prev.next = nxt              # anchor points at the new block head
     return dummy.next
 ```
 
 ### Complexity
-Time O(n), Space O(1). One pass to `left`, then constant work per swapped node.
+Time O(n) — at most `left-1` steps to reach the anchor plus `right-left` constant-time
+splices. Space O(1) — a dummy and three pointers.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Palindrome List (LeetCode 234)
-A representative **Reverse Linked List** problem. The signal: rewire next-pointers with prev/curr/next to reverse in o(n), o(1).
+Return `true` if the values of the linked list read the same forwards and backwards.
+Aim for O(n) time and O(1) extra space.
 
 ### Thought Process
-1. Find the middle with slow/fast pointers (fast moves two steps per slow step).
-2. Reverse the second half in place using the prev/curr/next template.
-3. Walk the first half and the reversed second half together; if any value differs it is not a palindrome.
+1. Comparing front to back needs backwards movement, which a singly linked list forbids —
+   so *make* a backwards half by reversing it.
+2. Find where the second half starts with slow/fast pointers: `fast` moves two nodes per
+   `slow` step, so when `fast` runs out, `slow` is at the midpoint.
+3. Reverse from `slow` onward using the exact prev/curr/next loop from Example 1.
+4. Walk `left` from the original head and `right` from the reversed half; any mismatch means
+   not a palindrome.
+5. Stop when `right` hits `nil`. The two halves overlap harmlessly on odd lengths, so no
+   length parity check is needed.
 
 ### Dry Run
-Input `1→2→2→1`.
-- slow stops at the 3rd node (start of second half)
-- reverse second half → `1→2` (values 2,1 become 1,2)
-- compare front `1,2` with reversed `1,2` → all equal → True
+
+Input: `1 → 2 → 2 → 1` (nodes `n0 n1 n2 n3`)
+
+**Phase 1 — find the midpoint**
+
+| step | `slow` | `fast` | guard `fast != nil && fast.Next != nil` |
+|------|--------|--------|------------------------------------------|
+| start| `n0(1)`| `n0(1)`| true |
+| 1    | `n1(2)`| `n2(2)`| true |
+| 2    | `n2(2)`| `nil`  | false → stop |
+
+`slow = n2`, the first node of the second half.
+
+**Phase 2 — reverse from `slow`**
+
+| iter | `nxt` | rewire | `prev` | `slow` |
+|------|-------|--------|--------|--------|
+| 1    | `n3`  | `n2.Next=nil` | `n2` | `n3` |
+| 2    | `nil` | `n3.Next=n2`  | `n3` | `nil` |
+
+Reversed second half: `n3(1) → n2(2)`.
+
+**Phase 3 — compare**
+
+| step | `left` | `right` | values | verdict |
+|------|--------|---------|--------|---------|
+| 1    | `n0`   | `n3`    | `1 == 1` | continue |
+| 2    | `n1`   | `n2`    | `2 == 2` | continue |
+| 3    | `n2`   | `nil`   | —        | loop ends |
+
+Output: **`true`**
+
+For `1 → 2` the compare loop's first step sees `1` vs `2` and returns `false` immediately.
 
 ### Visualization
-```
-input  ──▶ [ apply Reverse Linked List step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+original    1 → 2 → 2 → 1
+                    ↑
+                   slow  (start of second half)
+
+after reversing the tail:
+
+  left ──▶ 1 → 2 ─┐            ┌─ 1 ◀── right
+                  ↓            ↓
+             (first half)  (second half, backwards)
+
+compare  1 vs 1  ✓
+compare  2 vs 2  ✓
+right == nil → palindrome
 ```
 
 ### Code
+
+```go
+func isPalindrome(head *ListNode) bool {
+    // 1. slow lands on the first node of the second half
+    slow, fast := head, head
+    for fast != nil && fast.Next != nil {
+        slow = slow.Next
+        fast = fast.Next.Next
+    }
+    // 2. reverse the second half in place (Example 1's loop)
+    var prev *ListNode
+    for slow != nil {
+        nxt := slow.Next
+        slow.Next = prev
+        prev = slow
+        slow = nxt
+    }
+    // 3. walk both halves inwards; the shorter one (prev) ends the loop
+    left, right := head, prev
+    for right != nil {
+        if left.Val != right.Val {
+            return false
+        }
+        left, right = left.Next, right.Next
+    }
+    return true
+}
+```
+
 ```python
 def isPalindrome(head):
+    # 1. slow lands on the first node of the second half
     slow = fast = head
-    while fast and fast.next:           # slow lands at 2nd-half start
+    while fast and fast.next:
         slow = slow.next
         fast = fast.next.next
-    prev = None                          # reverse second half
+    # 2. reverse the second half in place (Example 1's loop)
+    prev = None
     while slow:
         nxt = slow.next
         slow.next = prev
         prev = slow
         slow = nxt
-    left, right = head, prev             # compare halves
+    # 3. walk both halves inwards; the shorter one (prev) ends the loop
+    left, right = head, prev
     while right:
         if left.val != right.val:
             return False
@@ -374,8 +704,10 @@ def isPalindrome(head):
 ```
 
 ### Complexity
-Time O(n), Space O(1). Find middle, reverse half, compare — all linear and in place.
+Time O(n) — one pass to find the middle, one to reverse half, one to compare half.
+Space O(1) — only pointers; the reversal is in place.
 
+---
 
 ## 12. LeetCode Practice Set
 

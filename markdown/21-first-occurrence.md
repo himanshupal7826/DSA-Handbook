@@ -41,32 +41,143 @@ first, leftmost, binary search, duplicates, boundary.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Where does the target **start**? Give me the leftmost index, not just any index."*
+
+Running example: `nums = [5, 7, 7, 8, 8, 10]`, `target = 8`. (Answer: index 3.)
+
 ### Intuition
-Linear scan checks each candidate — O(n).
+Scan from the left and return the first index whose value equals the target. Because you started at the left, the first hit *is* the leftmost hit.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For `i` from `0` to `n − 1`:
+2. &nbsp;&nbsp;If `nums[i] == target`, return `i` — done, this is the first occurrence.
+3. Return `-1`.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n)** — worst case the target is at the end or absent.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the First Occurrence pattern is built to use.
+- The "fix": run a plain binary search first, then walk left while `nums[i-1] == target`. That is correct but still **O(n)** — an array of one million 8s degenerates to a million backward steps. The fast part of the algorithm gets swallowed by the slow tail.
+- The real waste: a comparison against a *sorted* array already tells you which side the leftmost 8 is on. On the running example, `nums[3] == 8` proves no 8 exists at index 4 or beyond *for the purpose of finding the first one* — every candidate is at index ≤ 3. The scan-and-back-up approach never asks that question; it just plods.
+- Two hidden bugs live in the back-up loop: forgetting the `i > 0` guard, and using it when the array is all target (walk the whole thing).
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the First Occurrence invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Don't search for the value — search for the *boundary* between "too small" and "big enough", and never return early.**
+
+An exact-match binary search stops the moment it touches *an* 8, which may be any of them. A boundary search refuses to stop: even when it lands on an 8 it treats that index as "still a candidate" and keeps squeezing leftwards. When the range finally collapses, `lo` is sitting exactly on the wall between the last value `< target` and the first value `>= target`.
+
+### The thought process
+
+```text
+We need    : the LEFTMOST index holding target.
+Obvious way: binary search, then walk left.
+Too slow   : O(n) when the array is full of duplicates.
+Notice     : "is nums[i] >= target?" is FALSE, FALSE, ..., FALSE, TRUE, ..., TRUE.
+             Once true it stays true — the predicate is monotonic.
+Therefore  : binary search for the first TRUE, not for the value.
+Now        : never return early; let lo converge on the wall → O(log n).
+```
+
+### Why "never return early" is the whole trick
+
+Chapter 20's search returns as soon as `nums[mid] == target`. With duplicates that is a coin flip:
+
+```text
+nums = [5, 7, 7, 8, 8, 10]     target = 8
+                ↑
+        first probe lands on index 3 (correct here — by luck)
+
+nums = [8, 8, 8, 8, 8, 9]      target = 8
+                 ↑
+        first probe lands on index 2 or 3 — WRONG, the answer is 0
+```
+
+Replace "did I find it?" with "**could the answer still be here or to the left?**":
+
+```text
+nums[mid] <  target   → mid is too small; the answer is strictly right → lo = mid + 1
+nums[mid] >= target   → mid is itself a candidate; keep it            → hi = mid
+```
+
+Nothing in that pair of rules mentions equality, and neither branch discards a possible answer. `hi = mid` (not `mid - 1`) is what keeps `mid` alive as a candidate — the half-open convention makes this the natural spelling.
+
+### The loop invariant, in words
+
+> **The answer, if it exists, is always inside `[lo, hi)`.**
+
+It starts true (`[0, n)` is everything). Each branch removes only indices proved impossible. When `lo == hi`:
+
+```text
+every index < lo   →  proved nums[i] <  target
+every index >= lo  →  proved nums[i] >= target
+```
+
+So `lo` is the *lower bound*. Termination is guaranteed because `lo <= mid < hi` always (integer division rounds down), so `lo = mid+1` strictly grows `lo` and `hi = mid` strictly shrinks `hi`.
+
+Use `mid = lo + (hi-lo)/2`, never `(lo+hi)/2`: on a 32-bit machine with `lo = 1.5e9, hi = 2.0e9` the sum wraps negative and the search either indexes out of bounds or loops forever. The subtraction form can't overflow because `hi - lo <= hi`.
+
+### First occurrence = lower bound + one equality check
+
+The lower bound answers "where would the target go?", which is defined even when the target is absent. To answer "where **is** the target?" you add exactly one test at the end:
+
+```text
+i = lowerBound(nums, target)
+if i < n and nums[i] == target → i is the FIRST occurrence
+else                          → target is absent, return -1
+```
+
+Both guards matter: `i < n` catches a target larger than everything (`lo` lands on `n`), and `nums[i] == target` catches a target that simply isn't there (`lo` lands on the first larger value).
+
+### One algorithm, four variants
+
+Chapters 21–24 are **not** four algorithms. They are the loop above with one line changed:
+
+| Want | Move `lo` when | Return |
+|------|----------------|--------|
+| **lower bound** — first `i` with `a[i] >= t` | `a[mid] <  t` | `lo` |
+| **upper bound** — first `i` with `a[i] > t` | `a[mid] <= t` | `lo` |
+| **first occurrence** of `t` (ch. 21) | `a[mid] <  t` | `lo` if `lo < n && a[lo] == t`, else `-1` |
+| **last occurrence** of `t` (ch. 22) | `a[mid] <= t` | `lo-1` if `lo > 0 && a[lo-1] == t`, else `-1` |
+| **count** of `t` | — | `upperBound(t) − lowerBound(t)` |
+
+Read the middle column: `<` versus `<=`. That single character is the entire difference between chapters 21/23 and chapters 22/24.
+
+### Steps
+
+```text
+Step 1 → lo = 0, hi = n
+Step 2 → while lo < hi:
+Step 3 →     mid = lo + (hi - lo) / 2
+Step 4 →     if nums[mid] < target → lo = mid + 1     (too small; answer is right)
+Step 5 →     else                  → hi = mid         (candidate; keep it)
+Step 6 → if lo < n and nums[lo] == target → return lo
+Step 7 → return -1
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "first/leftmost occurrence", "starting position", "first bad version",
+  "smallest index such that ...", a sorted array WITH DUPLICATES,
+  a predicate that is false-then-true
+        ↓
+Think about...
+  "Is my condition monotonic — once true, does it stay true?"
+        ↓
+Use...
+  the boundary search: never return early, let lo converge
+  ├─ want the index even if absent  → return lo (that's the insert position)
+  └─ want it only if present        → check lo < n && a[lo] == target
+```
 
 ### Visual explanation
 
@@ -91,30 +202,68 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-First Occurrence  : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [ 5,  7,  7,  8,  8, 10 ]     target = 8
+index    0   1   2   3   4   5
+
+predicate "nums[i] >= 8":
+         F   F   F   T   T   T
+                     ↑
+                 the WALL — first TRUE — is the answer
+
+step 1  [lo=0 ─────────────────── hi=6)   mid=3  nums[3]=8 >= 8 → candidate → hi=3
+step 2  [lo=0 ───── hi=3)                 mid=1  nums[1]=7 <  8 → too small → lo=2
+step 3  [lo=2 hi=3)                       mid=2  nums[2]=7 <  8 → too small → lo=3
+        lo == hi == 3   ★
+
+then check: 3 < 6 and nums[3] == 8  →  first occurrence = 3
+
+note step 1: we landed ON an 8 and did NOT return — that's the whole pattern
 ```
 
 ### Interview explanation
-"This is a First Occurrence problem. I'll if the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration. That brings the complexity down to O(log n) time and O(1) space — here's the template."
+"I don't search for the value, I search for a boundary. The predicate `nums[i] >= target` is monotonic — false, false, …, then true forever — so I binary search for the first `true`. I keep the half-open range `[lo, hi)` with the invariant that the answer is always inside it: if `nums[mid] < target` the answer is strictly to the right so `lo = mid + 1`; otherwise `mid` is itself a candidate so `hi = mid`. Crucially I never return early on equality, which is what makes it find the *leftmost* match rather than an arbitrary one. When the loop ends `lo` is the lower bound, and one check — `lo < n && nums[lo] == target` — converts it into the first occurrence or `-1`. O(log n) time, O(1) space, and the `mid = lo + (hi-lo)/2` form keeps it overflow-safe."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Binary Search** family template. Adapt the comparison/condition to the specific problem.
+> Never return early. `nums[mid] < target → lo = mid+1`, else `hi = mid`. `lo` converges on the wall.
 
 ```go
-// Lower bound: first index with a[i] >= target. Half-open invariant [lo, hi).
-func lowerBound(a []int, target int) int {
+// LowerBound returns the first index i with a[i] >= target (len(a) if none).
+// Invariant: the answer always lies in [lo, hi).
+func LowerBound(a []int, target int) int {
     lo, hi := 0, len(a)
     for lo < hi {
-        mid := lo + (hi-lo)/2     // avoids overflow
+        mid := lo + (hi-lo)/2 // overflow-safe midpoint
         if a[mid] < target {
-            lo = mid + 1
+            lo = mid + 1 // too small → the answer is strictly right
         } else {
-            hi = mid
+            hi = mid // mid is still a candidate → keep it in range
+        }
+    }
+    return lo
+}
+
+// FirstOccurrence returns the leftmost index of target, or -1 if absent.
+func FirstOccurrence(a []int, target int) int {
+    i := LowerBound(a, target)
+    if i < len(a) && a[i] == target {
+        return i
+    }
+    return -1
+}
+
+// FirstTrue returns the smallest v in [lo, hi) with pred(v) true, or hi.
+// Works whenever pred is monotonic: false...false,true...true.
+func FirstTrue(lo, hi int, pred func(int) bool) int {
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if pred(mid) {
+            hi = mid // mid satisfies it → it or something left of it is the answer
+        } else {
+            lo = mid + 1
         }
     }
     return lo
@@ -123,35 +272,95 @@ func lowerBound(a []int, target int) int {
 
 ```python
 def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+    """First index i with a[i] >= target (len(a) if none)."""
+    lo, hi = 0, len(a)
     while lo < hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2      # overflow-safe habit
         if a[mid] < target:
-            lo = mid + 1
+            lo = mid + 1               # too small → answer is strictly right
         else:
+            hi = mid                   # mid is still a candidate
+    return lo
+
+
+def first_occurrence(a, target):
+    """Leftmost index of target, or -1 if absent."""
+    i = lower_bound(a, target)
+    return i if i < len(a) and a[i] == target else -1
+
+
+def first_true(lo, hi, pred):
+    """Smallest v in [lo, hi) with pred(v) true, or hi. pred must be monotonic."""
+    while lo < hi:
+        mid = lo + (hi - lo) // 2
+        if pred(mid):
             hi = mid
-    return lo                     # first index with a[i] >= target
+        else:
+            lo = mid + 1
+    return lo
 ```
 
 ```java
-int lowerBound(int[] a, int target) {
-    int lo = 0, hi = a.length;
-    while (lo < hi) {
-        int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+import java.util.function.IntPredicate;
+
+public class FirstOccurrenceSearch {
+    // First index i with a[i] >= target (a.length if none).
+    public static int lowerBound(int[] a, int target) {
+        int lo = 0, hi = a.length;
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;       // overflow-safe
+            if (a[mid] < target) lo = mid + 1;  // too small → answer is right
+            else hi = mid;                      // mid is still a candidate
+        }
+        return lo;
     }
-    return lo;
+
+    // Leftmost index of target, or -1 if absent.
+    public static int firstOccurrence(int[] a, int target) {
+        int i = lowerBound(a, target);
+        return (i < a.length && a[i] == target) ? i : -1;
+    }
+
+    // Smallest v in [lo, hi) with pred(v) true, or hi. pred must be monotonic.
+    public static int firstTrue(int lo, int hi, IntPredicate pred) {
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;
+            if (pred.test(mid)) hi = mid;
+            else lo = mid + 1;
+        }
+        return lo;
+    }
 }
 ```
 
 ```cpp
-int lowerBound(vector<int>& a, int target) {
+#include <functional>
+#include <vector>
+using namespace std;
+
+// First index i with a[i] >= target (a.size() if none).
+int lowerBound(const vector<int>& a, int target) {
     int lo = 0, hi = (int)a.size();
     while (lo < hi) {
+        int mid = lo + (hi - lo) / 2;        // overflow-safe
+        if (a[mid] < target) lo = mid + 1;   // too small → answer is right
+        else hi = mid;                       // mid is still a candidate
+    }
+    return lo;
+}
+
+// Leftmost index of target, or -1 if absent.
+int firstOccurrence(const vector<int>& a, int target) {
+    int i = lowerBound(a, target);
+    return (i < (int)a.size() && a[i] == target) ? i : -1;
+}
+
+// Smallest v in [lo, hi) with pred(v) true, or hi. pred must be monotonic.
+int firstTrue(int lo, int hi, const function<bool(int)>& pred) {
+    while (lo < hi) {
         int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+        if (pred(mid)) hi = mid;
+        else lo = mid + 1;
     }
     return lo;
 }
@@ -239,127 +448,284 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — First Last Position (LeetCode 34)
-Given a sorted array `nums`, return the starting and ending index of a given `target`, or `[-1, -1]` if it is absent.
+Given a sorted array `nums` that may contain duplicates, return the starting and ending index of `target` as `[first, last]`, or `[-1, -1]` if it is absent. Required complexity: O(log n).
 
 ### Thought Process
-1. The first index is `lower_bound(target)` — the leftmost `i` with `nums[i] >= target`.
-2. The last index is `lower_bound(target + 1) - 1` — one before the leftmost element strictly greater than `target`.
-3. If the lower bound is out of range or doesn't equal `target`, the value is missing, so return `[-1, -1]`.
+1. `first` is the leftmost index with `nums[i] >= target` — a **lower bound**, then confirmed with one equality check.
+2. `last` is one before the leftmost index with `nums[i] > target`. Rather than write a second loop with `<=`, note that on integers `nums[i] > target` is the same as `nums[i] >= target + 1` — so `last = lowerBound(target + 1) − 1` and we reuse the identical helper.
+3. Run `lowerBound(target)` first. If it lands past the end, or on a value that isn't the target, the target is absent → `[-1, -1]`.
+4. Otherwise the target *is* present, so `lowerBound(target + 1) − 1` is guaranteed to point at the last copy.
+5. Two O(log n) searches, so still O(log n) overall.
 
 ### Dry Run
-`nums = [5,7,7,8,8,10], target = 8`
-- `lower_bound(8)` → first index with value ≥ 8 → index 3.
-- `lower_bound(9)` → first index with value ≥ 9 → index 5, minus 1 → index 4.
-- `nums[3] == 8`, so answer is `[3, 4]`.
+
+Input: `nums = [5, 7, 7, 8, 8, 10]`, `target = 8`
+
+**Search A — `lowerBound(8)`** (first index with value ≥ 8):
+
+| step | `lo` | `hi` | `mid` | `nums[mid]` | `< 8`? | action |
+|------|------|------|-------|-------------|--------|--------|
+| 1 | 0 | 6 | **3** | 8 | no — candidate | `hi = 3` |
+| 2 | 0 | 3 | **1** | 7 | yes | `lo = 2` |
+| 3 | 2 | 3 | **2** | 7 | yes | `lo = 3` |
+| 4 | 3 | 3 | — | — | — | stop → **3** |
+
+Check `3 < 6` and `nums[3] == 8` ✓, so the target is present and `first = 3`.
+
+**Search B — `lowerBound(9)`** (first index with value ≥ 9, i.e. first index past the 8s):
+
+| step | `lo` | `hi` | `mid` | `nums[mid]` | `< 9`? | action |
+|------|------|------|-------|-------------|--------|--------|
+| 1 | 0 | 6 | **3** | 8 | yes | `lo = 4` |
+| 2 | 4 | 6 | **5** | 10 | no — candidate | `hi = 5` |
+| 3 | 4 | 5 | **4** | 8 | yes | `lo = 5` |
+| 4 | 5 | 5 | — | — | — | stop → **5** |
+
+`last = 5 − 1 = 4`.
+
+Output: **`[3, 4]`**
+
+Step 1 of search A is the moment that separates this from chapter 20: `nums[3]` *equals* the target and the loop keeps going. An early return there would have been correct by accident; on `[8,8,8,8]` the same shortcut returns 1 or 2 instead of 0.
 
 ### Visualization
-```
-[5, 7, 7, 8, 8, 10]   target = 8
-          ^  ^
-        first last  ──▶ [3, 4]
+
+```text
+nums  =  5   7   7   8   8  10
+index    0   1   2   3   4   5
+
+>= 8  :  F   F   F   T   T   T        lowerBound(8) = 3   ← first
+>= 9  :  F   F   F   F   F   T        lowerBound(9) = 5   ← one past last
+                     └───┬───┘
+                      the 8s: [3, 4]
+
+count of target = lowerBound(9) - lowerBound(8) = 5 - 3 = 2      (two 8s ✓)
 ```
 
 ### Code
+
+```go
+// rangeLowerBound: first index i with a[i] >= target, or len(a).
+func rangeLowerBound(a []int, target int) int {
+    lo, hi := 0, len(a)
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if a[mid] < target {
+            lo = mid + 1 // too small → answer is strictly right
+        } else {
+            hi = mid // still a candidate → never return early
+        }
+    }
+    return lo
+}
+
+func searchRange(nums []int, target int) []int {
+    first := rangeLowerBound(nums, target)
+    if first == len(nums) || nums[first] != target {
+        return []int{-1, -1} // target is absent
+    }
+    // For integers, "> target" is the same as ">= target+1".
+    last := rangeLowerBound(nums, target+1) - 1
+    return []int{first, last}
+}
+```
+
 ```python
 def searchRange(nums, target):
     def lower_bound(t):
         lo, hi = 0, len(nums)
         while lo < hi:
-            mid = (lo + hi) // 2
+            mid = lo + (hi - lo) // 2
             if nums[mid] < t:
-                lo = mid + 1
+                lo = mid + 1        # too small → answer is strictly right
             else:
-                hi = mid
+                hi = mid            # still a candidate → never return early
         return lo
 
     first = lower_bound(target)
     if first == len(nums) or nums[first] != target:
-        return [-1, -1]
+        return [-1, -1]             # target is absent
+
+    # for integers, "> target" is the same as ">= target + 1"
     last = lower_bound(target + 1) - 1
     return [first, last]
 ```
 
 ### Complexity
-Time O(log n) — two binary searches; Space O(1).
+Time **O(log n)** — two independent binary searches, each halving the range. Space **O(1)**.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — First Bad Version (LeetCode 278)
-Versions `1..n` are good then bad. Using the API `isBadVersion(v)`, find the first bad version with the fewest calls.
+Versions `1..n` were released in order; from some version onwards every release is bad. Given the API `isBadVersion(v)`, find the first bad version with the fewest calls.
 
 ### Thought Process
-1. The predicate `isBadVersion(v)` is monotonic: once true it stays true, so we can binary search the boundary.
-2. Keep a closed range `[lo, hi] = [1, n]`; on a bad mid, the answer is at `mid` or left (`hi = mid`), otherwise it's strictly right (`lo = mid + 1`).
-3. When `lo == hi` the range collapses onto the first bad version.
+1. There is no array — but `isBadVersion` is a **monotonic predicate**: false, false, …, true, true. That is the only structure a boundary search needs.
+2. Search over versions with the same half-open range: `[lo, hi) = [1, n + 1)`. `hi` is `n + 1` because `n` itself can be the answer and `hi` is exclusive.
+3. `isBadVersion(mid)` true → `mid` is a candidate, the answer is at `mid` or earlier → `hi = mid`. False → the answer is strictly after → `lo = mid + 1`.
+4. Never return early even on a `true` — the *first* bad version may still be to the left.
+5. `n` goes up to 2³¹ − 1, so `(lo + hi) / 2` genuinely overflows a 32-bit int here. This is the problem where the midpoint form stops being a stylistic preference.
 
 ### Dry Run
-`n = 5`, first bad = 4
-- `lo=1, hi=5, mid=3` → good → `lo=4`.
-- `lo=4, hi=5, mid=4` → bad → `hi=4`.
-- `lo == hi == 4` → return 4.
+
+Input: `n = 5`, the first bad version is `4`
+
+| step | `lo` | `hi` | `mid = lo+(hi-lo)/2` | `isBadVersion(mid)` | action |
+|------|------|------|----------------------|---------------------|--------|
+| 1 | 1 | 6 | 1 + 2 = **3** | false (good) | `lo = 4` — everything ≤ 3 is good |
+| 2 | 4 | 6 | 4 + 1 = **5** | true (bad) | `hi = 5` — 5 is a candidate, keep it |
+| 3 | 4 | 5 | 4 + 0 = **4** | true (bad) | `hi = 4` — 4 is a candidate, keep it |
+| 4 | 4 | 4 | — | — | `lo == hi` → return **4** |
+
+Output: **4** — three API calls for five versions.
+
+Steps 2 and 3 both hit `true` and neither returns. Step 3 is the one that matters: version 5 was already known bad, but 4 turned out to be bad too, and only the collapse of the range proves that 4 is the *first*.
 
 ### Visualization
-```
-versions:  1  2  3  4  5
-good ------------|
-bad             4  5   ──▶ first bad = 4
+
+```text
+version    1     2     3     4     5
+status     good  good  good  BAD   BAD
+predicate  F     F     F     T     T
+                             ↑ first TRUE = answer
+
+step 1  [lo=1 ─────────────────── hi=6)   mid=3  good → lo=4
+step 2              [lo=4 ─────── hi=6)   mid=5  bad  → hi=5
+step 3              [lo=4 ─ hi=5)         mid=4  bad  → hi=4
+        lo == hi == 4  ★
+
+a monotonic API call replaces the array lookup — the loop is unchanged
 ```
 
 ### Code
+
+```go
+// firstBad models the hidden state behind LeetCode's API so this runs standalone.
+var firstBad int
+
+func isBadVersion(version int) bool { return version >= firstBad }
+
+func firstBadVersion(n int) int {
+    lo, hi := 1, n+1 // half-open over VERSIONS; n must stay reachable
+
+    for lo < hi {
+        mid := lo + (hi-lo)/2 // n up to 2^31-1: (lo+hi)/2 would overflow
+        if isBadVersion(mid) {
+            hi = mid // mid is bad → it or an earlier one is the first
+        } else {
+            lo = mid + 1 // mid is good → the first bad one is strictly after
+        }
+    }
+    return lo
+}
+```
+
 ```python
 def firstBadVersion(n):
-    lo, hi = 1, n
+    lo, hi = 1, n + 1                  # half-open over versions
+
     while lo < hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2
         if isBadVersion(mid):
-            hi = mid
+            hi = mid                   # candidate → keep it, look further left
         else:
-            lo = mid + 1
+            lo = mid + 1               # good → first bad one is strictly after
+
     return lo
 ```
 
 ### Complexity
-Time O(log n) API calls; Space O(1).
+Time **O(log n)** API calls — 31 calls even at `n = 2³¹ − 1`. Space **O(1)**.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Search Insert (LeetCode 35)
-Given a sorted array of distinct integers and a `target`, return the index if found, otherwise the index where it would be inserted in order.
+Given a sorted array of distinct integers and a `target`, return the index of `target` if found, otherwise the index where it should be inserted to keep the array sorted.
 
 ### Thought Process
-1. The insert position is exactly the leftmost index `i` with `nums[i] >= target` — a lower bound.
-2. Search the half-open range `[0, len(nums))`; when `nums[mid] < target` move `lo` right, otherwise pull `hi` in to `mid`.
-3. `lo` ends on the first element ≥ target, or on `len(nums)` if target exceeds every element — both are the correct insert index.
+1. This is the lower bound *without* the final equality check — the "first occurrence" search stripped back to its bare boundary.
+2. The insert position is the first index `i` with `nums[i] >= target`: everything before it is strictly smaller, everything from it onwards is at least as large, so slotting the target in at `i` keeps the order.
+3. If the target is present, the lower bound lands directly on it — so "found" and "would insert" are the same index and no branch is needed.
+4. The loop is identical to example 1's helper; only the return differs (`lo` unconditionally, instead of `lo` or `-1`).
+5. A target above every element leaves `lo == n`, which is the correct append position — the half-open range makes that fall out for free.
 
 ### Dry Run
-`nums = [1,3,5,6], target = 4`
-- `lo=0, hi=4, mid=2` → `nums[2]=5 >= 4` → `hi=2`.
-- `lo=0, hi=2, mid=1` → `nums[1]=3 < 4` → `lo=2`.
-- `lo == hi == 2` → insert at index 2.
+
+Input: `nums = [1, 3, 5, 6]`, `target = 4`
+
+| step | `lo` | `hi` | `mid` | `nums[mid]` | `nums[mid] < 4`? | action |
+|------|------|------|-------|-------------|------------------|--------|
+| 1 | 0 | 4 | 0 + 2 = **2** | 5 | no — candidate | `hi = 2` |
+| 2 | 0 | 2 | 0 + 1 = **1** | 3 | yes — too small | `lo = 2` |
+| 3 | 2 | 2 | — | — | — | `lo == hi` → return **2** |
+
+Output: **2** — inserting 4 at index 2 gives `[1, 3, 4, 5, 6]`. ✓
+
+The three boundary cases on the same array:
+
+| target | result | reason |
+|--------|--------|--------|
+| 5 (present) | **2** | lower bound lands on the target itself |
+| 7 (above all) | **4** | `lo` runs to `n` — the append position |
+| 0 (below all) | **0** | `hi` runs to 0 — the prepend position |
+
+Contrast with example 1: identical loop, and the *only* difference is that `searchRange` follows it with `nums[lo] == target`. That check is what turns "where would it go" into "where is it".
 
 ### Visualization
-```
-[1, 3, 5, 6]   target = 4
-      ^
-   insert here  ──▶ 2
+
+```text
+nums  = [ 1,   3,   5,   6 ]        target = 4
+index     0    1    2    3    (4)  ← n is a legal answer
+
+>= 4  :   F    F    T    T
+                    ↑ first TRUE → insert at index 2
+
+step 1  [lo=0 ─────────── hi=4)   mid=2  nums[2]=5 not < 4 → hi=2
+step 2  [lo=0 ─ hi=2)             mid=1  nums[1]=3 <  4    → lo=2
+        lo == hi == 2  ★
+
+result: [1, 3, | 4 |, 5, 6]
 ```
 
 ### Code
+
+```go
+func searchInsert(nums []int, target int) int {
+    lo, hi := 0, len(nums) // half-open; lo == len(nums) means "append"
+
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if nums[mid] < target {
+            lo = mid + 1 // too small → the slot is strictly right
+        } else {
+            hi = mid // mid could be the slot → keep it
+        }
+    }
+    return lo // first index with nums[i] >= target
+}
+```
+
 ```python
 def searchInsert(nums, target):
-    lo, hi = 0, len(nums)
+    lo, hi = 0, len(nums)              # half-open; lo == len means "append"
+
     while lo < hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2
         if nums[mid] < target:
-            lo = mid + 1
+            lo = mid + 1               # too small → slot is strictly right
         else:
-            hi = mid
-    return lo
+            hi = mid                   # mid could be the slot → keep it
+
+    return lo                          # first index with nums[i] >= target
 ```
 
 ### Complexity
-Time O(log n); Space O(1).
+Time **O(log n)** — one boundary search. Space **O(1)**.
 
+---
 
 ## 12. LeetCode Practice Set
 

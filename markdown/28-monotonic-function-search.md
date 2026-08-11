@@ -41,32 +41,146 @@ monotonic, predicate, boolean search, first true, threshold.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Where does this yes/no question flip from NO to YES?"*
+
+Running example: versions `1 … 7` of a product were released in order. At some point a bug was introduced and every version from then on is bad. You may call `isBad(v)`, which is expensive. Suppose version 5 is the first bad one. Find it with as few calls as possible.
+
 ### Intuition
-Linear scan checks each candidate — O(n).
+Just walk forward. Ask about version 1, then 2, then 3… and stop at the first `true`.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For `v = 1 .. n`:
+2. &nbsp;&nbsp;If `isBad(v)`, return `v`.
+3. (The loop always terminates: version `n` is bad by assumption.)
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n)** calls to the predicate — and the predicate is the expensive part (an API call, a test-suite run, a simulation).
+- Space: O(1)
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Monotonic Function Search pattern is built to use.
+- With the flip at 5, the scan spends its calls like this:
+
+  ```text
+  isBad(1) → false     isBad(2) → false     isBad(3) → false
+  isBad(4) → false     isBad(5) → true   ← answer
+  ```
+
+  Four calls whose only content is "not yet".
+- The fact being ignored: **`isBad(4) == false` already proves versions 1, 2 and 3 are good too.** The answers are one solid block of `false` followed by one solid block of `true`. Walking that block one step at a time is like `git bisect`-ing by checking every commit in order.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Monotonic Function Search invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Forget arrays. Binary search works on any ordered domain the moment you have a yes/no test whose answers look like `F F F T T T` — and all you are ever doing is locating that one flip.**
+
+This is the general statement that chapters 25 and 27 were special cases of. Once you see it, half the "binary search" problems in the world collapse into the same three lines.
+
+```text
+problem                  domain of x    predicate P(x)                answer
+─────────────────────────────────────────────────────────────────────────────
+lower_bound in a sorted   index          a[x] >= target                first true
+first bad version         version no.    isBad(x)                      first true
+Koko's eating speed       speed          hours(x) <= h                 first true
+minimum ship capacity     capacity       daysNeeded(x) <= days         first true
+sqrt(n) to 1e-9           real number    x*x >= n                      boundary
+find a peak               index          a peak exists at x or left    first true
+```
+
+Notice that the classic "sorted array" case is not special at all — sortedness is simply the thing that makes `a[x] >= target` monotone. The array was never the point.
+
+### The thought process
+
+```text
+We need    : the first version that is bad.
+Obvious way: ask about every version in order.
+Too slow   : O(n) expensive calls.
+Notice     : the answers are monotone — once bad, always bad.
+Notice too : so asking about ONE version classifies ALL of them relative
+             to it:  false ⇒ everything to the left is false
+                     true  ⇒ everything to the right is true
+Therefore  : ask in the middle, and half the domain is resolved for free.
+Now        : O(log n) calls — 30 calls cover a billion versions.
+```
+
+### Why monotonicity is the only requirement
+
+Write the predicate's answers along the domain:
+
+```text
+x    :  1     2     3     4  │  5     6     7
+P(x) :  F     F     F     F  │  T     T     T
+                             ↑
+                     the flip — the thing we are searching for
+```
+
+The bar exists because `P` is **monotone**: `P(x) ⇒ P(x+1)`. That single property is what makes a probe informative:
+
+- `P(mid)` is **true** → every `x > mid` is also true, so nothing to the right can be the *first* true. Discard the right half, but **keep `mid`** — it may be the flip itself. (`hi = mid`)
+- `P(mid)` is **false** → every `x < mid` is also false. Discard the left half **and `mid`**. (`lo = mid + 1`)
+
+If `P` were not monotone — say `F T F T` — a probe landing on an `F` would say nothing about either side, and discarding a half could throw the flip away. So the one thing to verify before coding is: *does `P(x)` imply `P(x+1)`?*
+
+Two degenerate cases fall out for free, and they are the usual source of bugs:
+
+```text
+all true   (T T T T)  → the loop never moves lo, returns lo = the left edge  ✔
+all false  (F F F F)  → lo marches to hi; you must decide what "no flip"
+                        means. Search [lo, hi+1] and a return of hi+1 is the
+                        honest "nothing satisfies P".
+```
+
+### The real-valued case
+
+When the answer is a real number there is no "next" value, so there is no exact flip to land on — you can only trap it in a shrinking bracket:
+
+```text
+integer domain : loop while lo < hi          → terminates exactly
+real domain    : loop while hi - lo > eps    → terminates at a precision
+                 or simply loop a FIXED 100 times (each halves the range,
+                 so any starting range is crushed below 1e-30)
+```
+
+The fixed-iteration form is preferred in interviews: it cannot infinite-loop on floating-point rounding, and 100 iterations is instant. Everything else — the `hi = mid` / `lo = mid` structure — is identical.
+
+### Steps
+
+```text
+Step 1 → Name the domain: what is x? An index, a version, a capacity, a real?
+Step 2 → Write P(x) as a boolean, and check out loud: does P(x) imply P(x+1)?
+Step 3 → Bracket it: lo definitely-false-or-smallest-legal, hi definitely-true.
+Step 4 → while lo < hi:
+             mid = lo + (hi-lo)/2
+             if P(mid) { hi = mid } else { lo = mid + 1 }
+         return lo
+Step 5 → If "no x satisfies P" is possible, search up to hi+1 and treat a
+         return of hi+1 as "not found".
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "first / smallest / minimum x such that <condition>"
+  "last / largest x such that <condition>"
+  an expensive check with a huge candidate range (versions, capacities, times)
+  "find the threshold", "find where it starts failing", "bisect"
+        ↓
+Think about...
+  "Write the condition as P(x). Is it F...F T...T along x?"
+        ↓
+Use...
+  the first-true boundary search
+    ├─ first true      → if P(mid): hi = mid   else lo = mid + 1
+    ├─ last true       → if P(mid): lo = mid   else hi = mid - 1
+    │                    and round mid UP:  mid = lo + (hi-lo+1)/2
+    ├─ may not exist   → search [lo, hi+1]; hi+1 back means "none"
+    └─ real-valued x   → 100 fixed halvings, or until hi - lo < 1e-9
+```
 
 ### Visual explanation
 
@@ -100,69 +214,186 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Monotonic Function: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+versions 1..7,  first bad = 5      P(v) = isBad(v)
+
+  v    :  1   2   3   4  │  5   6   7
+  P(v) :  F   F   F   F  │  T   T   T
+                         ↑ the flip = answer
+
+step 1   lo=1 ───────────────────── hi=7   mid=4   P(4)=F → lo = 5
+step 2                     lo=5 ─── hi=7   mid=6   P(6)=T → hi = 6
+step 3                     lo=5 hi=6       mid=5   P(5)=T → hi = 5
+step 4                     lo=hi=5                 answer = 5
+
+3 predicate calls instead of 5 — and only 30 for a billion versions.
 ```
 
 ### Interview explanation
-"This is a Monotonic Function Search problem. I'll if the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration. That brings the complexity down to O(log n) time and O(1) space — here's the template."
+"I'd model this as a monotone predicate rather than an array search. `isBad(v)` is false for a while and then true forever, so the answers form `F F F T T T` and the problem is just 'find the flip'. Probing the middle resolves half the range in one call: a `true` means the flip is at `mid` or earlier so I keep `mid` and set `hi = mid`; a `false` means it is strictly later so `lo = mid + 1`. That is O(log n) predicate calls and O(1) space. The same skeleton handles minimise-the-maximum problems — the domain becomes candidate answers instead of versions — and for a real-valued answer I'd run a fixed hundred halvings instead of looping to equality."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Binary Search** family template. Adapt the comparison/condition to the specific problem.
+> Find the flip. `FirstTrue` returns `hi+1` when nothing satisfies the predicate, so "not found" is never silently wrong.
 
 ```go
-// Lower bound: first index with a[i] >= target. Half-open invariant [lo, hi).
-func lowerBound(a []int, target int) int {
-    lo, hi := 0, len(a)
+// FirstTrue returns the smallest x in [lo, hi] with pred(x) == true, or hi+1
+// if pred is false everywhere. pred must be monotone: pred(x) implies pred(x+1).
+func FirstTrue(lo, hi int, pred func(int) bool) int {
+    hi++ // search [lo, hi+1]; hi+1 is the sentinel "no such x"
     for lo < hi {
-        mid := lo + (hi-lo)/2     // avoids overflow
-        if a[mid] < target {
-            lo = mid + 1
+        mid := lo + (hi-lo)/2
+        if pred(mid) {
+            hi = mid // mid may be the flip itself — keep it
         } else {
-            hi = mid
+            lo = mid + 1 // everything up to and including mid is false
         }
     }
     return lo
 }
+
+// LastTrue returns the largest x in [lo, hi] with pred(x) == true, or lo-1 if
+// pred is false everywhere. pred must be monotone the other way:
+// true...true false...false.
+func LastTrue(lo, hi int, pred func(int) bool) int {
+    lo-- // search [lo-1, hi]; lo-1 is the sentinel "no such x"
+    for lo < hi {
+        mid := lo + (hi-lo+1)/2 // round UP, or lo == mid stalls the loop
+        if pred(mid) {
+            lo = mid
+        } else {
+            hi = mid - 1
+        }
+    }
+    return lo
+}
+
+// BoundaryReal brackets the flip of a monotone real-valued predicate.
+// A fixed iteration count cannot loop forever on floating-point rounding;
+// each pass halves the bracket, so 100 passes crush any range below 1e-30.
+func BoundaryReal(lo, hi float64, pred func(float64) bool) float64 {
+    for i := 0; i < 100; i++ {
+        mid := lo + (hi-lo)/2
+        if pred(mid) {
+            hi = mid
+        } else {
+            lo = mid
+        }
+    }
+    return hi
+}
 ```
 
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def first_true(lo, hi, pred):
+    """Smallest x in [lo, hi] with pred(x), or hi+1 if none. pred is F...F T...T."""
+    hi += 1                             # hi+1 is the "no such x" sentinel
     while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        mid = lo + (hi - lo) // 2
+        if pred(mid):
+            hi = mid                    # mid may be the flip itself
         else:
+            lo = mid + 1                # everything through mid is false
+    return lo
+
+
+def last_true(lo, hi, pred):
+    """Largest x in [lo, hi] with pred(x), or lo-1 if none. pred is T...T F...F."""
+    lo -= 1                             # lo-1 is the "no such x" sentinel
+    while lo < hi:
+        mid = lo + (hi - lo + 1) // 2   # round UP or the loop stalls
+        if pred(mid):
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
+
+
+def boundary_real(lo, hi, pred):
+    """Bracket the flip of a monotone real-valued predicate."""
+    for _ in range(100):                # each pass halves the bracket
+        mid = lo + (hi - lo) / 2
+        if pred(mid):
             hi = mid
-    return lo                     # first index with a[i] >= target
+        else:
+            lo = mid
+    return hi
 ```
 
 ```java
-int lowerBound(int[] a, int target) {
-    int lo = 0, hi = a.length;
-    while (lo < hi) {
-        int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+import java.util.function.DoublePredicate;
+import java.util.function.IntPredicate;
+
+public class BoundarySearch {
+    /** Smallest x in [lo, hi] with pred(x), or hi+1 if none. */
+    public static int firstTrue(int lo, int hi, IntPredicate pred) {
+        hi++;                                   // "no such x" sentinel
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;
+            if (pred.test(mid)) hi = mid;       // mid may be the flip
+            else lo = mid + 1;                  // everything through mid is false
+        }
+        return lo;
     }
-    return lo;
+
+    /** Largest x in [lo, hi] with pred(x), or lo-1 if none. */
+    public static int lastTrue(int lo, int hi, IntPredicate pred) {
+        lo--;                                   // "no such x" sentinel
+        while (lo < hi) {
+            int mid = lo + (hi - lo + 1) / 2;   // round UP or the loop stalls
+            if (pred.test(mid)) lo = mid;
+            else hi = mid - 1;
+        }
+        return lo;
+    }
+
+    /** Bracket the flip of a monotone real-valued predicate. */
+    public static double boundaryReal(double lo, double hi, DoublePredicate pred) {
+        for (int i = 0; i < 100; i++) {         // each pass halves the bracket
+            double mid = lo + (hi - lo) / 2;
+            if (pred.test(mid)) hi = mid;
+            else lo = mid;
+        }
+        return hi;
+    }
 }
 ```
 
 ```cpp
-int lowerBound(vector<int>& a, int target) {
-    int lo = 0, hi = (int)a.size();
+#include <functional>
+
+// Smallest x in [lo, hi] with pred(x), or hi+1 if none.
+int firstTrue(int lo, int hi, const std::function<bool(int)>& pred) {
+    ++hi;                                   // "no such x" sentinel
     while (lo < hi) {
         int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+        if (pred(mid)) hi = mid;            // mid may be the flip
+        else lo = mid + 1;                  // everything through mid is false
     }
     return lo;
+}
+
+// Largest x in [lo, hi] with pred(x), or lo-1 if none.
+int lastTrue(int lo, int hi, const std::function<bool(int)>& pred) {
+    --lo;                                   // "no such x" sentinel
+    while (lo < hi) {
+        int mid = lo + (hi - lo + 1) / 2;   // round UP or the loop stalls
+        if (pred(mid)) lo = mid;
+        else hi = mid - 1;
+    }
+    return lo;
+}
+
+// Bracket the flip of a monotone real-valued predicate.
+double boundaryReal(double lo, double hi, const std::function<bool(double)>& pred) {
+    for (int i = 0; i < 100; ++i) {         // each pass halves the bracket
+        double mid = lo + (hi - lo) / 2;
+        if (pred(mid)) hi = mid;
+        else lo = mid;
+    }
+    return hi;
 }
 ```
 
@@ -248,123 +479,270 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — First Bad Version (LeetCode 278)
-Versions `1..n` are good then all bad. Given `isBadVersion(v)`, find the first bad one with the fewest API calls.
+Versions `1 … n` were released in order; from some version onward every one is bad. Given the API `isBadVersion(v)`, find the first bad version with the fewest calls.
 
 ### Thought Process
-1. The predicate `isBadVersion(v)` is monotonic: once true, it stays true — so the good/bad boundary is exactly a first-true search.
-2. Keep a closed interval `[lo, hi] = [1, n]` and always retain a candidate that could still be the first bad version.
-3. When `mid` is bad, the answer is `mid` or earlier (`hi = mid`); when good, it must be later (`lo = mid + 1`). Converge to the flip.
+1. Name the predicate: `P(v) = isBadVersion(v)`. The domain is the version numbers `1 … n`.
+2. Check monotonicity out loud: once a bug exists it is never un-introduced, so `P(v) ⇒ P(v+1)`. The answers are `F…F T…T`.
+3. So the answer is the flip, and a probe at `mid` classifies half the range for free.
+4. `P(mid)` true → the flip is `mid` or earlier, so `hi = mid` (keep `mid`, it might be it). False → the flip is strictly later, so `lo = mid + 1`.
+5. The problem guarantees at least one bad version, so no "not found" sentinel is needed.
 
 ### Dry Run
-n=5, versions 1,2,3,4,5 with 4,5 bad → answer 4.
-- lo=1, hi=5, mid=3 → isBad(3)=False → lo=4.
-- lo=4, hi=5, mid=4 → isBad(4)=True → hi=4.
-- lo==hi==4 → return 4. ✓
+
+Input: `n = 7`, first bad version is **5** (so `isBadVersion` is `F F F F T T T`)
+
+| step | lo | hi | mid | isBadVersion(mid) | reasoning | move |
+|------|----|----|-----|-------------------|-----------|------|
+| 1 | 1 | 7 | 4 | false | 1–4 are all good | `lo = 5` |
+| 2 | 5 | 7 | 6 | true | flip is at 6 or earlier | `hi = 6` |
+| 3 | 5 | 6 | 5 | true | flip is at 5 or earlier | `hi = 5` |
+| 4 | 5 | 5 | — | loop ends, `lo == hi` | | return **5** |
+
+Output: **5**  (3 API calls instead of 5)
+
+Rows 2 and 3 show the rule people get wrong. Both probes return `true`, yet neither returns `mid` on the spot — a `true` only proves *no later version* is the first bad one, never that `mid` itself is. `hi = mid` keeps `mid` alive as a candidate; only `lo == hi` proves the flip has been pinned down.
 
 ### Visualization
-```
-versions ──▶ 1  2  3 | 4  5      good...good | bad...bad
-predicate──▶ F  F  F | T  T      find the first T
-answer   ──▶ 4                   leftmost bad version
+
+```text
+version :  1    2    3    4  │  5    6    7
+isBad   :  F    F    F    F  │  T    T    T
+                             ↑ first true = 5
+
+step 1   lo=1 ─────────── mid=4 ─────────── hi=7    F → the flip is right
+step 2                          lo=5 mid=6  hi=7    T → the flip is here or left
+step 3                          lo=5 mid=5 hi=6     T → the flip is here or left
+step 4                          lo=hi=5             answer = 5 ✓
+
+range: 7 → 3 → 2 → 1
 ```
 
 ### Code
+
+```go
+// LeetCode supplies isBadVersion as an ambient API; taking it as a parameter
+// keeps this self-contained and makes the predicate explicit.
+func firstBadVersion(n int, isBadVersion func(int) bool) int {
+    lo, hi := 1, n
+    for lo < hi {
+        mid := lo + (hi-lo)/2 // lo + (hi-lo)/2, not (lo+hi)/2: no overflow
+        if isBadVersion(mid) {
+            hi = mid // mid may itself be the first bad one — keep it
+        } else {
+            lo = mid + 1 // mid is good, so are all before it
+        }
+    }
+    return lo // lo == hi == the flip
+}
+```
+
 ```python
-def firstBadVersion(n):
-    lo, hi = 1, n                       # closed interval [lo, hi]
+def firstBadVersion(n, isBadVersion):
+    lo, hi = 1, n
     while lo < hi:
-        mid = lo + (hi - lo) // 2       # avoid overflow
+        mid = lo + (hi - lo) // 2       # no overflow, unlike (lo + hi) // 2
         if isBadVersion(mid):
-            hi = mid                    # mid may be the first bad one
+            hi = mid                    # mid may BE the first bad version
         else:
-            lo = mid + 1                # first bad is strictly after mid
-    return lo                           # lo == hi == first bad version
+            lo = mid + 1                # mid is good, so is everything before
+    return lo                           # lo == hi == the flip
 ```
 
 ### Complexity
-Time O(log n) API calls, Space O(1).
+Time O(log n) predicate calls — about 30 for a billion versions. Space O(1).
 
 ## 10. Solved Example 2
 
 ### Problem — Kth Missing Positive Number (LeetCode 1539)
-Given a strictly increasing array `arr`, return the `k`-th positive integer missing from it.
+Given a strictly increasing array `arr` of positive integers, return the `k`-th positive integer that is **missing** from it.
 
 ### Thought Process
-1. At index `i`, the count of positives missing before `arr[i]` is `missing(i) = arr[i] - (i + 1)` — a non-decreasing (monotonic) function.
-2. Binary-search the first index where `missing(i) >= k`; that brackets where the k-th missing number lands.
-3. After the loop `lo` is that boundary, and the answer is simply `k + lo` (k positions past the `lo` present numbers to its left).
+1. The trick is finding a monotone quantity. Define `missing(i) = arr[i] - (i + 1)`: how many positive integers are absent *before* `arr[i]`.
+2. Why that formula: by index `i` the array has supplied `i+1` numbers, but `arr[i]` itself is the `arr[i]`-th positive integer — the gap between them is exactly the count of skipped numbers.
+3. `missing` is non-decreasing (the array is strictly increasing), so `P(i) = missing(i) >= k` is `F…F T…T`. Find the first true.
+4. After the loop, `lo` = how many array elements sit *below* the k-th missing number.
+5. So the answer is `k + lo`: the k-th missing number has `k-1` missing numbers and `lo` present numbers beneath it, making it the `(k + lo)`-th positive integer.
 
 ### Dry Run
-arr=[2,3,4,7,11], k=5 → answer 9.
-- missing = [0,0,0,3,6]; want first missing(i) >= 5.
-- lo=0, hi=5, mid=2 → missing=0 < 5 → lo=3.
-- lo=3, hi=5, mid=4 → missing=6 >= 5 → hi=4.
-- lo=3, hi=4, mid=3 → missing=3 < 5 → lo=4 == hi. answer = k + lo = 5 + 4 = 9. ✓
+
+Input: `arr = [2, 3, 4, 7, 11]`, `k = 5`
+
+First, the derived table (verify this by hand — it is the whole algorithm):
+
+| i | arr[i] | i + 1 | missing(i) = arr[i] − (i+1) |
+|---|--------|-------|------------------------------|
+| 0 | 2 | 1 | **1** (missing: 1) |
+| 1 | 3 | 2 | **1** |
+| 2 | 4 | 3 | **1** |
+| 3 | 7 | 4 | **3** (missing: 1, 5, 6) |
+| 4 | 11 | 5 | **6** (missing: 1, 5, 6, 8, 9, 10) |
+
+Now the search for the first `i` with `missing(i) >= 5`, over the half-open range `[0, 5)`:
+
+| step | lo | hi | mid | missing(mid) | ≥ 5 ? | move |
+|------|----|----|-----|--------------|-------|------|
+| 1 | 0 | 5 | 2 | 1 | no | `lo = 3` |
+| 2 | 3 | 5 | 4 | 6 | yes | `hi = 4` |
+| 3 | 3 | 4 | 3 | 3 | no | `lo = 4` |
+| 4 | 4 | 4 | — | loop ends | | `lo = 4` |
+
+Answer = `k + lo` = `5 + 4` = **9**
+
+Check by hand: the missing positives are 1, 5, 6, 8, **9**, 10, 12… — the 5th is indeed 9. And `lo = 4` is right: exactly four array elements (2, 3, 4, 7) lie below 9.
 
 ### Visualization
-```
-arr      ──▶ 2  3  4  7  11
-missing  ──▶ 0  0  0  3   6      arr[i]-(i+1), monotonic
-k=5      ──▶ first index with missing >= k is lo=4
-answer   ──▶ k + lo = 9
+
+```text
+positives :  1   2   3   4   5   6   7   8   9  10  11
+arr has   :      ●   ●   ●           ●              ●
+missing   :  ✗           ✗   ✗   ✗       ✗   ✗   ✗
+count     :  1           2   3       4   5              ← k = 5 lands on 9
+
+index i   :  0   1   2   3   4
+missing(i):  1   1   1   3   6
+P(i)=≥5   :  F   F   F   F   T
+                             ↑ lo = 4    answer = k + lo = 9
 ```
 
 ### Code
+
+```go
+func findKthPositive(arr []int, k int) int {
+    // missing(i) = arr[i] - (i+1) = how many positives are absent before arr[i].
+    // Non-decreasing because arr is strictly increasing, so P(i) = missing(i)>=k
+    // is monotone and we can binary search the flip.
+    lo, hi := 0, len(arr) // half-open [lo, hi); hi == len(arr) means "past the end"
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if arr[mid]-(mid+1) < k {
+            lo = mid + 1 // fewer than k missing up to mid — go right
+        } else {
+            hi = mid // mid may be the first index with >= k missing
+        }
+    }
+    // lo array elements lie below the answer, plus k-1 missing ones below it,
+    // so the answer is the (k + lo)-th positive integer.
+    return k + lo
+}
+```
+
 ```python
 def findKthPositive(arr, k):
-    lo, hi = 0, len(arr)                # half-open [lo, hi]
+    # missing(i) = arr[i] - (i+1) counts positives absent before arr[i];
+    # it is non-decreasing, so "missing(i) >= k" is F...F T...T.
+    lo, hi = 0, len(arr)               # half-open; hi == len(arr) means past end
     while lo < hi:
-        mid = (lo + hi) // 2
-        if arr[mid] - (mid + 1) < k:    # fewer than k missing up to mid
-            lo = mid + 1
+        mid = lo + (hi - lo) // 2
+        if arr[mid] - (mid + 1) < k:
+            lo = mid + 1               # fewer than k missing up to mid
         else:
-            hi = mid
-    return k + lo                       # k-th missing positive
+            hi = mid                   # mid may be the first index with >= k
+    # lo present numbers sit below the answer, plus k-1 missing ones.
+    return k + lo
 ```
 
 ### Complexity
-Time O(log n), Space O(1).
+Time O(log n) — a pure boundary search; the `missing` values are computed on the fly, never materialised. Space O(1). (The naive walk over the positives is O(n + k).)
 
 ## 11. Solved Example 3
 
 ### Problem — Minimum Time to Complete Trips (LeetCode 2187)
-Each bus `i` takes `time[i]` per trip. Find the minimum time `t` for the fleet to make `totalTrips` trips in total.
+Bus `i` takes `time[i]` minutes per trip and runs continuously. Return the minimum number of minutes needed for the fleet to complete `totalTrips` trips in total.
 
 ### Thought Process
-1. In time `t`, bus `i` completes `t // time[i]` trips, so `feasible(t) = sum(t // x for x in time) >= totalTrips` is monotonic in `t`.
-2. Binary-search the answer over `t in [1, min(time) * totalTrips]` — the upper bound uses the fastest bus doing every trip alone.
-3. Shrink toward the smallest `t` for which `feasible(t)` is true (a first-true search on the answer space).
+1. Here the domain is not an index at all — it is *time*, a candidate answer. This is chapter 25's move stated in chapter 28's language.
+2. In `t` minutes bus `i` finishes `t / time[i]` trips (integer division), so `tripsBy(t) = Σ t / time[i]`.
+3. `P(t) = tripsBy(t) >= totalTrips` is monotone: more time never produces fewer trips. `F…F T…T` again.
+4. Bracket it: `lo = 1` (any answer is at least one minute) and `hi = min(time) * totalTrips` — the fastest bus alone could do every trip in that long, so `P(hi)` is certainly true.
+5. First-true search over `[1, hi]`.
 
 ### Dry Run
-time=[1,2,3], totalTrips=5 → answer 3.
-- lo=1, hi=5, mid=3 → 3//1+3//2+3//3 = 3+1+1 = 5 >= 5 → feasible → hi=3.
-- lo=1, hi=3, mid=2 → 2+1+0 = 3 < 5 → not feasible → lo=3.
-- lo==hi==3 → return 3. ✓
+
+Input: `time = [1, 2, 3]`, `totalTrips = 5` → range `[1, 1 × 5] = [1, 5]`
+
+| step | lo | hi | mid (t) | trips = ⌊t/1⌋ + ⌊t/2⌋ + ⌊t/3⌋ | ≥ 5 ? | move |
+|------|----|----|---------|----------------------------------|-------|------|
+| 1 | 1 | 5 | 3 | 3 + 1 + 1 = **5** | yes | `hi = 3` |
+| 2 | 1 | 3 | 2 | 2 + 1 + 0 = **3** | no | `lo = 3` |
+| 3 | 3 | 3 | — | loop ends, `lo == hi` | | return **3** |
+
+Output: **3**
+
+Row 2 shows the integer-division cliff that makes brute-forcing `t` pointless: between `t = 2` and `t = 3` the trip count jumps from 3 to 5, skipping 4 entirely. The predicate handles this without comment — it only ever asks "enough or not?", never "exactly how many?".
 
 ### Visualization
-```
-t        ──▶ 1  2  3  4  5      candidate answers
-feasible ──▶ F  F  T  T  T      sum(t//x) >= totalTrips, monotonic
-answer   ──▶ 3                  smallest feasible t
+
+```text
+t          :  1    2    3    4    5
+bus(1 min) :  1    2    3    4    5
+bus(2 min) :  0    1    1    2    2
+bus(3 min) :  0    0    1    1    1
+             ───────────────────────
+total trips:  1    3    5    7    8
+P(t) >= 5  :  F    F    T    T    T
+                       ↑ first true = 3 = answer
+
+step 1   lo=1 ─────── mid=3 ─────── hi=5    5 >= 5  T → hi = 3
+step 2   lo=1 mid=2   hi=3                  3 >= 5  F → lo = 3
+step 3            lo=hi=3                            answer = 3 ✓
 ```
 
 ### Code
+
+```go
+func minimumTime(time []int, totalTrips int) int {
+    // P(t): can the fleet finish totalTrips within t minutes?
+    // Monotone: more time never yields fewer trips.
+    enough := func(t int) bool {
+        trips := 0
+        for _, x := range time {
+            trips += t / x // whole trips bus x completes in t minutes
+            if trips >= totalTrips {
+                return true // early exit: the sum only grows
+            }
+        }
+        return trips >= totalTrips
+    }
+
+    fastest := time[0]
+    for _, x := range time {
+        fastest = min(fastest, x)
+    }
+
+    lo, hi := 1, fastest*totalTrips // the fastest bus alone could do it all
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if enough(mid) {
+            hi = mid // this much time works; try less
+        } else {
+            lo = mid + 1 // not enough time, nor is anything shorter
+        }
+    }
+    return lo
+}
+```
+
 ```python
 def minimumTime(time, totalTrips):
-    lo, hi = 1, min(time) * totalTrips          # fastest bus alone bounds it
+    def enough(t):
+        """Can the fleet finish totalTrips within t minutes? Monotone in t."""
+        return sum(t // x for x in time) >= totalTrips
+
+    lo, hi = 1, min(time) * totalTrips   # fastest bus alone could do it all
     while lo < hi:
-        mid = (lo + hi) // 2
-        trips = sum(mid // x for x in time)
-        if trips >= totalTrips:
-            hi = mid                            # mid works, try smaller
+        mid = lo + (hi - lo) // 2
+        if enough(mid):
+            hi = mid                     # this much time works; try less
         else:
-            lo = mid + 1                        # need more time
-    return lo                                   # min feasible time
+            lo = mid + 1                 # not enough, nor is anything shorter
+    return lo
 ```
 
 ### Complexity
-Time O(n log(min(time)·totalTrips)), Space O(1).
+Time O(n · log(min(time) · totalTrips)) — one O(n) predicate evaluation per halving. Space O(1). Enumerating every minute would be O(min(time) · totalTrips), which is up to 10¹⁴.
 
+---
 
 ## 12. LeetCode Practice Set
 

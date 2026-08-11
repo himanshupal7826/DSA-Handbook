@@ -41,32 +41,148 @@ next greater, monotonic stack, circular, to the right.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"For each element, what is the first element to its **right** that is strictly greater?"*
+
+Running example: `nums = [2, 1, 2, 4, 3]`. The answers are `[4, 2, 4, -1, -1]`.
+
 ### Intuition
-For each element scan outward to find the next/previous greater or smaller — O(n^2).
+Take one element at a time, walk rightwards, and stop at the first bigger value. Nothing
+to stop at? The answer is `-1`. Repeat for all `n` elements.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each index `i` from `0` to `n-1`:
+2. Walk `j = i+1, i+2, …` to the right.
+3. If `nums[j] > nums[i]`, record `nums[j]` as the answer and stop.
+4. If the walk falls off the end, record `-1`.
+5. Return the array of answers.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n²)** — the walk from `i` can cross the whole tail. A descending array like
+  `[5, 4, 3, 2, 1]` costs 4 + 3 + 2 + 1 = 10 steps and every answer is `-1`.
+- Space: O(1) beyond the output.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Next Greater Element pattern is built to use.
+- **The exact wasted work.** On `[2, 1, 2, 4, 3]` the walk from `i=0` visits indices 1, 2, 3
+  and stops at the `4`. Along the way it stepped over index 1 (`1`) and index 2 (`2`) — and
+  it had *already computed* their answers on that very walk (`2` for index 1, `4` for index
+  2). It throws both away, then recomputes them one loop later.
+- **The fact it never exploits.** Every element the walk steps over is `<=` the element it
+  started from. Such an element is beaten twice over: it sits further left *and* it is no
+  bigger. Nothing to the right will ever pick it. The brute force keeps re-visiting these
+  dead elements; the optimal approach removes them from the world.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Next Greater Element invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **A bigger element arriving answers every smaller element still waiting — all at once — and those elements are then dead forever, because the newcomer is nearer and bigger than any of them.**
+
+Think of a queue of people waiting to be told "who is the first person taller than me
+further along?". When a tall person walks in, everyone shorter who is still waiting gets
+their answer simultaneously and goes home. Nobody arriving later needs them: the tall
+newcomer stands in front of them and is bigger, so it would always be chosen first. The
+people still waiting are therefore in **decreasing** order of height.
+
+### The thought process
+
+```text
+We need    : for each i, the first element to the right that is greater
+Obvious way: walk right from every i
+Too slow   : O(n^2) — the same descending run is re-walked from every start inside it
+Notice     : a walk that steps over j has proved nums[j] <= nums[i]; from then on
+             j is dead — anything that could answer j is met by i first
+Therefore  : keep only the elements still WAITING for an answer; when nums[i] arrives
+             it answers, and removes, every waiting element smaller than it
+Now        : the waiting list is always decreasing, removals happen from its newest
+             end, and every index enters and leaves once → O(n)
+```
+
+### Why "resolve on pop" is the whole trick
+
+The stack is not the idea; it is the consequence. The idea is the *waiting list* of indices
+whose answer has not appeared yet.
+
+1. **The waiting list is decreasing.** If `j < i` were both waiting with
+   `nums[j] <= nums[i]`, then `i` itself would already have answered `j`. So it can't
+   happen: values decrease from the oldest entry to the newest.
+2. **Removals are newest-first.** The newest waiter holds the smallest value, so an
+   incoming value clears waiters from the newest end and stops as soon as it meets someone
+   bigger. Newest-in, newest-out — a stack.
+3. **The popped element's answer is the *nearest* one.** When `i` pops `j`, no index `k`
+   between them was greater: had `nums[k] > nums[j]`, `k` would have cleared everything
+   above `j` (all smaller than `nums[j]`) and then `j` too, so `j` would not still be
+   waiting. Therefore `i` is genuinely the *first* greater element to the right of `j`.
+4. **Leftovers are the answer-less ones.** Whatever is still on the stack after the pass has
+   nothing greater to its right — that is where the `-1`s come from, and it is why you
+   initialise the result array to `-1` and never write it again.
+
+**Store indices, not values.** The value is `nums[stack[top]]`, one lookup away; the
+position is unrecoverable from the value. Positions are what the variants need: the
+*distance* `i - j` (LeetCode 739), the *width* between boundaries (LeetCode 84), the *span*
+(LeetCode 901). Values-on-the-stack only works when the problem asks purely for values, as
+in LeetCode 496 — and even then indices cost nothing extra.
+
+### The direction table (identical in every chapter of this family)
+
+| You want, for each `i` … | Scan | Stack values | Pop while | Read the answer from |
+|---|---|---|---|---|
+| **next greater** to the right | left → right | **decreasing** | `nums[top] <= nums[i]` | the pop — `i` is the popped index's answer |
+| **previous greater** to the left | left → right | **decreasing** | `nums[top] <= nums[i]` | what is left on top *before* pushing `i` |
+| **next smaller** to the right | left → right | increasing | `nums[top] >= nums[i]` | the pop — `i` is the popped index's answer |
+| **previous smaller** to the left | left → right | increasing | `nums[top] >= nums[i]` | what is left on top *before* pushing `i` |
+
+The four rows are really **two passes**: rows 1–2 are one decreasing-stack pass read in two
+ways, rows 3–4 one increasing-stack pass read in two ways. This chapter lives in row 1;
+chapter 37 lives in row 2 with the very same code.
+
+**Duplicates — where the strictness goes.** In one pass the two readings get opposite
+strictness, and you cannot have both strict:
+
+```text
+pop while nums[top] <  nums[i]  →  pop gives "next strictly greater",
+                                   top gives "previous greater-or-equal"
+pop while nums[top] <= nums[i]  →  pop gives "next greater-or-equal",
+                                   top gives "previous strictly greater"
+```
+
+"Next greater" is conventionally **strict**, so this chapter pops with `<`. On the running
+example that matters: at `i=2` the value `2` does *not* pop the earlier `2`, so index 0's
+answer becomes `4` and not `2`.
+
+### Steps
+
+```text
+Step 1 → res[i] = -1 for all i; stack = empty list of INDICES
+Step 2 → for i = 0 … n-1:
+Step 3 →   while stack is non-empty and nums[stack.top] < nums[i]:
+Step 4 →       j = pop  →  res[j] = nums[i]        (i answers j)
+Step 5 →   push i                                  (i now waits for its own answer)
+Step 6 → leftovers keep res = -1
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "next greater element", "first larger to the right", "next warmer / taller / louder",
+  "how many days until", "circular array, next greater", "next bigger permutation",
+  n up to 1e5 and an obvious per-element rightward scan
+        ↓
+Think about...
+  "When this bigger value arrives, whose question does it answer — and who dies with it?"
+        ↓
+Use...
+  A decreasing stack of indices, popping while top < current.
+    want the value    → res[j] = nums[i]
+    want the distance → res[j] = i - j                     (chapter 39)
+    circular array    → loop i = 0 … 2n-1 over i % n, push only while i < n
+    subset lookup     → record answers in a value → answer map (LeetCode 496)
+    look leftwards    → same code, read the surviving top  (chapter 37)
+```
 
 ### Visual explanation
 
@@ -95,57 +211,122 @@ A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relat
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Next Greater Eleme: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums  =   2    1    2    4    3
+index     0    1    2    3    4
+res   =  -1   -1   -1   -1   -1        (everyone starts unanswered)
+
+i=0 v=2  nothing to answer                     push 0 → stack(vals) [2]
+i=1 v=1  2 < 1? no                             push 1 → [2,1]
+i=2 v=2  1 < 2 → pop 1, res[1] = 2
+         2 < 2? NO — equal is not greater      push 2 → [2,2]
+i=3 v=4  2 < 4 → pop 2, res[2] = 4
+         2 < 4 → pop 0, res[0] = 4             push 3 → [4]
+i=4 v=3  4 < 3? no                             push 4 → [4,3]
+
+leftovers on the stack: indices 3 and 4  →  res stays -1 for both
+
+res   =   4    2    4   -1   -1
 ```
 
+Five pushes, three pops, one pass — versus the brute force's ten steps.
+
 ### Interview explanation
-"This is a Next Greater Element problem. I'll a stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element. That brings the complexity down to O(n) time and O(n) space — here's the template."
+"For every element I need the first larger element on its right. Scanning right from each
+index redoes the same walk, so instead I keep a stack of *indices that are still waiting for
+an answer*. When a new value arrives it pops — and answers — every waiting index smaller
+than itself; those indices are then gone for good, because the newcomer is both nearer and
+bigger, so nobody later could ever pick them. The waiting values are always decreasing, the
+pops always happen at the newest end, and whatever remains at the end has no greater element
+to its right, which gives the `-1`s. Each index is pushed once and popped at most once, so
+it's O(n) time and O(n) space. For a circular array I run the loop `2n` times over `i % n`
+and only push during the first lap."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Stacks** family template. Adapt the comparison/condition to the specific problem.
+> **Everyone on the stack is still waiting; the incoming value answers all the smaller ones and they never come back.**
 
 ```go
-// Next greater element to the right using a monotonic decreasing stack.
-func nextGreater(nums []int) []int {
-    res := make([]int, len(nums))
-    for i := range res { res[i] = -1 }
-    stack := []int{} // indices, values decreasing from bottom to top
-    for i, v := range nums {
-        for len(stack) > 0 && nums[stack[len(stack)-1]] < v {
-            top := stack[len(stack)-1]
-            stack = stack[:len(stack)-1]
-            res[top] = v
-        }
-        stack = append(stack, i)
-    }
-    return res
+// nextGreaterIndex returns, for every i, the index of the first strictly greater
+// element to the right, or -1 when there is none. Take nums[res[i]] for the value
+// or res[i]-i for the distance — that is why the stack holds indices.
+func nextGreaterIndex(nums []int) []int {
+	res := make([]int, len(nums))
+	for i := range res {
+		res[i] = -1
+	}
+	stack := make([]int, 0, len(nums)) // indices still waiting; values decreasing
+	for i, v := range nums {
+		for len(stack) > 0 && nums[stack[len(stack)-1]] < v { // strict: equal keeps waiting
+			j := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			res[j] = i
+		}
+		stack = append(stack, i)
+	}
+	return res // indices never popped keep -1
+}
+
+// nextGreaterCircular is the same routine on a circular array: two laps, push once.
+func nextGreaterCircular(nums []int) []int {
+	n := len(nums)
+	res := make([]int, n)
+	for i := range res {
+		res[i] = -1
+	}
+	stack := make([]int, 0, n)
+	for i := 0; i < 2*n; i++ {
+		v := nums[i%n]
+		for len(stack) > 0 && nums[stack[len(stack)-1]] < v {
+			j := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			res[j] = i % n
+		}
+		if i < n {
+			stack = append(stack, i)
+		}
+	}
+	return res
 }
 ```
 
 ```python
-def next_greater(nums):
+def next_greater_index(nums):
+    """res[i] = index of the first strictly greater element to the right, else -1."""
     res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
+    stack = []                                  # indices waiting, values decreasing
     for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
+        while stack and nums[stack[-1]] < v:    # strict: equal keeps waiting
+            res[stack.pop()] = i
         stack.append(i)
+    return res
+
+
+def next_greater_circular(nums):
+    n = len(nums)
+    res = [-1] * n
+    stack = []
+    for i in range(2 * n):
+        v = nums[i % n]
+        while stack and nums[stack[-1]] < v:
+            res[stack.pop()] = i % n
+        if i < n:                               # push only on the first lap
+            stack.append(i)
     return res
 ```
 
 ```java
-int[] nextGreater(int[] nums) {
-    int[] res = new int[nums.length];
+// res[i] = index of the first strictly greater element to the right, else -1.
+int[] nextGreaterIndex(int[] nums) {
+    int n = nums.length;
+    int[] res = new int[n];
     Arrays.fill(res, -1);
-    Deque<Integer> stack = new ArrayDeque<>();
-    for (int i = 0; i < nums.length; i++) {
+    Deque<Integer> stack = new ArrayDeque<>();  // indices waiting, values decreasing
+    for (int i = 0; i < n; i++) {
         while (!stack.isEmpty() && nums[stack.peek()] < nums[i])
-            res[stack.pop()] = nums[i];
+            res[stack.pop()] = i;
         stack.push(i);
     }
     return res;
@@ -153,14 +334,16 @@ int[] nextGreater(int[] nums) {
 ```
 
 ```cpp
-vector<int> nextGreater(vector<int>& nums) {
-    vector<int> res(nums.size(), -1);
-    stack<int> st;                  // indices
-    for (int i = 0; i < (int)nums.size(); ++i) {
-        while (!st.empty() && nums[st.top()] < nums[i]) {
-            res[st.top()] = nums[i]; st.pop();
+// res[i] = index of the first strictly greater element to the right, else -1.
+vector<int> nextGreaterIndex(const vector<int>& nums) {
+    int n = nums.size();
+    vector<int> res(n, -1), stack;              // stack holds indices
+    for (int i = 0; i < n; ++i) {
+        while (!stack.empty() && nums[stack.back()] < nums[i]) {
+            res[stack.back()] = i;
+            stack.pop_back();
         }
-        st.push(i);
+        stack.push_back(i);
     }
     return res;
 }
@@ -248,127 +431,296 @@ vector<int> nextGreater(vector<int>& nums) {
 ## 9. Solved Example 1
 
 ### Problem — Next Greater I (LeetCode 496)
-A representative **Next Greater Element** problem. The signal: stack scan to find each element's next strictly greater neighbor.
+`nums1` is a subset of `nums2`, all values distinct. For each value of `nums1`, return the
+first value to its **right in `nums2`** that is greater, or `-1`.
 
 ### Thought Process
-1. Scan `nums2` with a decreasing monotonic stack; when the current value exceeds the stack top, it is that top's next greater element — record it in a hash map.
-2. Any values still on the stack at the end have no greater element, so they default to -1.
-3. Answer each query in `nums1` by a direct lookup in the map (nums1 is a subset of nums2).
+1. Solve the general question on `nums2` first: one decreasing-stack pass gives every
+   position its next greater element.
+2. The queries arrive as *values*, not positions, and the values are distinct — so record
+   each answer in a map `value → next greater value` as the pop happens.
+3. Positions never popped have no greater element to their right, so they never enter the
+   map.
+4. Answer each `nums1[k]` with a map lookup defaulting to `-1`.
 
 ### Dry Run
-`nums1=[4,1,2]`, `nums2=[1,3,4,2]`.
-- 1 pushed; 3>1 → map[1]=3, push 3; 4>3 → map[3]=4, push 4; 2<4 → push 2. Leftover 4,2 → -1.
-- map={1:3, 3:4, 4:-1, 2:-1}.
-- Lookups: 4→-1, 1→3, 2→-1 ⇒ `[-1, 3, -1]`.
+
+Input: `nums1 = [4, 1, 2]`, `nums2 = [1, 3, 4, 2]`
+
+| i | `nums2[i]` | pops (`j` → `res`) | stack after (indices) | stack values | map so far |
+|---|---|---|---|---|---|
+| 0 | 1 | — | `[0]` | `[1]` | `{}` |
+| 1 | 3 | `0` → `1's answer = 3` | `[1]` | `[3]` | `{1:3}` |
+| 2 | 4 | `1` → `3's answer = 4` | `[2]` | `[4]` | `{1:3, 3:4}` |
+| 3 | 2 | none (`4 > 2`) | `[2,3]` | `[4,2]` | `{1:3, 3:4}` |
+
+Leftover indices 2 and 3 (values `4`, `2`) never found anything greater.
+Lookups: `4 → -1`, `1 → 3`, `2 → -1`.
+
+Output: **`[-1, 3, -1]`**
 
 ### Visualization
-```
-input  ──▶ [ apply Next Greater Element step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums2 =  1    3    4    2
+         └───▶3                     3 pops 1 and becomes its answer
+              └───▶4                4 pops 3 and becomes its answer
+                        (2 is still waiting when the array ends)
+
+stack values:  [1]  →  [3]  →  [4]  →  [4,2]
+                                        ^^^^ leftovers → -1
+
+nums1 =  4    1    2
+         ↓    ↓    ↓
+        -1    3   -1
 ```
 
 ### Code
+
+```go
+func nextGreaterElement(nums1 []int, nums2 []int) []int {
+	answer := make(map[int]int, len(nums2))
+	stack := make([]int, 0, len(nums2)) // indices into nums2; values decreasing
+	for i, v := range nums2 {
+		for len(stack) > 0 && nums2[stack[len(stack)-1]] < v {
+			j := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			answer[nums2[j]] = v // v is the first greater element to the right of j
+		}
+		stack = append(stack, i)
+	}
+	res := make([]int, len(nums1))
+	for k, v := range nums1 {
+		if g, ok := answer[v]; ok {
+			res[k] = g
+		} else {
+			res[k] = -1
+		}
+	}
+	return res
+}
+```
+
 ```python
 def nextGreaterElement(nums1, nums2):
-    next_greater = {}
-    stack = []                      # values, decreasing
-    for v in nums2:
-        while stack and stack[-1] < v:
-            next_greater[stack.pop()] = v
-        stack.append(v)
-    return [next_greater.get(v, -1) for v in nums1]
+    answer = {}
+    stack = []                                  # indices into nums2, values decreasing
+    for i, v in enumerate(nums2):
+        while stack and nums2[stack[-1]] < v:
+            answer[nums2[stack.pop()]] = v
+        stack.append(i)
+    return [answer.get(v, -1) for v in nums1]
 ```
 
 ### Complexity
-Time O(n + m), Space O(n) for the stack and map (n = len(nums2), m = len(nums1)).
+Time O(n + m) — one pass over `nums2` (n elements, each pushed and popped once) plus one
+lookup per element of `nums1` (m). Space O(n) for the stack and map.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Next Greater II (LeetCode 503)
-A representative **Next Greater Element** problem. The signal: stack scan to find each element's next strictly greater neighbor.
+The array is **circular**: the search for a greater element continues past the last element
+back to the first. Return each element's next greater value, or `-1`.
 
 ### Thought Process
-1. The array is circular, so simulate two passes by iterating indices `0 .. 2n-1` and using `i % n` to wrap around.
-2. Keep a decreasing monotonic stack of indices; when the current value beats the value at the stack top, that top's next greater element is found.
-3. Only assign results during the first conceptual pass isn't needed — the modulo indexing lets later elements resolve earlier ones; leftovers stay -1.
+1. Circularity only means an element may be answered by something to its left — but only
+   after the scan has wrapped once.
+2. Simulate the wrap with `i = 0 … 2n-1`, reading `nums[i % n]`. Two laps suffice: after one
+   full lap, anything still waiting is a maximum of the array, and no further lap can help.
+3. **Push only while `i < n`.** On lap 2 the entries are re-read but never re-pushed —
+   otherwise the same position could sit on the stack twice and get answered twice.
+4. Everything still waiting at the end is `-1`.
 
 ### Dry Run
-`nums=[1,2,1]`, n=3, loop i=0..5 (index = i % n).
-- i=0 (1): push 0 → stack=[0]. i=1 (2): nums[0]=1<2 → res[0]=2, pop; push 1 → stack=[1].
-- i=2 (1): 2<1? no; push 2 → stack=[1,2]. i=3 (1): no pop, i≥n so no push.
-- i=4 (2): nums[2]=1<2 → res[2]=2, pop → stack=[1]. i=5 (1): no pop.
-- Result `[2, -1, 2]`.
+
+Input: `nums = [3, 8, 4, 1]` (n = 4, so `i` runs 0…7)
+
+| i | `i%n` | value | pops (`j` → `res[j]`) | push? | stack after (indices) |
+|---|---|---|---|---|---|
+| 0 | 0 | 3 | — | yes | `[0]` |
+| 1 | 1 | 8 | `0` → `res[0]=8` | yes | `[1]` |
+| 2 | 2 | 4 | none (`8 > 4`) | yes | `[1,2]` |
+| 3 | 3 | 1 | none (`4 > 1`) | yes | `[1,2,3]` |
+| 4 | 0 | 3 | `3` → `res[3]=3` | no (lap 2) | `[1,2]` |
+| 5 | 1 | 8 | `2` → `res[2]=8`, stop (`8 = 8`) | no (lap 2) | `[1]` |
+| 6 | 2 | 4 | none | no (lap 2) | `[1]` |
+| 7 | 3 | 1 | none | no (lap 2) | `[1]` |
+
+Index 1 (value 8, the maximum) is never popped → `res[1] = -1`.
+
+Output: **`[8, -1, 8, 3]`**
+
+Rows `i=4` and `i=5` are the point of lap 2: indices 3 and 2 are answered by elements that
+lie to their **left** in the original array. Row `i=5` also shows the strict comparison — the
+`8` at position 1 does not pop itself.
 
 ### Visualization
-```
-input  ──▶ [ apply Next Greater Element step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+index    0    1    2    3  ╎  0    1    2    3
+value    3    8    4    1  ╎  3    8    4    1
+         └───▶8            ╎  ▲    ▲
+                           ╎  │    └── answers index 2 (wrapped)
+                           ╎  └─────── answers index 3 (wrapped)
+                          lap 2: read only, never push
+
+res =    8   -1    8    3
+              ^ the maximum is answered by nobody
 ```
 
 ### Code
+
+```go
+func nextGreaterElements(nums []int) []int {
+	n := len(nums)
+	res := make([]int, n)
+	for i := range res {
+		res[i] = -1
+	}
+	stack := make([]int, 0, n) // indices still waiting; values decreasing
+	for i := 0; i < 2*n; i++ {
+		v := nums[i%n]
+		for len(stack) > 0 && nums[stack[len(stack)-1]] < v {
+			j := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			res[j] = v
+		}
+		if i < n { // lap 2 answers, it never enqueues
+			stack = append(stack, i)
+		}
+	}
+	return res
+}
+```
+
 ```python
 def nextGreaterElements(nums):
     n = len(nums)
     res = [-1] * n
-    stack = []                      # indices, values decreasing
+    stack = []                                  # indices waiting, values decreasing
     for i in range(2 * n):
         v = nums[i % n]
         while stack and nums[stack[-1]] < v:
             res[stack.pop()] = v
-        if i < n:
+        if i < n:                               # lap 2 answers, never enqueues
             stack.append(i)
     return res
 ```
 
 ### Complexity
-Time O(n), Space O(n). Two passes over n elements; each index pushed/popped at most once.
+Time O(n) — `2n` iterations, `n` pushes and at most `n` pops. Space O(n) for the stack.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Next Greater III (LeetCode 556)
-A representative **Next Greater Element** problem. The signal: stack scan to find each element's next strictly greater neighbor.
+Given a positive integer `n`, find the smallest integer that uses exactly the same digits
+and is **greater than `n`**. Return `-1` if none exists or if it does not fit in 32 bits.
 
 ### Thought Process
-1. This is the "next permutation" of `n`'s digits: scan from the right for the first index `i` where `d[i] < d[i+1]` (the pivot). If none exists the digits are descending — no greater permutation, return -1.
-2. Scan from the right for the smallest digit greater than `d[i]` and swap it with `d[i]`.
-3. Reverse the suffix after `i` to make it the smallest arrangement, then check the result fits in a 32-bit signed int (≤ 2^31 − 1).
+1. Same question, different alphabet: instead of "next greater element" we want "next
+   greater *arrangement*" — the next permutation of the digit string.
+2. Scan from the right while digits are non-increasing. That suffix is already the largest
+   arrangement of itself, so nothing inside it can grow — it is exactly the "decreasing run"
+   this chapter keeps popping, except here the array itself stores it.
+3. The first digit that breaks the run is the **pivot**. To grow the number as little as
+   possible, swap the pivot with the *smallest digit to its right that is still bigger than
+   it* — that digit is the rightmost one greater than the pivot, since the suffix descends.
+4. After the swap the suffix is still descending, so reverse it to make it ascending — the
+   smallest possible tail.
+5. Reject the result if it overflows a signed 32-bit integer.
+
+*(LeetCode names this function `nextGreaterElement` too; it is renamed here so it does not
+collide with Example 1.)*
 
 ### Dry Run
-`n=12` → digits `[1,2]`.
-- Pivot: rightmost `i` with `d[i]<d[i+1]` is i=0 (1<2).
-- Swap d[0] with smallest larger digit to its right (2) → `[2,1]`.
-- Reverse suffix after i=0 (single digit) → `21`; fits in 32-bit ⇒ answer **21**.
+
+Input: `n = 21453`
+
+| step | digits | what happened |
+|---|---|---|
+| start | `2 1 4 5 3` | — |
+| find pivot | `2 1 [4] 5 3` | scan right→left: `5 ≥ 3` keeps going, `4 < 5` stops → pivot at index 2 |
+| find swap partner | `2 1 [4] 5 [3]` | rightmost digit greater than `4` is `5` at index 3 (`3` is too small) |
+| swap | `2 1 5 4 3` | pivot replaced by the smallest digit that still increases the number |
+| reverse suffix | `2 1 5 3 4` | the tail `4 3` becomes `3 4`, the smallest ordering |
+
+Output: **`21534`**
+
+The suffix `5 3` is the decreasing run; had the whole number been decreasing (`54321`), the
+pivot scan would fall off the left end and the answer would be `-1`.
 
 ### Visualization
-```
-input  ──▶ [ apply Next Greater Element step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+        2    1    4    5    3
+                  ▲    └────┘  suffix already at its maximum arrangement
+                  pivot: the first digit smaller than its right neighbour
+
+swap  : 2    1    5    4    3        ← 5 is the smallest digit > 4 in the suffix
+reverse:2    1    5    3    4        ← tail sorted ascending = smallest tail
+                       └──┘
+
+21453  →  21534      (next larger arrangement of the same digits)
 ```
 
 ### Code
+
+```go
+func nextGreaterNumber(n int) int {
+	digits := []byte(strconv.Itoa(n))
+	// 1. rightmost pivot: the first digit smaller than its right neighbour.
+	i := len(digits) - 2
+	for i >= 0 && digits[i] >= digits[i+1] {
+		i--
+	}
+	if i < 0 {
+		return -1 // digits are fully descending: this is the largest arrangement
+	}
+	// 2. rightmost digit greater than the pivot (the suffix descends, so it is the
+	//    smallest such digit).
+	j := len(digits) - 1
+	for digits[j] <= digits[i] {
+		j--
+	}
+	digits[i], digits[j] = digits[j], digits[i]
+	// 3. the suffix is still descending; reverse it to get the smallest tail.
+	for l, r := i+1, len(digits)-1; l < r; l, r = l+1, r-1 {
+		digits[l], digits[r] = digits[r], digits[l]
+	}
+	value, err := strconv.Atoi(string(digits))
+	if err != nil || value > math.MaxInt32 {
+		return -1
+	}
+	return value
+}
+```
+
 ```python
-def nextGreaterElement(n):
-    d = list(str(n))
-    i = len(d) - 2
-    while i >= 0 and d[i] >= d[i + 1]:
+def nextGreaterNumber(n):
+    digits = list(str(n))
+    i = len(digits) - 2                                 # 1. find the pivot
+    while i >= 0 and digits[i] >= digits[i + 1]:
         i -= 1
     if i < 0:
-        return -1
-    j = len(d) - 1
-    while d[j] <= d[i]:
+        return -1                                       # fully descending
+    j = len(digits) - 1                                 # 2. rightmost digit > pivot
+    while digits[j] <= digits[i]:
         j -= 1
-    d[i], d[j] = d[j], d[i]
-    d[i + 1:] = reversed(d[i + 1:])
-    ans = int("".join(d))
-    return ans if ans <= 2**31 - 1 else -1
+    digits[i], digits[j] = digits[j], digits[i]
+    digits[i + 1:] = reversed(digits[i + 1:])           # 3. smallest possible tail
+    value = int("".join(digits))
+    return value if value <= 2 ** 31 - 1 else -1
 ```
 
 ### Complexity
-Time O(k), Space O(k) where k is the number of digits in n.
+Time O(d) where `d` is the number of digits — three linear sweeps over the digit string.
+Space O(d) for the mutable digit buffer.
 
+---
 
 ## 12. LeetCode Practice Set
 

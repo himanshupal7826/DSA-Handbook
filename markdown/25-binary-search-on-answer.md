@@ -41,32 +41,121 @@ binary search answer, minimize maximum, feasible, parametric, capacity.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"What is the smallest (or largest) value that still works?"*
+
+Running example: Koko has piles `[3, 6, 7, 11]` and `h = 8` hours. She eats at some integer speed `k` bananas/hour and can only work on one pile per hour. What is the **slowest** speed that still empties every pile within 8 hours?
+
 ### Intuition
-Linear scan checks each candidate — O(n).
+There is no array to search here — the answer is a *number* we have to invent. So invent them all: try `k = 1`, then `k = 2`, then `k = 3`… and stop at the first speed that finishes in time. Checking one speed is easy: add up `ceil(pile / k)` over the piles and compare with `h`.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For `k = 1, 2, 3, … max(piles)`:
+2. &nbsp;&nbsp;Compute `hours = ceil(3/k) + ceil(6/k) + ceil(7/k) + ceil(11/k)`.
+3. &nbsp;&nbsp;If `hours <= h`, return `k`.
+4. The loop always ends: `k = max(piles)` needs exactly one hour per pile.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n · maxPile)** — one full O(n) scan per candidate speed, and there are `maxPile` candidates. With `maxPile` up to 10⁹ that is hopeless.
+- Space: O(1)
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Binary Search on Answer pattern is built to use.
+- Look at the candidates we actually test for `[3,6,7,11], h=8`:
+
+  ```text
+  k = 1 → 27 hours   too slow
+  k = 2 → 14 hours   too slow
+  k = 3 → 10 hours   too slow
+  k = 4 →  8 hours   FITS  ← answer
+  ```
+
+  Three full scans were spent proving "still too slow", and each one only ruled out **one** speed.
+- The fact being thrown away is huge: **if `k = 3` is too slow, then `k = 2` and `k = 1` are too slow as well.** The answers come in a block of `no`s followed by a block of `yes`es, and the brute force walks that block one step at a time instead of jumping to its edge.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Binary Search on Answer invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Stop searching the array — search the ANSWER. Guess a value `x`, ask a yes/no question `feasible(x)`, and because the yes/no answers form `F F F T T T`, binary search finds the boundary.**
+
+Think of a dimmer switch. You are looking for the lowest brightness at which you can still read. You don't test every notch — you jump to the middle, ask "can I read?", and that single answer eliminates half the dial. It works only because brightness is *monotone*: if you can read at a setting, you can read at every brighter one.
+
+### The thought process
+
+```text
+We need    : the smallest eating speed k that finishes within h hours.
+Obvious way: try k = 1, 2, 3, ... and stop at the first that fits.
+Too slow   : O(n · maxPile); maxPile can be 10^9.
+Notice     : "does speed k fit in h hours?" is a cheap O(n) yes/no question.
+Notice too : that answer is monotone — faster never hurts, so once it is
+             yes, it stays yes forever.
+Therefore  : the yes/no array over k looks like  F F F T T T T
+             and finding the first T is exactly binary search.
+Now        : O(log maxPile) questions × O(n) each → O(n log maxPile).
+```
+
+### Why the monotone predicate is the whole problem
+
+Binary search on an answer needs one thing and one thing only: a function
+
+```text
+feasible(x) = true  ⟺  an answer of "x" is good enough
+```
+
+that is **monotone** — once it flips to true it never flips back:
+
+```text
+x        :  1   2   3   4   5   6   7   8   9  10  11
+feasible :  F   F   F   T   T   T   T   T   T   T   T
+                     ↑
+                     the single boundary — that is the answer
+```
+
+Everything else is boilerplate. Beginners get this backwards: they memorise the `lo`/`hi`/`mid` loop and then flail at the modelling. Flip it. **Spend your thinking on inventing `feasible`, and copy the loop.**
+
+Why does monotonicity make halving safe? Suppose you test `mid` and get **true**. Because the predicate never flips back, everything to the right of `mid` is also true — so no answer smaller than `mid` lives there. The whole right side can be discarded, keeping `mid` itself because it might be the boundary (`hi = mid`). Suppose instead you get **false**. Then everything to the *left* is also false, so the answer is strictly greater (`lo = mid + 1`). Either way, half the candidates die on one question.
+
+Break monotonicity and the method collapses. If the pattern were `F T F T`, then testing the middle `F` tells you nothing — the answer could be on either side, and discarding a half can throw the answer away. So before you write a single line, sanity-check the claim "if `x` works, does `x + 1` work too?"
+
+### Steps
+
+```text
+Step 1 → Decide WHAT you are guessing. It is the quantity the problem asks
+         you to minimise or maximise: a speed, a capacity, a time, a length.
+Step 2 → Write feasible(x): a plain, honest simulation — usually a greedy
+         O(n) pass — returning "is x good enough?". Prove it is monotone.
+Step 3 → Pick the search range [lo, hi] so that lo is definitely too small
+         (or the smallest legal value) and hi is definitely big enough.
+Step 4 → Binary search the boundary:
+             while lo < hi:
+                 mid = lo + (hi-lo)/2
+                 if feasible(mid): hi = mid      // mid might be the answer
+                 else:             lo = mid + 1  // mid is provably too small
+         return lo
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "minimize the maximum ...", "maximize the minimum ..."
+  "smallest capacity / speed / time such that ..."
+  "the least k so that ... is possible"
+  a huge value range (up to 1e9) but a small array (n up to 1e5)
+        ↓
+Think about...
+  "If I were HANDED an answer x, could I check it in O(n)?
+   And if x works, does every larger x work too?"
+        ↓
+Use...
+  binary search over the answer range, with feasible(x) as the predicate
+    ├─ minimising → find the FIRST true   (mid = lo + (hi-lo)/2,   hi = mid)
+    ├─ maximising → find the LAST true    (mid = lo + (hi-lo+1)/2, lo = mid)
+    └─ real-valued answer → loop ~100 times, or until hi - lo < 1e-9
+```
 
 ### Visual explanation
 
@@ -99,69 +188,177 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Binary Search on A: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+piles = [3, 6, 7, 11],  h = 8      answer range k ∈ [1 .. 11]
+
+  k :  1   2   3   4   5   6   7   8   9  10  11
+  F :  F   F   F   T   T   T   T   T   T   T   T
+                   ↑ first T = answer
+
+step 1   lo=1 ............................. hi=11   mid=6  → 6 hrs ≤ 8  T → hi=6
+step 2   lo=1 .............. hi=6                   mid=3  → 10 hrs > 8 F → lo=4
+step 3            lo=4 ..... hi=6                   mid=5  → 8 hrs ≤ 8  T → hi=5
+step 4            lo=4 . hi=5                       mid=4  → 8 hrs ≤ 8  T → hi=4
+step 5            lo=hi=4                           answer = 4
+
+4 questions instead of 11 — and 30 questions would cover a billion.
 ```
 
 ### Interview explanation
-"This is a Binary Search on Answer problem. I'll if the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration. That brings the complexity down to O(log n) time and O(1) space — here's the template."
+"The answer here is a speed, not an array element, so I'll binary search the answer space instead of the input. The key observation is that feasibility is monotone: if Koko finishes in time at speed `k`, she also finishes at any faster speed — so the predicate looks like `F F F T T T` and I just need the first `T`. My predicate is an O(n) pass summing `ceil(pile/k)` and comparing to `h`. I search `k` in `[1, max(piles)]`, keeping `mid` when it's feasible and moving past it when it isn't. That's O(n log max(piles)) time and O(1) space. The only real thinking is the predicate — the loop is boilerplate."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Binary Search** family template. Adapt the comparison/condition to the specific problem.
+> Binary search the *value*, not the index. `SmallestFeasible` finds the first true; `LargestFeasible` finds the last true and must round `mid` **up** or it stalls.
 
 ```go
-// Lower bound: first index with a[i] >= target. Half-open invariant [lo, hi).
-func lowerBound(a []int, target int) int {
-    lo, hi := 0, len(a)
+// SmallestFeasible returns the smallest x in [lo, hi] with feasible(x) == true.
+// feasible must be monotone increasing: false...false true...true.
+func SmallestFeasible(lo, hi int, feasible func(int) bool) int {
     for lo < hi {
-        mid := lo + (hi-lo)/2     // avoids overflow
-        if a[mid] < target {
-            lo = mid + 1
+        mid := lo + (hi-lo)/2 // rounds down
+        if feasible(mid) {
+            hi = mid // mid may itself be the boundary — keep it
         } else {
-            hi = mid
+            lo = mid + 1 // mid is provably too small — discard it
         }
     }
     return lo
 }
+
+// LargestFeasible returns the largest x in [lo, hi] with feasible(x) == true.
+// feasible must be monotone decreasing: true...true false...false.
+func LargestFeasible(lo, hi int, feasible func(int) bool) int {
+    for lo < hi {
+        mid := lo + (hi-lo+1)/2 // round UP: with hi == lo+1 a rounded-down
+        if feasible(mid) {      // mid equals lo, and lo = mid loops forever
+            lo = mid
+        } else {
+            hi = mid - 1
+        }
+    }
+    return lo
+}
+
+// SmallestFeasibleFloat is the real-valued form: no integer boundary exists,
+// so run a fixed number of halvings until the range is narrower than eps.
+func SmallestFeasibleFloat(lo, hi float64, feasible func(float64) bool) float64 {
+    for i := 0; i < 100; i++ { // 100 halvings shrink any range below 1e-30
+        mid := lo + (hi-lo)/2
+        if feasible(mid) {
+            hi = mid
+        } else {
+            lo = mid
+        }
+    }
+    return hi
+}
 ```
 
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def smallest_feasible(lo, hi, feasible):
+    """Smallest x in [lo, hi] with feasible(x); feasible is F...F T...T."""
     while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] < target:
-            lo = mid + 1
+        mid = lo + (hi - lo) // 2          # rounds down
+        if feasible(mid):
+            hi = mid                       # mid may be the boundary
         else:
+            lo = mid + 1                   # mid is provably too small
+    return lo
+
+
+def largest_feasible(lo, hi, feasible):
+    """Largest x in [lo, hi] with feasible(x); feasible is T...T F...F."""
+    while lo < hi:
+        mid = lo + (hi - lo + 1) // 2      # round UP or the loop stalls
+        if feasible(mid):
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
+
+
+def smallest_feasible_float(lo, hi, feasible):
+    """Real-valued answer: halve a fixed number of times instead of exactly."""
+    for _ in range(100):
+        mid = lo + (hi - lo) / 2
+        if feasible(mid):
             hi = mid
-    return lo                     # first index with a[i] >= target
+        else:
+            lo = mid
+    return hi
 ```
 
 ```java
-int lowerBound(int[] a, int target) {
-    int lo = 0, hi = a.length;
-    while (lo < hi) {
-        int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+import java.util.function.DoublePredicate;
+import java.util.function.IntPredicate;
+
+public class AnswerSearch {
+    /** Smallest x in [lo, hi] with feasible(x); feasible is F...F T...T. */
+    public static int smallestFeasible(int lo, int hi, IntPredicate feasible) {
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;      // rounds down
+            if (feasible.test(mid)) hi = mid;  // mid may be the boundary
+            else lo = mid + 1;                 // mid is provably too small
+        }
+        return lo;
     }
-    return lo;
+
+    /** Largest x in [lo, hi] with feasible(x); feasible is T...T F...F. */
+    public static int largestFeasible(int lo, int hi, IntPredicate feasible) {
+        while (lo < hi) {
+            int mid = lo + (hi - lo + 1) / 2;  // round UP or the loop stalls
+            if (feasible.test(mid)) lo = mid;
+            else hi = mid - 1;
+        }
+        return lo;
+    }
+
+    /** Real-valued answer: halve a fixed number of times. */
+    public static double smallestFeasibleFloat(double lo, double hi, DoublePredicate feasible) {
+        for (int i = 0; i < 100; i++) {
+            double mid = lo + (hi - lo) / 2;
+            if (feasible.test(mid)) hi = mid;
+            else lo = mid;
+        }
+        return hi;
+    }
 }
 ```
 
 ```cpp
-int lowerBound(vector<int>& a, int target) {
-    int lo = 0, hi = (int)a.size();
+#include <functional>
+
+// Smallest x in [lo, hi] with feasible(x); feasible is F...F T...T.
+int smallestFeasible(int lo, int hi, const std::function<bool(int)>& feasible) {
     while (lo < hi) {
-        int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+        int mid = lo + (hi - lo) / 2;   // rounds down
+        if (feasible(mid)) hi = mid;    // mid may be the boundary
+        else lo = mid + 1;              // mid is provably too small
     }
     return lo;
+}
+
+// Largest x in [lo, hi] with feasible(x); feasible is T...T F...F.
+int largestFeasible(int lo, int hi, const std::function<bool(int)>& feasible) {
+    while (lo < hi) {
+        int mid = lo + (hi - lo + 1) / 2;  // round UP or the loop stalls
+        if (feasible(mid)) lo = mid;
+        else hi = mid - 1;
+    }
+    return lo;
+}
+
+// Real-valued answer: halve a fixed number of times.
+double smallestFeasibleFloat(double lo, double hi, const std::function<bool(double)>& feasible) {
+    for (int i = 0; i < 100; ++i) {
+        double mid = lo + (hi - lo) / 2;
+        if (feasible(mid)) hi = mid;
+        else lo = mid;
+    }
+    return hi;
 }
 ```
 
@@ -247,75 +444,185 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Koko Bananas (LeetCode 875)
-Koko eats bananas at speed `k` per hour, finishing one pile per hour (or less). Find the minimum integer `k` so she finishes all piles within `h` hours.
+Koko eats bananas at some integer speed `k` per hour and works on only one pile per hour (leftovers of a pile wait for the next hour). Return the **smallest** `k` that empties all piles within `h` hours.
 
 ### Thought Process
-1. The answer `k` is monotonic: if speed `k` works within `h` hours, any faster speed also works — so binary search `k`.
-2. Feasibility `feasible(k)` = total hours `sum(ceil(p/k))` is `<= h`. Search `k` in `[1, max(piles)]`.
-3. Find the smallest `k` for which `feasible(k)` is true using a lower-bound style search.
+1. The answer is a *speed*, not an array element — so the thing to search is the range of possible speeds, `[1, max(piles)]`.
+2. `feasible(k)` = "does speed `k` finish in time?" = `Σ ceil(pile/k) <= h`. That is one honest O(n) pass.
+3. It is monotone: eating faster never costs more hours, so `feasible` is `F…F T…T` in `k`.
+4. So find the **first true** — keep `mid` when feasible (`hi = mid`), skip past it when not (`lo = mid + 1`).
+5. `k = max(piles)` always works (one pile per hour), so the range is guaranteed to contain a true.
 
 ### Dry Run
-piles=[3,6,7,11], h=8. Range [1,11], mid=6 → hours=1+1+2+2=6 ≤ 8 → feasible, go left (hi=6).
-mid=3 → hours=1+2+3+4=10 > 8 → infeasible, lo=4. mid=5 → 1+2+2+3=8 ≤ 8 → hi=5.
-mid=4 → 1+2+2+3=8 ≤ 8 → hi=4. lo=hi=4 → answer **4**.
+
+Input: `piles = [3, 6, 7, 11]`, `h = 8` → search `k` in `[1, 11]`
+
+| step | lo | hi | mid | hours = ceil(3/mid)+ceil(6/mid)+ceil(7/mid)+ceil(11/mid) | ≤ 8 ? | move |
+|------|----|----|-----|------------------------------------------------------------|-------|------|
+| 1 | 1 | 11 | 6 | 1 + 1 + 2 + 2 = **6** | yes | `hi = 6` |
+| 2 | 1 | 6 | 3 | 1 + 2 + 3 + 4 = **10** | no | `lo = 4` |
+| 3 | 4 | 6 | 5 | 1 + 2 + 2 + 3 = **8** | yes | `hi = 5` |
+| 4 | 4 | 5 | 4 | 1 + 2 + 2 + 3 = **8** | yes | `hi = 4` |
+| 5 | 4 | 4 | — | loop ends, `lo == hi` | — | return `lo` |
+
+Output: **4**
+
+Row 4 is the one that matters: `mid = 4` is feasible, yet we do **not** return it — we set `hi = mid`, because a speed of 4 might still not be the *smallest* feasible one. Only when `lo == hi` has the boundary been pinned down. Row 3 shows the mirror rule: `mid = 5` was feasible too, so 5 was never a candidate for "smallest" once 4 survived.
 
 ### Visualization
-```
-speed k ──▶ [ hours = Σ ceil(pile/k) ]
-predicate ──▶ feasible(k) = hours ≤ h  (monotonic in k)
-output ──▶ smallest k that stays within h hours
+
+```text
+k        :  1    2    3    4    5    6    7    8    9   10   11
+hours    : 27   14   10    8    8    6    6    5    5    4    4
+feasible :  F    F    F    T    T    T    T    T    T    T    T
+                       ↑
+                    first T = 4 = answer
+
+lo/hi walk:
+  1 ─────────────────────────────────────────────── 11    mid=6  T
+  1 ─────────────────── 6                                  mid=3  F
+              4 ─────── 6                                  mid=5  T
+              4 ─── 5                                      mid=4  T
+              4                                            done → 4
 ```
 
 ### Code
-```python
-import math
 
+```go
+func minEatingSpeed(piles []int, h int) int {
+    // feasible(k): can Koko finish every pile within h hours at speed k?
+    // Monotone: a larger k never needs more hours.
+    feasible := func(k int) bool {
+        hours := 0
+        for _, p := range piles {
+            hours += (p + k - 1) / k // ceil(p / k) with integer math
+        }
+        return hours <= h
+    }
+
+    lo, hi := 1, 1
+    for _, p := range piles {
+        hi = max(hi, p) // speed max(piles) clears one pile per hour
+    }
+
+    for lo < hi { // find the first k where feasible(k) is true
+        mid := lo + (hi-lo)/2
+        if feasible(mid) {
+            hi = mid // mid works, but something slower might too
+        } else {
+            lo = mid + 1 // mid is too slow, and so is everything below it
+        }
+    }
+    return lo
+}
+```
+
+```python
 def minEatingSpeed(piles, h):
     def feasible(k):
-        return sum(math.ceil(p / k) for p in piles) <= h
+        """Can Koko finish within h hours at speed k? Monotone in k."""
+        hours = sum((p + k - 1) // k for p in piles)   # ceil(p / k)
+        return hours <= h
 
-    lo, hi = 1, max(piles)           # k must be at least 1
+    lo, hi = 1, max(piles)          # speed max(piles) clears a pile per hour
     while lo < hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2
         if feasible(mid):
-            hi = mid                 # mid works; try slower
+            hi = mid                # mid works; something slower might too
         else:
-            lo = mid + 1             # too slow; speed up
-    return lo                        # smallest feasible speed
+            lo = mid + 1            # mid too slow, and so is everything below
+    return lo
 ```
 
 ### Complexity
-Time O(n log(max(piles))), Space O(1) — each of the log candidates costs an O(n) feasibility scan.
+Time O(n · log(max(piles))) — about 30 feasibility questions for a billion-wide range, each an O(n) scan. Space O(1) — only `lo`, `hi`, `mid` and a running sum.
 
 ## 10. Solved Example 2
 
 ### Problem — Ship Within Days (LeetCode 1011)
-Packages with given `weights` must ship in order within `days`. A ship has a fixed daily capacity. Find the minimum capacity that ships everything within `days`.
+Packages must be shipped **in the given order**. Each day the ship carries a prefix of the remaining packages whose total weight fits its capacity. Return the smallest capacity that ships everything within `days` days.
 
 ### Thought Process
-1. Capacity is monotonic: a larger capacity needs the same or fewer days, so binary search the capacity.
-2. Lower bound is `max(weights)` (must fit the heaviest package); upper bound is `sum(weights)` (ship all in one day).
-3. `feasible(cap)` = greedily fill each day until the next package overflows `cap`, counting days; feasible if `days_needed <= days`.
+1. The answer is a *capacity*. Search the range `[max(weights), sum(weights)]`: it must at least fit the heaviest package, and one day carrying everything always works.
+2. `feasible(cap)` = greedily pack: keep adding packages to today until the next one would overflow `cap`, then start a new day. Feasible if `daysUsed <= days`.
+3. Greedy packing is optimal here because the order is fixed — delaying a package that still fits can never reduce the day count.
+4. Monotone: a bigger ship fits at least as much per day, so it never needs more days.
+5. First-true search again.
 
 ### Dry Run
-weights=[1,2,3,4,5,6,7,8,9,10], days=5. Range [10,55], mid=32 → greedy days=2 ≤ 5 → hi=32.
-mid=21 → days=3 ≤ 5 → hi=21. mid=15 → days=5 ≤ 5 → hi=15. mid=12 → days=6 > 5 → lo=13.
-mid=14 → days=5 → hi=14. mid=13 → days=6 → lo=14. lo=hi=14 → answer **15**.
+
+Input: `weights = [3,2,2,4,1,4]`, `days = 3` → search `cap` in `[4, 16]`
+
+| step | lo | hi | mid (cap) | greedy packing | days used | ≤ 3 ? | move |
+|------|----|----|-----------|----------------|-----------|-------|------|
+| 1 | 4 | 16 | 10 | `[3,2,2] [4,1,4]` | 2 | yes | `hi = 10` |
+| 2 | 4 | 10 | 7 | `[3,2,2] [4,1] [4]` | 3 | yes | `hi = 7` |
+| 3 | 4 | 7 | 5 | `[3,2] [2] [4,1] [4]` | 4 | no | `lo = 6` |
+| 4 | 6 | 7 | 6 | `[3,2] [2,4] [1,4]` | 3 | yes | `hi = 6` |
+| 5 | 6 | 6 | — | loop ends, `lo == hi` | — | — | return `lo` |
+
+Output: **6**
+
+Row 3 is the instructive one. Capacity 5 fails not because the total is too big but because the *fixed order* forces a bad split: `[3,2]` fills the day, then the lone `2` cannot be joined by the `4`. One unit more of capacity (row 4) lets `[2,4]` ride together and the day count drops from 4 to 3.
 
 ### Visualization
-```
-capacity cap ──▶ [ greedily pack packages into days ]
-predicate ──▶ feasible(cap) = days_needed ≤ days  (monotonic in cap)
-output ──▶ smallest capacity shipping within days
+
+```text
+weights = 3  2  2  4  1  4        days allowed = 3
+
+cap = 5   | 3 2 | 2 | 4 1 | 4 |          → 4 days  ✗
+cap = 6   | 3 2 | 2 4 | 1 4 |            → 3 days  ✓   ← smallest that fits
+cap = 7   | 3 2 2 | 4 1 | 4 |            → 3 days  ✓
+cap = 10  | 3 2 2 | 4 1 4 |              → 2 days  ✓
+
+cap      :  4    5    6    7   ...  16
+feasible :  F    F    T    T   ...   T
+                      ↑ first T
 ```
 
 ### Code
+
+```go
+func shipWithinDays(weights []int, days int) int {
+    // feasible(cap): can we ship in order within `days` using capacity cap?
+    // Monotone: a larger cap never needs more days.
+    feasible := func(cap int) bool {
+        used, load := 1, 0
+        for _, w := range weights {
+            if load+w > cap { // today is full — open a new day
+                used++
+                load = 0
+            }
+            load += w
+        }
+        return used <= days
+    }
+
+    lo, hi := 0, 0
+    for _, w := range weights {
+        lo = max(lo, w) // must fit the heaviest package on its own
+        hi += w         // one day carrying everything always works
+    }
+
+    for lo < hi { // first capacity that is big enough
+        mid := lo + (hi-lo)/2
+        if feasible(mid) {
+            hi = mid // this ship suffices; try a smaller one
+        } else {
+            lo = mid + 1 // too small, and so is anything below
+        }
+    }
+    return lo
+}
+```
+
 ```python
 def shipWithinDays(weights, days):
     def feasible(cap):
+        """Greedily fill each day; monotone in cap."""
         used, load = 1, 0
         for w in weights:
-            if load + w > cap:       # start a new day
+            if load + w > cap:      # today is full - open a new day
                 used += 1
                 load = 0
             load += w
@@ -323,46 +630,102 @@ def shipWithinDays(weights, days):
 
     lo, hi = max(weights), sum(weights)
     while lo < hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2
         if feasible(mid):
-            hi = mid                 # capacity suffices; shrink it
+            hi = mid                # this ship suffices; try a smaller one
         else:
-            lo = mid + 1             # too small; grow capacity
-    return lo                        # minimum feasible capacity
+            lo = mid + 1            # too small, and so is anything below
+    return lo
 ```
 
 ### Complexity
-Time O(n log(sum(weights))), Space O(1) — a greedy O(n) day-count per binary-search step.
+Time O(n · log(sum(weights))) — an O(n) greedy packing per binary-search step. Space O(1).
 
 ## 11. Solved Example 3
 
 ### Problem — Split Array Largest Sum (LeetCode 410)
-Split `nums` into `k` non-empty contiguous subarrays so the largest subarray sum is minimized. Return that minimized largest sum.
+Split `nums` into exactly `k` non-empty **contiguous** subarrays so that the largest subarray sum is as small as possible. Return that minimized largest sum.
 
 ### Thought Process
-1. Binary search the answer `cap` = the allowed largest subarray sum. Fewer splits are needed as `cap` grows — monotonic.
-2. Search `cap` in `[max(nums), sum(nums)]`: it must fit the biggest element, and one part could hold everything.
-3. `feasible(cap)` = greedily extend a running sum, starting a new subarray whenever adding would exceed `cap`; feasible if the number of subarrays is `<= k`.
+1. "Minimize the maximum" is the loudest possible signal for this pattern. The answer is a *sum cap*.
+2. Flip the question: instead of "what is the best split into k pieces?", ask "**with a cap of `x`, how few pieces can I get away with?**" — that is easy to answer greedily.
+3. `feasible(x)` = greedily extend the current piece while the running sum stays `<= x`, cutting when it would exceed. Feasible if `pieces <= k`.
+4. Monotone: raising the cap can only let pieces grow, so the piece count never increases.
+5. Range `[max(nums), sum(nums)]`: the cap must fit the largest single element, and one piece holding everything is always allowed.
 
 ### Dry Run
-nums=[7,2,5,10,8], k=2. Range [10,32], mid=21 → greedy parts: [7,2,5]=14,[10,8]=18 → 2 ≤ 2 → hi=21.
-mid=15 → [7,2,5]=14,[10],[8] → 3 > 2 → lo=16. mid=18 → [7,2,5],[10,8] → 2 → hi=18.
-mid=17 → [7,2,5],[10],[8] → 3 → lo=18. lo=hi=18 → answer **18**.
+
+Input: `nums = [7, 2, 5, 10, 8]`, `k = 2` → search cap in `[10, 32]`
+
+| step | lo | hi | mid (cap) | greedy pieces | count | ≤ 2 ? | move |
+|------|----|----|-----------|---------------|-------|-------|------|
+| 1 | 10 | 32 | 21 | `[7,2,5]=14` `[10,8]=18` | 2 | yes | `hi = 21` |
+| 2 | 10 | 21 | 15 | `[7,2,5]=14` `[10]` `[8]` | 3 | no | `lo = 16` |
+| 3 | 16 | 21 | 18 | `[7,2,5]=14` `[10,8]=18` | 2 | yes | `hi = 18` |
+| 4 | 16 | 18 | 17 | `[7,2,5]=14` `[10]` `[8]` | 3 | no | `lo = 18` |
+| 5 | 18 | 18 | — | loop ends, `lo == hi` | — | — | return `lo` |
+
+Output: **18**
+
+Rows 3 and 4 pin the boundary exactly: at cap 18 the pair `10 + 8` just barely fits, at cap 17 it does not and a third piece is forced. 18 is therefore the smallest achievable "largest sum".
 
 ### Visualization
-```
-cap (largest allowed sum) ──▶ [ greedily cut subarrays ]
-predicate ──▶ feasible(cap) = pieces ≤ k  (monotonic in cap)
-output ──▶ smallest cap achievable with k pieces
+
+```text
+nums = 7  2  5  10  8      k = 2 pieces allowed
+
+cap = 17   | 7 2 5 |  10  |  8  |        3 pieces  ✗
+cap = 18   | 7 2 5 |  10 8      |        2 pieces  ✓   ← 10+8 = 18 fits exactly
+cap = 21   | 7 2 5 |  10 8      |        2 pieces  ✓
+
+cap      :  10  ...  15   16   17   18   19  ...  32
+feasible :   F  ...   F    F    F    T    T  ...   T
+                                     ↑ first T = 18
 ```
 
 ### Code
+
+```go
+func splitArray(nums []int, k int) int {
+    // feasible(cap): can nums be cut into <= k contiguous pieces, each
+    // summing to at most cap? Monotone: a larger cap needs fewer pieces.
+    feasible := func(cap int) bool {
+        pieces, cur := 1, 0
+        for _, x := range nums {
+            if cur+x > cap { // this piece is full — cut before x
+                pieces++
+                cur = 0
+            }
+            cur += x
+        }
+        return pieces <= k
+    }
+
+    lo, hi := 0, 0
+    for _, x := range nums {
+        lo = max(lo, x) // a piece must hold the biggest element
+        hi += x         // one piece may hold everything
+    }
+
+    for lo < hi { // smallest cap that still fits in k pieces
+        mid := lo + (hi-lo)/2
+        if feasible(mid) {
+            hi = mid // cap works; try a tighter one
+        } else {
+            lo = mid + 1 // cap forces too many pieces
+        }
+    }
+    return lo
+}
+```
+
 ```python
 def splitArray(nums, k):
     def feasible(cap):
+        """Fewest contiguous pieces with every sum <= cap; monotone in cap."""
         pieces, cur = 1, 0
         for x in nums:
-            if cur + x > cap:        # cut here; open a new subarray
+            if cur + x > cap:       # this piece is full - cut before x
                 pieces += 1
                 cur = 0
             cur += x
@@ -370,17 +733,18 @@ def splitArray(nums, k):
 
     lo, hi = max(nums), sum(nums)
     while lo < hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2
         if feasible(mid):
-            hi = mid                 # cap works; try a smaller max
+            hi = mid                # cap works; try a tighter one
         else:
-            lo = mid + 1             # needs too many pieces; raise cap
-    return lo                        # minimized largest subarray sum
+            lo = mid + 1            # cap forces too many pieces
+    return lo
 ```
 
 ### Complexity
-Time O(n log(sum(nums))), Space O(1) — an O(n) greedy feasibility check per binary-search step.
+Time O(n · log(sum(nums))) — one O(n) greedy cut per binary-search step, and the range shrinks by half each time. Space O(1) — no table, just the running piece sum.
 
+---
 
 ## 12. LeetCode Practice Set
 

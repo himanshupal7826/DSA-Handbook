@@ -41,32 +41,151 @@ monotonic stack, increasing, previous smaller, next smaller.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"For each element, where is the nearest **smaller** element — and how far away is it?"*
+
+Running example: `nums = [2, 1, 5, 6, 3]`. For every index, find the nearest strictly
+smaller element to its **right**.
+
 ### Intuition
-For each element scan outward to find the next/previous greater or smaller — O(n^2).
+There is nothing clever to see at first. Stand on each element, walk to the right one
+step at a time, and stop at the first value that is smaller. If you fall off the end,
+there is no answer. Repeat for every element.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each index `i` from `0` to `n-1`:
+2. Walk `j = i+1, i+2, …` to the right.
+3. The first `j` with `nums[j] < nums[i]` is the answer — record it and stop.
+4. If no such `j` exists, record "none".
+5. Return the array of answers.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n²)** — every one of the `n` starts can walk to the end of the array, and a
+  long run of large values is re-walked from every start inside it.
+- Space: O(1) beyond the output.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Monotonic Increasing Stack pattern is built to use.
+- **The exact wasted work.** On `[2, 1, 5, 6, 3]` the scan from `i=2` (value 5) steps over
+  index 3 (value 6) and stops at index 4 (value 3). In doing so it *proved* that 3 is also
+  the answer for index 3 — and then throws that fact away. The very next iteration,
+  `i=3`, rediscovers it from scratch. On `[6, 6, 6, 6, 1]` this repeats maximally:
+  4 + 3 + 2 + 1 = 10 steps to compute five answers that are all the same element.
+- **The fact it never exploits.** While the scan from `i` walks past an index `j` with
+  `nums[j] >= nums[i]`, it has learned that `j` is worse than `i` in *both* ways at once:
+  `j` is further left and no smaller. Nothing to the right of `i` will ever want `j`. The
+  brute force notices this and forgets it; the optimal approach notices it and *deletes*
+  `j`.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Monotonic Increasing Stack invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **If a later element is at least as small as an earlier one, the earlier one is dead — it has already been answered and it can never be anyone else's answer again, so pop it and never look at it once more.**
+
+Picture a queue of people, each one only interested in the first person *shorter* than
+themselves standing further down the line. A short person walks in and instantly satisfies
+every taller person still waiting — all of them, at once — and those people go home
+forever. Whoever is still waiting must therefore be in **increasing** order of height:
+anybody taller than someone in front of them would already have left. That waiting list,
+shortest at the top, is the monotonic increasing stack.
+
+### The thought process
+
+```text
+We need    : for each i, the nearest strictly smaller element to its right
+Obvious way: from each i, walk right until something smaller shows up
+Too slow   : O(n^2) — every run of large values is re-walked from every start inside it
+Notice     : if j < i and nums[j] >= nums[i], then j is finished twice over —
+             i settles j's "next smaller", and no k > i can ever want j as its
+             "previous smaller" because i is nearer and no larger
+Therefore  : delete j the moment i arrives; the indices still waiting always have
+             increasing values, and the newest one is the smallest
+Now        : deletions happen from the newest end → that is a stack, and each index
+             is pushed once and popped at most once → O(n) overall
+```
+
+### Why the stack (and why it must be increasing) works
+
+Start from the *set of unresolved indices*, not from the data structure. At any moment
+that set is exactly "indices whose nearest-smaller-to-the-right has not shown up yet". Two
+facts pin it down:
+
+1. **It is always increasing in value.** If two unresolved indices `j < i` had
+   `nums[j] >= nums[i]`, then `i` itself already settled `j` — contradiction. So the
+   values, read left to right, must strictly increase.
+2. **A newcomer resolves it from the newest end backwards.** The newest unresolved index
+   holds the smallest value. A new value `nums[i]` knocks out the newest ones first and
+   stops as soon as it meets something smaller than itself. Newest-out-first *is* a stack.
+
+**Why the answer is the *nearest* one.** When `i` pops `j`, could some index `k` between
+them have been smaller? No. If `nums[k] < nums[j]`, then when `k` arrived it would have
+popped everything above `j` (those are larger than `nums[j]`) and then `j` too. So every
+index strictly between `j` and `i` had a value `>= nums[j]`, and `i` is genuinely the
+first smaller one.
+
+**Store indices, not values.** The value is one array lookup away (`nums[stack[top]]`), but
+the *position* cannot be recovered from a value. You almost always need the position:
+distances (`i - j` for "days until warmer"), widths (`right - left - 1` for histogram
+rectangles), spans (`i - prevGreater` for stock span). Push `i`, not `nums[i]`.
+
+### The direction table (identical in every chapter of this family)
+
+| You want, for each `i` … | Scan | Stack values | Pop while | Read the answer from |
+|---|---|---|---|---|
+| **next smaller** to the right | left → right | **increasing** | `nums[top] >= nums[i]` | the pop — `i` is the popped index's answer |
+| **previous smaller** to the left | left → right | **increasing** | `nums[top] >= nums[i]` | what is left on top *before* pushing `i` |
+| **next greater** to the right | left → right | decreasing | `nums[top] <= nums[i]` | the pop — `i` is the popped index's answer |
+| **previous greater** to the left | left → right | decreasing | `nums[top] <= nums[i]` | what is left on top *before* pushing `i` |
+
+The four rows are really **two passes**: rows 1–2 are one increasing-stack pass read in two
+ways, rows 3–4 one decreasing-stack pass read in two ways.
+
+**Duplicates — where the strictness goes.** In one pass the two readings get opposite
+strictness, and you cannot have both strict:
+
+```text
+pop while nums[top] >  nums[i]  →  pop gives "next strictly smaller",
+                                   top gives "previous smaller-or-equal"
+pop while nums[top] >= nums[i]  →  pop gives "next smaller-or-equal",
+                                   top gives "previous strictly smaller"
+```
+
+Choose the comparison the problem's tie-breaking needs, then remember the other reading
+flipped. (For greater-queries, mirror `>`/`>=` to `<`/`<=`.)
+
+### Steps
+
+```text
+Step 1 → stack = empty list of INDICES; answers default to "none"
+Step 2 → for i = 0 … n-1:
+Step 3 →   while stack is non-empty and nums[stack.top] >= nums[i]:
+Step 4 →       j = pop  →  nextSmaller[j] = i        (i settles j)
+Step 5 →   prevSmaller[i] = stack.top if stack is non-empty else "none"
+Step 6 →   push i
+Step 7 → anything still on the stack has no smaller element to its right
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "nearest / next / previous smaller", "first element less than",
+  "how far until", "span", "width until a shorter bar",
+  "sum of subarray minimums", n up to 1e5 with an obvious O(n^2) scan
+        ↓
+Think about...
+  "When a new element arrives, which earlier elements just became useless forever?"
+        ↓
+Use...
+  A monotonic stack of indices.
+    smaller-queries → increasing stack, pop while top >= current
+    greater-queries → decreasing stack, pop while top <= current  (chapter 35)
+    need the distance/width → you stored indices, so subtract them
+    need every bar flushed  → append a sentinel (chapter 38)
+```
 
 ### Visual explanation
 
@@ -91,74 +210,119 @@ A stack kept in monotonic order lets you resolve 'nearest greater/smaller' relat
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Monotonic Increasi: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums  =   2    1    5    6    3
+index     0    1    2    3    4
+
+i=0 v=2  stack empty                  prev[0] = none    push 0 → stack(vals) [2]
+i=1 v=1  2 >= 1 → pop 0, next[0] = 1  prev[1] = none    push 1 → [1]
+i=2 v=5  1 >= 5? no                   prev[2] = 1       push 2 → [1,5]
+i=3 v=6  5 >= 6? no                   prev[3] = 5       push 3 → [1,5,6]
+i=4 v=3  6 >= 3 → pop 3, next[3] = 3
+         5 >= 3 → pop 2, next[2] = 3
+         1 >= 3? no                   prev[4] = 1       push 4 → [1,3]
+
+end: indices 1 and 4 never popped → they have no smaller element to the right
+
+previous smaller : [ --, --,  1,  5,  1 ]     (values; -- = none)
+next     smaller : [  1, --,  3,  3, -- ]
 ```
 
+Five pushes, three pops, one pass — not the ten steps the brute force needed.
+
 ### Interview explanation
-"This is a Monotonic Increasing Stack problem. I'll a stack kept in monotonic order lets you resolve 'nearest greater/smaller' relationships in amortized O(1) per element. That brings the complexity down to O(n) time and O(n) space — here's the template."
+"For each element I need the nearest smaller one, and the brute force rescans the same
+stretch of array over and over. The key observation is that when a new element arrives,
+every earlier element that is at least as large is finished forever: the newcomer is its
+next-smaller, and it can never be anyone else's previous-smaller because the newcomer is
+both nearer and no larger. So I keep a stack of *indices* whose values increase from bottom
+to top, pop everything `>=` the incoming value — recording the incoming index as their
+answer — and whatever remains on top is the incoming element's previous smaller. Each index
+is pushed once and popped at most once, so it's O(n) time and O(n) space."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Stacks** family template. Adapt the comparison/condition to the specific problem.
+> One increasing stack, one pass: **the pop tells you the next smaller, the leftover top tells you the previous smaller.**
 
 ```go
-// Next greater element to the right using a monotonic decreasing stack.
-func nextGreater(nums []int) []int {
-    res := make([]int, len(nums))
-    for i := range res { res[i] = -1 }
-    stack := []int{} // indices, values decreasing from bottom to top
-    for i, v := range nums {
-        for len(stack) > 0 && nums[stack[len(stack)-1]] < v {
-            top := stack[len(stack)-1]
-            stack = stack[:len(stack)-1]
-            res[top] = v
-        }
-        stack = append(stack, i)
-    }
-    return res
+// nearestSmaller returns, for every index i, the index of the nearest smaller
+// element on each side. prev[i] = -1 and next[i] = len(nums) mean "none".
+//
+// Pop condition `>=` means: prev[i] is the previous STRICTLY smaller element,
+// next[i] is the next SMALLER-OR-EQUAL element. Use `>` to swap the strictness.
+func nearestSmaller(nums []int) (prev, next []int) {
+	n := len(nums)
+	prev, next = make([]int, n), make([]int, n)
+	for i := 0; i < n; i++ {
+		prev[i], next[i] = -1, n
+	}
+	stack := make([]int, 0, n) // indices; values increase bottom → top
+	for i := 0; i < n; i++ {
+		// Everything at least as large as nums[i] is settled by i and dies here.
+		for len(stack) > 0 && nums[stack[len(stack)-1]] >= nums[i] {
+			top := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			next[top] = i
+		}
+		if len(stack) > 0 {
+			prev[i] = stack[len(stack)-1]
+		}
+		stack = append(stack, i)
+	}
+	return prev, next
 }
 ```
 
 ```python
-def next_greater(nums):
-    res = [-1] * len(nums)
-    stack = []                      # indices, values decreasing
-    for i, v in enumerate(nums):
-        while stack and nums[stack[-1]] < v:
-            res[stack.pop()] = v
+def nearest_smaller(nums):
+    """prev[i] = index of previous strictly smaller (-1 if none),
+       next[i] = index of next smaller-or-equal (len(nums) if none)."""
+    n = len(nums)
+    prev, next_ = [-1] * n, [n] * n
+    stack = []                                  # indices, values increasing
+    for i in range(n):
+        while stack and nums[stack[-1]] >= nums[i]:
+            next_[stack.pop()] = i              # i settles the popped index
+        if stack:
+            prev[i] = stack[-1]                 # survivor is strictly smaller
         stack.append(i)
-    return res
+    return prev, next_
 ```
 
 ```java
-int[] nextGreater(int[] nums) {
-    int[] res = new int[nums.length];
-    Arrays.fill(res, -1);
-    Deque<Integer> stack = new ArrayDeque<>();
-    for (int i = 0; i < nums.length; i++) {
-        while (!stack.isEmpty() && nums[stack.peek()] < nums[i])
-            res[stack.pop()] = nums[i];
+// prev[i] = previous strictly smaller index (-1), next[i] = next smaller-or-equal (n).
+int[][] nearestSmaller(int[] nums) {
+    int n = nums.length;
+    int[] prev = new int[n], next = new int[n];
+    Arrays.fill(prev, -1);
+    Arrays.fill(next, n);
+    Deque<Integer> stack = new ArrayDeque<>();  // indices, values increasing
+    for (int i = 0; i < n; i++) {
+        while (!stack.isEmpty() && nums[stack.peek()] >= nums[i])
+            next[stack.pop()] = i;
+        if (!stack.isEmpty()) prev[i] = stack.peek();
         stack.push(i);
     }
-    return res;
+    return new int[][]{prev, next};
 }
 ```
 
 ```cpp
-vector<int> nextGreater(vector<int>& nums) {
-    vector<int> res(nums.size(), -1);
-    stack<int> st;                  // indices
-    for (int i = 0; i < (int)nums.size(); ++i) {
-        while (!st.empty() && nums[st.top()] < nums[i]) {
-            res[st.top()] = nums[i]; st.pop();
+// prev[i] = previous strictly smaller index (-1), next[i] = next smaller-or-equal (n).
+pair<vector<int>, vector<int>> nearestSmaller(const vector<int>& nums) {
+    int n = nums.size();
+    vector<int> prev(n, -1), nxt(n, n), stack;   // stack holds indices
+    for (int i = 0; i < n; ++i) {
+        while (!stack.empty() && nums[stack.back()] >= nums[i]) {
+            nxt[stack.back()] = i;
+            stack.pop_back();
         }
-        st.push(i);
+        if (!stack.empty()) prev[i] = stack.back();
+        stack.push_back(i);
     }
-    return res;
+    return {prev, nxt};
 }
 ```
 
@@ -244,41 +408,81 @@ vector<int> nextGreater(vector<int>& nums) {
 ## 9. Solved Example 1
 
 ### Problem — Daily Temps (LeetCode 739)
-A representative **Monotonic Increasing Stack** problem. The signal: maintain an increasing stack to find nearest smaller elements.
+Given daily temperatures, return for each day how many days you must wait for a **warmer**
+day (0 if none ever comes).
+
+This is a *greater* question, so it uses row 3 of the direction table: same machinery,
+**decreasing** stack, pop while `top <= current`. Chapter 39 is devoted to it.
 
 ### Thought Process
-1. We want, for each day, how many days until a warmer temperature — i.e. the distance to the next greater element.
-2. Keep a stack of indices whose warmer day hasn't been found yet, with temperatures kept monotonically decreasing (top is the coldest pending day).
-3. For each new day, pop every pending index whose temperature is strictly less than today's; today is their answer, so record `i - popped_index`.
-4. Push the current index. Any indices left on the stack at the end keep their default answer of 0.
+1. "Days until warmer" = distance to the **next strictly greater** element — so the stack
+   must hold *indices*, otherwise the distance is unrecoverable.
+2. The stack holds days that are still waiting for a warmer day.
+3. When day `i` arrives, every waiting day `j` with `temps[j] < temps[i]` is answered right
+   now: `res[j] = i - j`. It is the *first* such day because any earlier warm day would
+   already have popped `j`.
+4. Push `i`. Days left on the stack at the end keep their default 0.
 
 ### Dry Run
-Input `[73, 74, 75, 71, 69, 72]`:
-```
-i=0 t=73  stack=[]        -> push 0            stack=[0]
-i=1 t=74  74>73 pop 0 ans[0]=1-0=1             stack=[1]
-i=2 t=75  75>74 pop 1 ans[1]=2-1=1             stack=[2]
-i=3 t=71  71<75 push 3                         stack=[2,3]
-i=4 t=69  69<71 push 4                         stack=[2,3,4]
-i=5 t=72  pop 4 ans[4]=1, pop 3 ans[3]=2       stack=[2,5]
-end -> index 2 & 5 unresolved, ans stays 0
-```
-Result `[1, 1, 4, 2, 1, 0]`.
+
+Input: `[73, 74, 75, 71, 69, 76]`
+
+| i | t | pops (`j` → `res[j] = i-j`) | stack after (indices) | stack temps |
+|---|----|---|---|---|
+| 0 | 73 | — | `[0]` | `[73]` |
+| 1 | 74 | `0` → `res[0]=1-0=1` | `[1]` | `[74]` |
+| 2 | 75 | `1` → `res[1]=2-1=1` | `[2]` | `[75]` |
+| 3 | 71 | none (`75 > 71`) | `[2,3]` | `[75,71]` |
+| 4 | 69 | none (`71 > 69`) | `[2,3,4]` | `[75,71,69]` |
+| 5 | 76 | `4`→`res[4]=1`, `3`→`res[3]=2`, `2`→`res[2]=3` | `[5]` | `[76]` |
+
+Output: **`[1, 1, 3, 2, 1, 0]`**
+
+Row `i=5` is the whole pattern in one line: one warm day settles three pending days in a
+single burst, and each of those indices leaves the stack forever. Index 5 is never popped,
+so it keeps the default 0.
 
 ### Visualization
-```
-input  ──▶ [ apply Monotonic Increasing Stack step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+day     0    1    2    3    4    5
+temp   73   74   75   71   69   76
+                 └────┬────┴────┘
+                      day 5 pops 4, then 3, then 2  (newest first)
+
+waiting stack over time (top on the right):
+  [73]  [74]  [75]  [75,71]  [75,71,69]  [76]
+         ^ temps in the stack always DECREASE bottom → top
+
+res =   1    1    3    2    1    0
+        ↑              ↑
+     5-4=1 for day 4, 5-2=3 for day 2 — distances need INDICES
 ```
 
 ### Code
+
+```go
+func dailyTemperatures(temps []int) []int {
+	res := make([]int, len(temps))
+	stack := make([]int, 0, len(temps)) // indices of days still waiting; temps decreasing
+	for i, t := range temps {
+		for len(stack) > 0 && temps[stack[len(stack)-1]] < t {
+			j := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			res[j] = i - j // today is the first warmer day for day j
+		}
+		stack = append(stack, i)
+	}
+	return res // days never popped keep 0
+}
+```
+
 ```python
-def dailyTemperatures(temperatures):
-    res = [0] * len(temperatures)
-    stack = []                          # indices, temps decreasing
-    for i, t in enumerate(temperatures):
-        while stack and temperatures[stack[-1]] < t:
+def dailyTemperatures(temps):
+    res = [0] * len(temps)
+    stack = []                              # indices, temps decreasing
+    for i, t in enumerate(temps):
+        while stack and temps[stack[-1]] < t:
             j = stack.pop()
             res[j] = i - j
         stack.append(i)
@@ -286,101 +490,202 @@ def dailyTemperatures(temperatures):
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each index is pushed and popped at most once.
+Time O(n) — each day is pushed once and popped at most once, so the inner `while` runs at
+most `n` times in total. Space O(n) — the stack in the worst case of a decreasing array.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Next Greater (LeetCode 496)
-A representative **Monotonic Increasing Stack** problem. The signal: maintain an increasing stack to find nearest smaller elements.
+`nums1` is a subset of `nums2` (all values distinct). For each value of `nums1`, return the
+first value to its **right in `nums2`** that is greater, or `-1`.
 
 ### Thought Process
-1. `nums1` is a subset of `nums2`; for each value we need its next greater element to the right within `nums2`.
-2. Sweep `nums2` once with a decreasing stack of values whose next-greater is still unknown.
-3. When the current value exceeds the stack top, it is that top's next greater — pop and record it in a hash map `value -> next greater`.
-4. Finally map each element of `nums1` through the dictionary, defaulting to -1.
+1. Ignore `nums1` at first: solve "next greater element" for the whole of `nums2` in one
+   pass with a decreasing stack of indices.
+2. When `nums2[i]` beats the stack top `j`, `nums2[i]` is `j`'s answer — record
+   `answer[nums2[j]] = nums2[i]` in a map, because `nums1` addresses elements by value.
+3. Indices never popped have no greater element to the right → `-1`.
+4. Finally look up each element of `nums1` in the map.
 
 ### Dry Run
-`nums2 = [1, 3, 4, 2]`, `nums1 = [4, 1, 2]`:
-```
-v=1  stack=[]        push 1        stack=[1]
-v=3  3>1 pop1 nge[1]=3, push3      stack=[3]
-v=4  4>3 pop3 nge[3]=4, push4      stack=[4]
-v=2  2<4 push2                     stack=[4,2]
-end -> nge={1:3, 3:4}
-map nums1: 4->-1, 1->3, 2->-1
-```
-Result `[-1, 3, -1]`.
+
+Input: `nums1 = [4, 1, 2]`, `nums2 = [1, 3, 4, 2]`
+
+| i | `nums2[i]` | pops (value → its next greater) | stack after (indices) | stack values | map so far |
+|---|---|---|---|---|---|
+| 0 | 1 | — | `[0]` | `[1]` | `{}` |
+| 1 | 3 | `1 → 3` | `[1]` | `[3]` | `{1:3}` |
+| 2 | 4 | `3 → 4` | `[2]` | `[4]` | `{1:3, 3:4}` |
+| 3 | 2 | none (`4 > 2`) | `[2,3]` | `[4,2]` | `{1:3, 3:4}` |
+
+Leftovers `4` and `2` never found anything greater → they are absent from the map.
+Lookup: `4 → -1`, `1 → 3`, `2 → -1`.
+
+Output: **`[-1, 3, -1]`**
 
 ### Visualization
-```
-input  ──▶ [ apply Monotonic Increasing Stack step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums2 =  1    3    4    2
+         └─▶3 └─▶4      (each pop pairs a value with the element that popped it)
+
+stack values (top right):  [1]  [3]  [4]  [4,2]
+                                       ^ never popped → answer -1
+
+nums1 =  4    1    2
+         ↓    ↓    ↓
+        -1    3   -1
 ```
 
 ### Code
+
+```go
+func nextGreaterElement(nums1 []int, nums2 []int) []int {
+	nextGreater := make(map[int]int, len(nums2))
+	stack := make([]int, 0, len(nums2)) // indices into nums2; values decreasing
+	for i, v := range nums2 {
+		for len(stack) > 0 && nums2[stack[len(stack)-1]] < v {
+			j := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			nextGreater[nums2[j]] = v
+		}
+		stack = append(stack, i)
+	}
+	res := make([]int, len(nums1))
+	for i, v := range nums1 {
+		if g, ok := nextGreater[v]; ok {
+			res[i] = g
+		} else {
+			res[i] = -1
+		}
+	}
+	return res
+}
+```
+
 ```python
 def nextGreaterElement(nums1, nums2):
-    nge = {}
-    stack = []                          # values, decreasing
-    for v in nums2:
-        while stack and stack[-1] < v:
-            nge[stack.pop()] = v
-        stack.append(v)
-    return [nge.get(v, -1) for v in nums1]
+    next_greater = {}
+    stack = []                              # indices into nums2, values decreasing
+    for i, v in enumerate(nums2):
+        while stack and nums2[stack[-1]] < v:
+            next_greater[nums2[stack.pop()]] = v
+        stack.append(i)
+    return [next_greater.get(v, -1) for v in nums1]
 ```
 
 ### Complexity
-Time O(n + m), Space O(n) for the stack and map (n = len(nums2), m = len(nums1)).
+Time O(n + m) — one pass over `nums2` (n) plus one map lookup per element of `nums1` (m).
+Space O(n) for the stack and the map.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Largest Rectangle (LeetCode 84)
-A representative **Monotonic Increasing Stack** problem. The signal: maintain an increasing stack to find nearest smaller elements.
+Given bar heights of a histogram (all bars width 1), return the area of the largest
+rectangle that fits inside it.
+
+This is the increasing stack in its natural habitat — see chapter 38 for the full
+derivation.
 
 ### Thought Process
-1. Each bar defines a maximal rectangle whose height is that bar; its width spans until a strictly shorter bar on each side.
-2. Keep a stack of indices with heights in increasing order. When a bar shorter than the stack top arrives, the top's rectangle can be closed.
-3. On popping index `top`, its height is `heights[top]` and its width is bounded left by the new stack top and right by the current index `i`, giving width `i - stack[-1] - 1` (or `i` if the stack is empty).
-4. Append a sentinel height 0 at the end to flush all remaining bars.
+1. Every candidate rectangle is limited by its shortest bar, so it is enough to ask, for
+   each bar `i`: how wide can a rectangle of height `heights[i]` grow?
+2. It grows left until a strictly shorter bar and right until a shorter bar — exactly the
+   nearest-smaller query this chapter answers.
+3. With an increasing stack, popping `i` reveals both boundaries at once: the new stack top
+   is the left boundary `left`, the current index is the right boundary `i`, so
+   `width = i - left - 1`.
+4. Append a sentinel height `0` so every remaining bar is forced out of the stack and
+   measured.
 
 ### Dry Run
-Input `[2, 1, 5, 6, 2]` (append sentinel 0):
-```
-i=0 h=2  push0                       stack=[0]
-i=1 h=1  1<2 pop0 area=2*1=2          stack=[1]  push1
-i=2 h=5  push2                        stack=[1,2]
-i=3 h=6  push3                        stack=[1,2,3]
-i=4 h=2  2<6 pop3 area=6*(4-2-1)=6
-         2<5 pop2 area=5*(4-1-1)=10   best=10  push4
-i=5 h=0  pop4 area=2*(5-1-1)=6, pop1 area=1*5=5
-```
-Best area `10`.
+
+Input: `heights = [2, 1, 5, 6, 2]`, scanned with a virtual sentinel `0` at index 5.
+
+| i | h | pop | popped height | left = new top | width = `i-left-1` | area | best |
+|---|---|---|---|---|---|---|---|
+| 0 | 2 | — | | | | | 0 |
+| 1 | 1 | `0` | 2 | none (−1) | `1-(-1)-1 = 1` | 2 | 2 |
+| 2 | 5 | — | | | | | 2 |
+| 3 | 6 | — | | | | | 2 |
+| 4 | 2 | `3` | 6 | 2 | `4-2-1 = 1` | 6 | 6 |
+| 4 | 2 | `2` | 5 | 1 | `4-1-1 = 2` | **10** | **10** |
+| 5 | 0 | `4` | 2 | 1 | `5-1-1 = 3` | 6 | 10 |
+| 5 | 0 | `1` | 1 | none (−1) | `5-(-1)-1 = 5` | 5 | 10 |
+
+Output: **`10`**
+
+The winning row is `i=4, pop 2`: bar `5` reaches left to index 2 and right to index 3, so
+width 2 and area 10. Without the sentinel row the last two rectangles (`2×3` and `1×5`)
+would never be measured at all.
 
 ### Visualization
-```
-input  ──▶ [ apply Monotonic Increasing Stack step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+index    0    1    2    3    4
+height   2    1    5    6    2
+                   █    █
+                 ┌─██──██─┐          ← height 5, width 2, area 10  ★
+              █  │ ██   ██ │  █
+              ██ │ ██   ██ │  ██
+         ────────┴─────────┴──────
+
+stack (indices, heights increasing bottom → top):
+  [0]  →  [1]  →  [1,2]  →  [1,2,3]  →  [1,4]  →  []
+   2       1      1,5       1,5,6      1,2     drained by the sentinel
 ```
 
 ### Code
+
+```go
+func largestRectangleArea(heights []int) int {
+	best := 0
+	stack := make([]int, 0, len(heights)+1) // indices; heights increase bottom → top
+	for i := 0; i <= len(heights); i++ {
+		h := 0 // sentinel at i == len(heights) forces every bar out
+		if i < len(heights) {
+			h = heights[i]
+		}
+		for len(stack) > 0 && heights[stack[len(stack)-1]] >= h {
+			top := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			left := -1 // no shorter bar on the left → rectangle starts at index 0
+			if len(stack) > 0 {
+				left = stack[len(stack)-1]
+			}
+			if area := heights[top] * (i - left - 1); area > best {
+				best = area
+			}
+		}
+		stack = append(stack, i)
+	}
+	return best
+}
+```
+
 ```python
 def largestRectangleArea(heights):
-    stack = []                          # indices, heights increasing
     best = 0
-    for i, h in enumerate(heights + [0]):
+    stack = []                                  # indices, heights increasing
+    for i in range(len(heights) + 1):
+        h = heights[i] if i < len(heights) else 0   # sentinel drains the stack
         while stack and heights[stack[-1]] >= h:
             height = heights[stack.pop()]
-            width = i - stack[-1] - 1 if stack else i
-            best = max(best, height * width)
+            left = stack[-1] if stack else -1
+            best = max(best, height * (i - left - 1))
         stack.append(i)
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each bar is pushed and popped exactly once.
+Time O(n) — `n+1` pushes and at most `n+1` pops. Space O(n) — the stack holds at most every
+index once (a strictly increasing histogram).
 
+---
 
 ## 12. LeetCode Practice Set
 

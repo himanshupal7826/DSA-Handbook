@@ -41,32 +41,139 @@ last, rightmost, binary search, duplicates, boundary.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Where does the target **end**? Give me the rightmost index."*
+
+Running example: `nums = [5, 7, 7, 8, 8, 10]`, `target = 8`. (Answer: index 4.)
+
 ### Intuition
-Linear scan checks each candidate — O(n).
+Scan from the **right** and return the first index whose value equals the target — starting from the right makes the first hit the rightmost hit.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For `i` from `n − 1` down to `0`:
+2. &nbsp;&nbsp;If `nums[i] == target`, return `i`.
+3. Return `-1`.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n)** — worst case the target sits at the front or is absent.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Last Occurrence pattern is built to use.
+- The tempting patch — binary search for any match, then walk **right** while `nums[i+1] == target` — is still O(n). On `[8,8,8,…,8]` with a million entries, the probe lands in the middle and the walk covers half a million indices. You paid for a logarithmic search and got a linear one.
+- The wasted work is concrete: on the running example the right-to-left scan reads `10`, then `8`. The `10` comparison already proved (via sortedness) that every index above 5 is too large — but the scan can't use that; it only ever learns about the one cell it touched.
+- The scan also can't answer the neighbouring question "how many 8s are there?" without a second pass, whereas the boundary approach below gets it by subtraction.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-If the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Last Occurrence invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Binary search can only ever find a *first* TRUE — so to find the last target, search for the first thing that is *bigger*, and step back one.**
+
+That sentence is worth re-reading, because it dissolves the whole difficulty of "last occurrence" problems. A collapsing `[lo, hi)` range always converges on a wall with FALSEs on the left and TRUEs on the right; it points at the *start* of the TRUE block. There is no separate "find the last one" loop to memorise. You reframe: the last 8 is the cell immediately before the first thing greater than 8.
+
+### The thought process
+
+```text
+We need    : the RIGHTMOST index holding target.
+Obvious way: binary search, then walk right.
+Too slow   : O(n) when duplicates are dense.
+Notice     : the loop converges on a FIRST-TRUE wall — it cannot converge on a last-true.
+Reframe    : first index with a[i] >  target   is one PAST the last target.
+Therefore  : run the same loop with <= instead of <, then subtract 1.
+Now        : O(log n), no walking.
+```
+
+### Why the comparison becomes `<=` — and nothing else changes
+
+The lower bound (chapter 21) asks "is `a[mid]` too small to be the answer?" and answers `a[mid] < target`. The upper bound asks the *same* question about a different wall:
+
+```text
+lower bound wall : first index with a[i] >= target    →  push lo past everything <  target
+upper bound wall : first index with a[i] >  target    →  push lo past everything <= target
+```
+
+So the only edit is one character in the comparison:
+
+```text
+lower bound:   if a[mid] <  target  → lo = mid + 1   else hi = mid
+upper bound:   if a[mid] <= target  → lo = mid + 1   else hi = mid
+                        ↑
+             equal values are now "already handled, move past them"
+```
+
+With `<=`, landing exactly on a target is no longer a reason to keep `mid` — that copy is accounted for, and we want to know whether there are *more* to its right. That is what drags `lo` to the far end of the run of equal values.
+
+### The loop invariant, in words
+
+> **The answer, if it exists, is always inside `[lo, hi)`.**
+
+True at the start (`[0, n)` is everything), preserved by both branches (each discards only indices proved impossible), and when `lo == hi`:
+
+```text
+every index < lo   →  proved a[i] <= target
+every index >= lo  →  proved a[i] >  target
+```
+
+`lo` is the upper bound. Termination is the same argument as always: integer division rounds down, so `lo <= mid < hi`, meaning `lo = mid + 1` strictly grows `lo` and `hi = mid` strictly shrinks `hi`. The gap falls by at least 1 each pass.
+
+And `mid = lo + (hi - lo) / 2`, never `(lo + hi) / 2` — with `lo` and `hi` near 2×10⁹ the sum overflows a 32-bit int and wraps negative, producing an out-of-range index or an endless loop. `hi - lo` is always ≤ `hi`, so the subtraction form is safe by construction.
+
+### Turning the upper bound into the last occurrence
+
+```text
+i = upperBound(nums, target)          # first index with nums[i] > target
+if i > 0 and nums[i-1] == target → i-1 is the LAST occurrence
+else                             → target is absent, return -1
+```
+
+Both guards earn their place. `i > 0` catches a target smaller than everything (`lo` never moves, so `i-1` would be `-1`, an out-of-bounds read in most languages). `nums[i-1] == target` catches a target that falls in a gap between two present values.
+
+> **Integer shortcut:** for integers, `nums[i] > target` and `nums[i] >= target + 1` are the same condition, so `upperBound(t) == lowerBound(t + 1)`. If you only ever want to write *one* loop, write the lower bound and call it with `t + 1`. This does **not** work for floats or for values at the type's maximum.
+
+### One algorithm, four variants
+
+| Want | Move `lo` when | Return |
+|------|----------------|--------|
+| **lower bound** — first `i` with `a[i] >= t` (ch. 23) | `a[mid] <  t` | `lo` |
+| **upper bound** — first `i` with `a[i] > t` (ch. 24) | `a[mid] <= t` | `lo` |
+| **first occurrence** of `t` (ch. 21) | `a[mid] <  t` | `lo` if `lo < n && a[lo] == t`, else `-1` |
+| **last occurrence** of `t` (this chapter) | `a[mid] <= t` | `lo-1` if `lo > 0 && a[lo-1] == t`, else `-1` |
+| **count** of `t` | — | `upperBound(t) − lowerBound(t)` |
+
+Four rows, one loop body. The middle column holds a single character of difference; the right column holds the rest.
+
+### Steps
+
+```text
+Step 1 → lo = 0, hi = n
+Step 2 → while lo < hi:
+Step 3 →     mid = lo + (hi - lo) / 2
+Step 4 →     if nums[mid] <= target → lo = mid + 1    (this copy is handled; look right)
+Step 5 →     else                   → hi = mid        (too big; the wall is here or left)
+Step 6 → if lo > 0 and nums[lo-1] == target → return lo - 1
+Step 7 → return -1
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "last/rightmost occurrence", "ending position", "greatest index such that ...",
+  "largest value <= x", "the most recent entry at or before time t",
+  a sorted array WITH DUPLICATES
+        ↓
+Think about...
+  "What is the first thing that is TOO BIG? My answer is right before it."
+        ↓
+Use...
+  the upper-bound loop (<= moves lo), then step back one
+  ├─ want the count of targets     → upperBound(t) - lowerBound(t)
+  ├─ want the largest value <= t   → upperBound(t) - 1  (no equality check needed)
+  └─ integers only                 → upperBound(t) == lowerBound(t+1)
+```
 
 ### Visual explanation
 
@@ -91,69 +198,169 @@ If the space is sorted (or a predicate is monotonic), comparing the middle lets 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Last Occurrence   : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [ 5,  7,  7,  8,  8, 10 ]     target = 8
+index    0   1   2   3   4   5
+
+predicate "nums[i] > 8":
+         F   F   F   F   F   T
+                             ↑
+                 first TRUE = 5 = one PAST the last 8
+                 last occurrence = 5 - 1 = 4  ★
+
+step 1  [lo=0 ─────────────────── hi=6)   mid=3  nums[3]=8 <= 8 → move past → lo=4
+step 2                  [lo=4 ─── hi=6)   mid=5  nums[5]=10 > 8 → too big   → hi=5
+step 3                  [lo=4 hi=5)       mid=4  nums[4]=8 <= 8 → move past → lo=5
+        lo == hi == 5
+
+then check: 5 > 0 and nums[4] == 8  →  last occurrence = 4
+
+note steps 1 and 3: we landed ON an 8 twice and moved RIGHT both times —
+that is the entire difference from chapter 21, where we would have moved left
 ```
 
 ### Interview explanation
-"This is a Last Occurrence problem. I'll if the space is sorted (or a predicate is monotonic), comparing the middle lets you discard half every iteration. That brings the complexity down to O(log n) time and O(1) space — here's the template."
+"Binary search converges on a first-`true` boundary, so I never try to search for a 'last' anything directly — I search for the first element that is *strictly greater* than the target and subtract one. That's the upper bound, and it's the lower-bound loop with `<` changed to `<=`: when `nums[mid] <= target` that copy is already accounted for, so `lo = mid + 1` pushes past it, and otherwise `hi = mid` because `mid` is too big. I keep the half-open invariant that the answer stays inside `[lo, hi)`, and use `lo + (hi-lo)/2` so the midpoint can't overflow. Afterwards I guard with `lo > 0 && nums[lo-1] == target` to distinguish 'present' from 'absent'. O(log n) time, O(1) space — and as a bonus, `upperBound − lowerBound` gives the number of copies for free."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Binary Search** family template. Adapt the comparison/condition to the specific problem.
+> Same loop as the lower bound with `<` swapped for `<=`; then step back one index.
 
 ```go
-// Lower bound: first index with a[i] >= target. Half-open invariant [lo, hi).
-func lowerBound(a []int, target int) int {
+// UpperBound returns the first index i with a[i] > target (len(a) if none).
+// Invariant: the answer always lies in [lo, hi).
+func UpperBound(a []int, target int) int {
     lo, hi := 0, len(a)
     for lo < hi {
-        mid := lo + (hi-lo)/2     // avoids overflow
+        mid := lo + (hi-lo)/2 // overflow-safe midpoint
+        if a[mid] <= target {
+            lo = mid + 1 // equal counts as "handled" → look further right
+        } else {
+            hi = mid // strictly greater → the wall is here or to the left
+        }
+    }
+    return lo
+}
+
+// LastOccurrence returns the rightmost index of target, or -1 if absent.
+func LastOccurrence(a []int, target int) int {
+    i := UpperBound(a, target)
+    if i > 0 && a[i-1] == target {
+        return i - 1
+    }
+    return -1
+}
+
+// CountEqual returns how many copies of target the sorted slice holds.
+func CountEqual(a []int, target int) int {
+    lo, hi := 0, len(a)
+    for lo < hi { // lower bound: first index with a[i] >= target
+        mid := lo + (hi-lo)/2
         if a[mid] < target {
             lo = mid + 1
         } else {
             hi = mid
         }
     }
-    return lo
+    return UpperBound(a, target) - lo // upper bound minus lower bound
 }
 ```
 
 ```python
-def lower_bound(a, target):
-    lo, hi = 0, len(a)            # half-open [lo, hi)
+def upper_bound(a, target):
+    """First index i with a[i] > target (len(a) if none)."""
+    lo, hi = 0, len(a)
     while lo < hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2      # overflow-safe habit
+        if a[mid] <= target:
+            lo = mid + 1               # equal is "handled" → look further right
+        else:
+            hi = mid                   # strictly greater → wall is here or left
+    return lo
+
+
+def last_occurrence(a, target):
+    """Rightmost index of target, or -1 if absent."""
+    i = upper_bound(a, target)
+    return i - 1 if i > 0 and a[i - 1] == target else -1
+
+
+def count_equal(a, target):
+    """How many copies of target the sorted list holds."""
+    lo, hi = 0, len(a)
+    while lo < hi:                     # lower bound: first index >= target
+        mid = lo + (hi - lo) // 2
         if a[mid] < target:
             lo = mid + 1
         else:
             hi = mid
-    return lo                     # first index with a[i] >= target
+    return upper_bound(a, target) - lo
 ```
 
 ```java
-int lowerBound(int[] a, int target) {
-    int lo = 0, hi = a.length;
-    while (lo < hi) {
-        int mid = lo + (hi - lo) / 2;
-        if (a[mid] < target) lo = mid + 1;
-        else hi = mid;
+public class LastOccurrenceSearch {
+    // First index i with a[i] > target (a.length if none).
+    public static int upperBound(int[] a, int target) {
+        int lo = 0, hi = a.length;
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;        // overflow-safe
+            if (a[mid] <= target) lo = mid + 1;  // equal → look further right
+            else hi = mid;                       // strictly greater → wall is left
+        }
+        return lo;
     }
-    return lo;
+
+    // Rightmost index of target, or -1 if absent.
+    public static int lastOccurrence(int[] a, int target) {
+        int i = upperBound(a, target);
+        return (i > 0 && a[i - 1] == target) ? i - 1 : -1;
+    }
+
+    // How many copies of target the sorted array holds.
+    public static int countEqual(int[] a, int target) {
+        int lo = 0, hi = a.length;
+        while (lo < hi) {                        // lower bound
+            int mid = lo + (hi - lo) / 2;
+            if (a[mid] < target) lo = mid + 1;
+            else hi = mid;
+        }
+        return upperBound(a, target) - lo;
+    }
 }
 ```
 
 ```cpp
-int lowerBound(vector<int>& a, int target) {
+#include <vector>
+using namespace std;
+
+// First index i with a[i] > target (a.size() if none).
+int upperBound(const vector<int>& a, int target) {
     int lo = 0, hi = (int)a.size();
     while (lo < hi) {
+        int mid = lo + (hi - lo) / 2;         // overflow-safe
+        if (a[mid] <= target) lo = mid + 1;   // equal → look further right
+        else hi = mid;                        // strictly greater → wall is left
+    }
+    return lo;
+}
+
+// Rightmost index of target, or -1 if absent.
+int lastOccurrence(const vector<int>& a, int target) {
+    int i = upperBound(a, target);
+    return (i > 0 && a[i - 1] == target) ? i - 1 : -1;
+}
+
+// How many copies of target the sorted vector holds.
+int countEqual(const vector<int>& a, int target) {
+    int lo = 0, hi = (int)a.size();
+    while (lo < hi) {                         // lower bound
         int mid = lo + (hi - lo) / 2;
         if (a[mid] < target) lo = mid + 1;
         else hi = mid;
     }
-    return lo;
+    return upperBound(a, target) - lo;
 }
 ```
 
@@ -239,126 +446,304 @@ int lowerBound(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — First Last Position (LeetCode 34)
-Given a sorted array with duplicates, return `[first, last]` — the leftmost and rightmost indices of `target`, or `[-1, -1]` if absent.
+Given a sorted array with duplicates, return `[first, last]` — the leftmost and rightmost indices of `target` — or `[-1, -1]` if it is absent. Required complexity: O(log n).
 
 ### Thought Process
-1. Run a lower-bound search: first index with `nums[i] >= target`. That is the *first* occurrence (if it equals target).
-2. For the *last* occurrence, run an upper-bound search: first index with `nums[i] > target`, then subtract 1 — this is the Last Occurrence move.
-3. Guard the empty/absent case: if the first index is out of range or `nums[first] != target`, return `[-1, -1]`.
+1. Two walls, two searches: `first` is the **lower bound** (first index with `nums[i] >= target`), `last` is the **upper bound minus one** (first index with `nums[i] > target`, step back).
+2. Both searches are the same loop; only the comparison differs — `<` for the lower bound, `<=` for the upper bound.
+3. Run the lower bound first and use it as the presence test: if it lands past the end, or on a value that isn't the target, return `[-1, -1]` and skip the second search.
+4. If the target *is* present, `upperBound(target) - 1` is guaranteed to be in range and to hold the target, so no second guard is needed.
+5. As a free extra, `upperBound − lowerBound` is the number of copies.
 
 ### Dry Run
-`nums = [5,7,7,8,8,10], target = 8`
-- lower_bound(8) → first index with value ≥ 8 → index 3.
-- upper_bound(8) → first index with value > 8 → index 5; last = 5 - 1 = 4.
-- `nums[3] == 8`, so answer = `[3, 4]`.
+
+Input: `nums = [5, 7, 7, 8, 8, 10]`, `target = 8`
+
+**Search A — lower bound** (`nums[mid] < 8` moves `lo`):
+
+| step | `lo` | `hi` | `mid` | `nums[mid]` | `< 8`? | action |
+|------|------|------|-------|-------------|--------|--------|
+| 1 | 0 | 6 | **3** | 8 | no | `hi = 3` — keep the candidate |
+| 2 | 0 | 3 | **1** | 7 | yes | `lo = 2` |
+| 3 | 2 | 3 | **2** | 7 | yes | `lo = 3` |
+| 4 | 3 | 3 | — | — | — | stop → `first = 3` |
+
+**Search B — upper bound** (`nums[mid] <= 8` moves `lo`):
+
+| step | `lo` | `hi` | `mid` | `nums[mid]` | `<= 8`? | action |
+|------|------|------|-------|-------------|---------|--------|
+| 1 | 0 | 6 | **3** | 8 | **yes** | `lo = 4` — move *past* this copy |
+| 2 | 4 | 6 | **5** | 10 | no | `hi = 5` |
+| 3 | 4 | 5 | **4** | 8 | **yes** | `lo = 5` — move past this copy too |
+| 4 | 5 | 5 | — | — | — | stop → upper bound = 5, `last = 4` |
+
+Output: **`[3, 4]`** — and the count is `5 − 3 = 2`, which matches the two 8s.
+
+Compare step 1 of the two searches. Both probe index 3 and both see the value 8. Search A treats it as a candidate and moves `hi` **left**; search B treats it as already handled and moves `lo` **right**. One character of difference in the comparison, opposite directions, opposite walls.
 
 ### Visualization
-```
-[5,7,7,8,8,10]  target=8
-        ^   ^
-     first=3 last=upper(5)-1=4  ──▶ [3,4]
+
+```text
+nums  =  5   7   7   8   8  10
+index    0   1   2   3   4   5
+
+>= 8  :  F   F   F   T   T   T     lower bound = 3   → first = 3
+>  8  :  F   F   F   F   F   T     upper bound = 5   → last  = 5 - 1 = 4
+                     ├───────┤
+                     the run of 8s
+
+count = upper - lower = 5 - 3 = 2
 ```
 
 ### Code
+
+```go
+// lowerBoundIdx: first index i with a[i] >= target, or len(a).
+func lowerBoundIdx(a []int, target int) int {
+    lo, hi := 0, len(a)
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if a[mid] < target {
+            lo = mid + 1 // strictly smaller → answer is right
+        } else {
+            hi = mid // equal or bigger → mid is still a candidate
+        }
+    }
+    return lo
+}
+
+// upperBoundIdx: first index i with a[i] > target, or len(a).
+// Identical loop; only the comparison changes from < to <=.
+func upperBoundIdx(a []int, target int) int {
+    lo, hi := 0, len(a)
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if a[mid] <= target {
+            lo = mid + 1 // equal is handled → move PAST it
+        } else {
+            hi = mid // strictly bigger → the wall is here or left
+        }
+    }
+    return lo
+}
+
+func searchRange(nums []int, target int) []int {
+    first := lowerBoundIdx(nums, target)
+    if first == len(nums) || nums[first] != target {
+        return []int{-1, -1} // absent
+    }
+    last := upperBoundIdx(nums, target) - 1 // one before the first bigger value
+    return []int{first, last}
+}
+```
+
 ```python
 def searchRange(nums, target):
-    def lower_bound(x):
+    def lower_bound(t):                 # first index with nums[i] >= t
         lo, hi = 0, len(nums)
         while lo < hi:
-            mid = (lo + hi) // 2
-            if nums[mid] < x:
+            mid = lo + (hi - lo) // 2
+            if nums[mid] < t:
                 lo = mid + 1
+            else:
+                hi = mid                # still a candidate
+        return lo
+
+    def upper_bound(t):                 # first index with nums[i] > t
+        lo, hi = 0, len(nums)
+        while lo < hi:
+            mid = lo + (hi - lo) // 2
+            if nums[mid] <= t:
+                lo = mid + 1            # equal is handled → move past it
             else:
                 hi = mid
         return lo
 
     first = lower_bound(target)
     if first == len(nums) or nums[first] != target:
-        return [-1, -1]
-    last = lower_bound(target + 1) - 1   # upper bound - 1
-    return [first, last]
+        return [-1, -1]                 # absent
+
+    return [first, upper_bound(target) - 1]
 ```
 
 ### Complexity
-Time O(log n) — two binary searches; Space O(1).
+Time **O(log n)** — two halving searches. Space **O(1)**.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — K Closest (LeetCode 658)
-Given a sorted array `arr`, return the `k` elements closest to `x`, in ascending order (ties prefer the smaller value).
+Given a sorted array `arr`, an integer `k` and a value `x`, return the `k` elements closest to `x`, sorted ascending. When two elements are equally close, prefer the smaller one.
 
 ### Thought Process
-1. The answer is a contiguous window of length `k`. We only need its left index `lo`, which ranges over `[0, len(arr) - k]`.
-2. Binary search that left bound: compare the window edges. If `x - arr[mid] > arr[mid + k] - x`, the right edge is closer, so slide right (`lo = mid + 1`); otherwise keep left (`hi = mid`).
-3. When `lo` converges, `arr[lo : lo + k]` is the closest window, already sorted.
+1. **Key observation:** the answer is always a *contiguous* window of length `k`. (If it skipped an element, that skipped element would be closer to `x` than at least one element you kept.) So the whole problem reduces to finding one number: the window's left index.
+2. The left index ranges over `[0, n − k]`. Binary search *that* range instead of the array.
+3. Compare the two elements that would swap if the window slid one step right: `arr[mid]` leaves, `arr[mid + k]` enters. If the entering element is strictly closer — `x − arr[mid] > arr[mid+k] − x` — slide right (`lo = mid + 1`); otherwise the current left edge is at least as good (`hi = mid`).
+4. That predicate is monotonic: as `mid` grows, `x − arr[mid]` shrinks and `arr[mid+k] − x` grows, so "keep left" is false…false, true…true. We are again searching for the first `true`.
+5. **Why `hi` starts at `n − k`, not `n − k + 1`:** index `n − k` is the last legal left edge, and testing it would read `arr[n]`, out of bounds. It never needs testing — it is the fallback answer if every smaller candidate loses. So it sits at `hi` as a guaranteed-true sentinel, and the loop probes only strictly smaller candidates.
+6. On a tie (`x − arr[mid] == arr[mid+k] − x`) we take `hi = mid`, keeping the left window — which is exactly the "prefer the smaller value" rule.
 
 ### Dry Run
-`arr = [1,2,3,4,5], k = 4, x = 3`, search lo in `[0,1]`.
-- mid=0: `x-arr[0]=2` vs `arr[4]-x=2` → not greater → `hi = 0`.
-- lo==hi==0 → window `arr[0:4]` = `[1,2,3,4]`.
+
+Input: `arr = [1, 2, 3, 4, 5]`, `k = 2`, `x = 4` → left index searched in `[0, 3]`, so `lo = 0`, `hi = 3`
+
+| step | `lo` | `hi` | `mid` | leaving `arr[mid]` | entering `arr[mid+k]` | `x−arr[mid]` | `arr[mid+k]−x` | entering closer? | action |
+|------|------|------|-------|--------------------|-----------------------|--------------|----------------|------------------|--------|
+| 1 | 0 | 3 | **1** | `arr[1]=2` | `arr[3]=4` | 4−2 = **2** | 4−4 = **0** | yes (2 > 0) | `lo = 2` — slide right |
+| 2 | 2 | 3 | **2** | `arr[2]=3` | `arr[4]=5` | 4−3 = **1** | 5−4 = **1** | **tie** (1 > 1 is false) | `hi = 2` — keep left |
+| 3 | 2 | 2 | — | — | — | — | — | — | stop → left = **2** |
+
+Output: **`arr[2:4] = [3, 4]`**
+
+Step 2 is the tie-break in action: 3 and 5 are both distance 1 from 4, and the `>` (not `>=`) comparison keeps the window whose extra element is the *smaller* value, 3. Flipping that to `>=` would return `[4, 5]` and fail the problem's tie rule.
+
+Sanity check with the canonical example `arr = [1,2,3,4,5], k = 4, x = 3`: `hi = 1`, step 1 probes `mid = 0` where `x−arr[0] = 2` and `arr[4]−x = 2` — a tie, so `hi = 0` and the answer is `arr[0:4] = [1,2,3,4]`. ✓
 
 ### Visualization
-```
-[1,2,3,4,5] k=4 x=3
- lo=0 ─────┘ window arr[0:4] = [1,2,3,4]
+
+```text
+arr =   1   2   3   4   5        k = 2, x = 4
+index   0   1   2   3   4
+
+left index candidates:  0   1   2   3
+"keep left?"            F   F   T   T(sentinel, never probed)
+                                ↑ first TRUE = 2  ★
+
+mid=1:  window [2,3]  →  slide?  2 leaves (dist 2), 4 enters (dist 0)   YES
+mid=2:  window [3,4]  →  slide?  3 leaves (dist 1), 5 enters (dist 1)   tie → NO
+
+answer = arr[2 : 2+2] = [3, 4]
+
+the array is sorted, but we binary search the WINDOW POSITION, not the values
 ```
 
 ### Code
+
+```go
+func findClosestElements(arr []int, k int, x int) []int {
+    lo, hi := 0, len(arr)-k // candidate left edges; hi is the untested sentinel
+
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        // Sliding right swaps arr[mid] out for arr[mid+k].
+        if x-arr[mid] > arr[mid+k]-x {
+            lo = mid + 1 // the entering element is strictly closer → slide right
+        } else {
+            hi = mid // left edge is at least as good; ties keep the smaller value
+        }
+    }
+    return arr[lo : lo+k]
+}
+```
+
 ```python
 def findClosestElements(arr, k, x):
-    lo, hi = 0, len(arr) - k          # left bound of the window
+    lo, hi = 0, len(arr) - k           # candidate left edges; hi is the sentinel
+
     while lo < hi:
-        mid = (lo + hi) // 2
+        mid = lo + (hi - lo) // 2
+        # sliding right swaps arr[mid] out for arr[mid + k]
         if x - arr[mid] > arr[mid + k] - x:
-            lo = mid + 1              # right edge closer → shift window right
+            lo = mid + 1               # entering element is strictly closer
         else:
-            hi = mid
+            hi = mid                   # keep left; ties prefer the smaller value
+
     return arr[lo:lo + k]
 ```
 
 ### Complexity
-Time O(log(n - k) + k) — binary search plus slicing the window; Space O(1) extra.
+Time **O(log(n − k) + k)** — the binary search over left edges, plus copying out the `k`-element window. Space **O(k)** for the returned slice, O(1) extra.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Single Element (LeetCode 540)
-In a sorted array where every element appears exactly twice except one, find the single element in O(log n) time.
+In a sorted array where every element appears exactly twice except one, find the element that appears once. Required: O(log n) time, O(1) space.
 
 ### Thought Process
-1. Pairs `(0,1),(2,3),...` start at even indices. Before the single element, each pair's first member sits at an even index and equals its right neighbor.
-2. Binary search on even indices. Use `mid ^ 1` to get mid's pair partner (flips the low bit): if `nums[mid] == nums[mid ^ 1]`, the single element is to the right (`lo = mid + 2`); else it's at `mid` or to the left (`hi = mid`).
-3. Keep `lo` even so the invariant holds; `lo` converges on the answer.
+1. Before the single element, the pairs are perfectly aligned: `(0,1), (2,3), (4,5), …` — each pair *starts* at an even index. After the single element, every pair is shifted by one and starts at an **odd** index.
+2. So define, over **even** indices `e`: `broken(e) = (nums[e] != nums[e+1])`. That is false, false, …, true, true — monotonic. Once again: find the first `true`.
+3. Search only even indices. Compute `mid` as usual, then round it **down** to even (`mid -= mid & 1`). Since `lo` is always even and `mid >= lo`, rounding down never falls below `lo`.
+4. `broken(mid)` false → the pairing is still intact through `mid+1`, so the single element is strictly after → `lo = mid + 2` (the next even index). True → `mid` is a candidate → `hi = mid`.
+5. `hi` starts at `n − 1`, the last (even) index — the array has odd length, and that final element is the fallback answer if every pair before it is intact. Like example 2, it is a guaranteed-true sentinel that never needs probing.
 
 ### Dry Run
-`nums = [1,1,2,3,3,4,4]`, lo=0, hi=6.
-- mid=2 (even), `mid^1=3`: `nums[2]=2 != nums[3]=3` → `hi = 2`.
-- mid=0, `mid^1=1`: `nums[0]=1 == nums[1]=1` → `lo = 2`.
-- lo==hi==2 → answer `nums[2] = 2`.
+
+Input: `nums = [1, 1, 2, 3, 3, 4, 4]` (n = 7) → `lo = 0`, `hi = 6`
+
+| step | `lo` | `hi` | raw `mid` | even `mid` | `nums[mid]` | `nums[mid+1]` | pair intact? | action |
+|------|------|------|-----------|------------|-------------|---------------|--------------|--------|
+| 1 | 0 | 6 | 0+3 = 3 | **2** | 2 | 3 | **no** — broken | `hi = 2` (candidate) |
+| 2 | 0 | 2 | 0+1 = 1 | **0** | 1 | 1 | yes | `lo = 2` (skip the whole pair) |
+| 3 | 2 | 2 | — | — | — | — | — | stop → answer `nums[2] = 2` |
+
+Output: **2**
+
+A second trace, `nums = [3,3,7,7,10,11,11]`: step 1 `mid = 3 → 2`, `nums[2]=7 == nums[3]=7` intact → `lo = 4`; step 2 `lo=4, hi=6, mid = 5 → 4`, `nums[4]=10 != nums[5]=11` broken → `hi = 4`; stop → `nums[4] = 10`. ✓
+
+Step 2 in the first trace shows why `lo = mid + 2` and not `mid + 1`: an intact pair rules out **both** of its indices, and jumping by 2 keeps `lo` even so the "even index starts a pair" invariant survives.
 
 ### Visualization
-```
-[1,1,2,3,3,4,4]
-     ^ pairs break here → single = nums[2] = 2
+
+```text
+index    0   1   2   3   4   5   6
+nums   [ 1,  1,  2,  3,  3,  4,  4 ]
+pairs   └──┘    ?   └──┘    └──┘
+                ↑ the single element breaks the alignment
+
+even index e :   0        2        4        6
+nums[e]==nums[e+1]?  T    F        F        (n/a → sentinel true)
+"broken?"        F        T        T        T
+                          ↑ first TRUE = 2  ★  answer = nums[2] = 2
+
+BEFORE the single: pairs start at EVEN indices
+AFTER  the single: pairs start at ODD indices
 ```
 
 ### Code
+
+```go
+func singleNonDuplicate(nums []int) int {
+    // Search even indices only; hi is the last index and acts as the sentinel.
+    lo, hi := 0, len(nums)-1
+
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        mid -= mid & 1 // round down to an even index (lo is always even)
+
+        if nums[mid] == nums[mid+1] {
+            lo = mid + 2 // pair intact → the single element is strictly after
+        } else {
+            hi = mid // pairing already broken at or before mid
+        }
+    }
+    return nums[lo]
+}
+```
+
 ```python
 def singleNonDuplicate(nums):
+    # search even indices only; hi is the last index and acts as the sentinel
     lo, hi = 0, len(nums) - 1
+
     while lo < hi:
-        mid = (lo + hi) // 2
-        if mid % 2 == 1:          # keep mid on an even index
-            mid -= 1
+        mid = lo + (hi - lo) // 2
+        mid -= mid & 1                 # round down to an even index
+
         if nums[mid] == nums[mid + 1]:
-            lo = mid + 2          # pair intact → single is to the right
+            lo = mid + 2               # pair intact → single element is after
         else:
-            hi = mid              # break here or earlier
+            hi = mid                   # pairing broken at or before mid
+
     return nums[lo]
 ```
 
 ### Complexity
-Time O(log n) — binary search over pairs; Space O(1).
+Time **O(log n)** — each step halves the number of candidate pairs. Space **O(1)**.
 
+---
 
 ## 12. LeetCode Practice Set
 

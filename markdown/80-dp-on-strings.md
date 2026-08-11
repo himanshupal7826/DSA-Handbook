@@ -41,32 +41,138 @@ string dp, edit distance, palindrome, interleaving, matching.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"What is the best way to line up two strings (or a string with itself), one character at a time?"*
+
+Running example: turn `"sea"` into `"eat"` using insert / delete / replace, as cheaply as possible.
+
 ### Intuition
-Naive recursion recomputes overlapping subproblems — exponential time.
+Look at the last character of each string. Either they already agree (nothing to pay, step both back), or they don't — and then you must pay for one of three repairs: delete the last char of the first string, insert the missing char, or replace one with the other. Try all three and recurse.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. `solve(i, j)` = cost of turning the first `i` chars of `a` into the first `j` chars of `b`.
+2. If `i == 0` return `j` (insert everything). If `j == 0` return `i` (delete everything).
+3. If `a[i-1] == b[j-1]` return `solve(i-1, j-1)`.
+4. Otherwise return `1 + min(solve(i-1, j), solve(i, j-1), solve(i-1, j-1))`.
+5. Answer is `solve(len(a), len(b))`.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(3^(m+n))** — three branches, and each branch shrinks the total length by only one.
+- Space: O(m + n) recursion stack.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the DP on Strings pattern is built to use.
+- The same pair `(i, j)` is reached by many different op sequences. From `solve(3,3)`:
+
+```text
+solve(3,3) → solve(2,3)  → solve(1,2)      "delete, then insert"
+solve(3,3) → solve(3,2)  → solve(2,1)
+solve(3,3) → solve(2,2)  → solve(1,2)      "replace, then insert"  ← same node!
+```
+
+  `solve(1,2)` is computed twice here, and at depth 6 the same node is reached dozens of times. Nothing about it changes between visits — it only depends on `i` and `j`.
+- The brute force never exploits the one fact that makes the whole family easy: **the answer depends only on how much of each string is left, not on which operations got you there.** That is exactly two numbers, so there are only `(m+1)·(n+1)` distinct questions in the entire recursion.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the DP on Strings invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **A string-DP state is nothing but a pair of prefix lengths — `dp[i][j]` answers the whole question for "first `i` chars of A vs first `j` chars of B" — so a grid of `(m+1)×(n+1)` cells holds every subproblem exactly once.**
+
+Think of it as a spreadsheet. Row `i` is "I have consumed `i` characters of A", column `j` is "I have consumed `j` characters of B". Each cell asks one small question, answers it by peeking at two or three neighbours that are already filled in, and writes down a number. When you reach the bottom-right corner you have the answer, and you never asked the same question twice.
+
+### The thought process
+
+```text
+We need    : the best alignment of two strings.
+Obvious way: recurse on "what do I do with the last character?".
+Too slow   : three branches per character -> 3^(m+n).
+Notice     : the recursion's arguments are only (i, j) — two small integers.
+Notice too : (i, j) has at most (m+1)(n+1) values, but the recursion visits
+             many of them thousands of times.
+Therefore  : give every (i, j) a cell in a grid, compute it once, read it forever.
+Now        : O(m*n) time, and each cell is O(1) work.
+```
+
+### Why the fill order is forced (this is the whole game)
+
+A cell may only be computed **after** every cell it reads. So the fill order is decided by the recurrence, not by taste. There are exactly two shapes in this chapter:
+
+**Shape 1 — prefix DP (edit distance, LCS, regex).** `dp[i][j]` reads `dp[i-1][j]`, `dp[i][j-1]`, `dp[i-1][j-1]` — all **up and/or left**:
+
+```text
+      j-1   j
+i-1    ↘    ↓
+i      →   [?]      every arrow comes from a smaller i or a smaller j
+```
+
+So a plain `for i = 1..m { for j = 1..n }` sweep works: by the time you touch `(i, j)`, row `i-1` is entirely done and row `i` is done up to `j-1`.
+
+**Shape 2 — interval DP (palindromes).** `dp[i][j]` = "is `s[i..j]` a palindrome" reads `dp[i+1][j-1]` — that is **one row DOWN and one column LEFT**:
+
+```text
+      j-1   j
+i          [?]
+i+1   [x]           the dependency is BELOW, not above
+```
+
+A naive `for i = 0..n-1` ascending would ask for row `i+1` before it exists. Two orders fix it, and they are the same order in disguise:
+
+* iterate by **increasing substring length**, or
+* iterate `i` **descending**, `j` ascending.
+
+Let's actually watch it happen on `s = "abba"`. `dp[i][j] = (s[i]==s[j]) && (j-i < 2 || dp[i+1][j-1])`. Filling by length:
+
+```text
+length 1 (free):            length 2:                  length 3:
+    j 0  1  2  3                j 0  1  2  3               j 0  1  2  3
+i 0   T  .  .  .            i 0   T  F  .  .           i 0   T  F  F  .
+i 1   -  T  .  .            i 1   -  T  T  .           i 1   -  T  T  F
+i 2   -  -  T  .            i 2   -  -  T  F           i 2   -  -  T  F
+i 3   -  -  -  T            i 3   -  -  -  T           i 3   -  -  -  T
+
+length 4:
+    j 0  1  2  3      dp[0][3]: s[0]='a' == s[3]='a', and it needs dp[1][2].
+i 0   T  F  F [T]     dp[1][2] is the length-2 cell "bb" — filled two rounds
+i 1   -  T  T  F      ago, so it is available. Answer: "abba" is a palindrome.
+i 2   -  -  T  F
+i 3   -  -  -  T
+```
+
+Now break it deliberately. With ascending `i`, computing `dp[0][3]` happens in the very first row — at that moment `dp[1][2]` is still `false` (its default), so `"abba"` would be reported as **not** a palindrome. The bug is silent: no crash, just a wrong answer. That is why the loop order is part of the algorithm, not an implementation detail.
+
+### Steps
+
+```text
+Step 1 → Write the state as an English sentence. "dp[i][j] = <answer> for
+         the first i chars of A and the first j chars of B."
+Step 2 → Write the recurrence by asking "what happens at the last character?"
+Step 3 → Fill in the base row and base column (one string empty).
+Step 4 → Look at which neighbours the recurrence reads.
+Step 5 → Choose the loop order so those neighbours are already written.
+Step 6 → Read the answer out of the corner cell.
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  two strings compared / aligned / interleaved / matched,
+  or one string cut into substrings,
+  and lengths around 1000 (so O(n^2) is fine but O(2^n) is not)
+        ↓
+Think about...
+  "What are the smallest facts that pin down a subproblem?"
+  Two strings  -> a pair of prefix lengths (i, j)
+  One string   -> a substring range (i, j)
+        ↓
+Use...
+  prefix pair  -> dp[i][j] from up / left / diagonal, sweep rows forward
+  substring    -> dp[i][j] from dp[i+1][j-1], sweep by INCREASING LENGTH
+                  (or i descending, j ascending)
+```
 
 ### Visual explanation
 
@@ -101,61 +207,191 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-DP on Strings     : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+Edit distance grid for a = "sea", b = "eat"
+
+            ""   e    a    t
+       ""    0    1    2    3      base row: insert j characters
+       s     1    1    2    3
+       e     2    1    2    3
+       a     3    2    1  [ 2 ]    answer
+             ^
+             base column: delete i characters
+
+each cell looks at three already-filled neighbours:
+
+        dp[i-1][j-1]  dp[i-1][j]        match    -> take the diagonal
+        dp[i][j-1]    dp[i][j]          mismatch -> 1 + min of all three
 ```
 
 ### Interview explanation
-"This is a DP on Strings problem. I'll optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it. That brings the complexity down to O(states × transitions) time and O(states) space — here's the template."
+"String DP problems are all the same move: the state is a pair of prefix lengths, `dp[i][j]`, meaning the answer for the first `i` characters of one string and the first `j` of the other. I derive the recurrence by asking what happens at the last character — either the two characters agree and I move diagonally for free, or I pay one operation and move up, left, or diagonally. Base cases are the empty-string row and column. Since every cell reads only cells above and to the left, a simple forward double loop is a valid fill order. That's O(m·n) time and O(m·n) space, which I can drop to O(n) by keeping only the previous row. The one variation to watch for is interval DP on a single string — there `dp[i][j]` reads `dp[i+1][j-1]`, so I must iterate by increasing substring length instead."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Dynamic Programming** family template. Adapt the comparison/condition to the specific problem.
+> Two skeletons cover this chapter: **prefix-pair DP** sweeps rows forward; **interval DP** sweeps by increasing length.
 
 ```go
-// 0/1 Knapsack, space-optimized to 1D. dp[w] = best value at capacity w.
-func knapsack(weights, values []int, cap int) int {
-    dp := make([]int, cap+1)
-    for i := range weights {
-        for w := cap; w >= weights[i]; w-- {  // reverse: each item once
-            if dp[w-weights[i]]+values[i] > dp[w] {
-                dp[w] = dp[w-weights[i]] + values[i]
+// LCSLength is the prefix-pair skeleton.
+// dp[i][j] = length of the longest common subsequence of a[:i] and b[:j].
+// Reads only up / left / diagonal, so a forward row sweep is a legal order.
+func LCSLength(a, b string) int {
+    m, n := len(a), len(b)
+    dp := make([][]int, m+1)
+    for i := range dp {
+        dp[i] = make([]int, n+1) // dp[0][*] and dp[*][0] are 0: empty prefix
+    }
+
+    for i := 1; i <= m; i++ {
+        for j := 1; j <= n; j++ {
+            if a[i-1] == b[j-1] {
+                dp[i][j] = dp[i-1][j-1] + 1 // matched pair, extend the diagonal
+            } else if dp[i-1][j] >= dp[i][j-1] {
+                dp[i][j] = dp[i-1][j] // drop a[i-1]
+            } else {
+                dp[i][j] = dp[i][j-1] // drop b[j-1]
             }
         }
     }
-    return dp[cap]
+    return dp[m][n]
+}
+
+// PalindromeTable is the interval skeleton.
+// table[i][j] reports whether s[i..j] is a palindrome. Because the recurrence
+// reads table[i+1][j-1] (one row BELOW), we must fill shorter spans first.
+func PalindromeTable(s string) [][]bool {
+    n := len(s)
+    table := make([][]bool, n)
+    for i := range table {
+        table[i] = make([]bool, n)
+        table[i][i] = true // every single character is a palindrome
+    }
+
+    for length := 2; length <= n; length++ { // increasing span length
+        for i := 0; i+length-1 < n; i++ {
+            j := i + length - 1
+            if s[i] != s[j] {
+                continue
+            }
+            // length 2 has an empty interior; longer spans consult the inside,
+            // which was decided in an earlier (shorter) round.
+            if length == 2 || table[i+1][j-1] {
+                table[i][j] = true
+            }
+        }
+    }
+    return table
 }
 ```
 
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def lcs_length(a, b):
+    """dp[i][j] = LCS length of a[:i] and b[:j]. Reads up / left / diagonal."""
+    m, n = len(a), len(b)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]   # empty prefix rows are 0
+
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if a[i - 1] == b[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1   # extend the diagonal
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+    return dp[m][n]
+
+
+def palindrome_table(s):
+    """table[i][j] = is s[i..j] a palindrome. Fill SHORT spans first, because
+    the recurrence reads table[i+1][j-1], which lives one row below."""
+    n = len(s)
+    table = [[False] * n for _ in range(n)]
+    for i in range(n):
+        table[i][i] = True                        # single characters
+
+    for length in range(2, n + 1):                # increasing span length
+        for i in range(0, n - length + 1):
+            j = i + length - 1
+            if s[i] != s[j]:
+                continue
+            if length == 2 or table[i + 1][j - 1]:
+                table[i][j] = True
+    return table
 ```
 
 ```java
-int knapsack(int[] weights, int[] values, int cap) {
-    int[] dp = new int[cap + 1];
-    for (int i = 0; i < weights.length; i++)
-        for (int w = cap; w >= weights[i]; w--)
-            dp[w] = Math.max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+public class StringDP {
+    // dp[i][j] = LCS length of a[:i] and b[:j]; reads up / left / diagonal.
+    public static int lcsLength(String a, String b) {
+        int m = a.length(), n = b.length();
+        int[][] dp = new int[m + 1][n + 1];        // empty-prefix borders are 0
+
+        for (int i = 1; i <= m; i++) {
+            for (int j = 1; j <= n; j++) {
+                if (a.charAt(i - 1) == b.charAt(j - 1))
+                    dp[i][j] = dp[i - 1][j - 1] + 1;   // extend the diagonal
+                else
+                    dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+            }
+        }
+        return dp[m][n];
+    }
+
+    // table[i][j] = is s[i..j] a palindrome. Shorter spans MUST come first:
+    // the recurrence reads table[i + 1][j - 1], one row below.
+    public static boolean[][] palindromeTable(String s) {
+        int n = s.length();
+        boolean[][] table = new boolean[n][n];
+        for (int i = 0; i < n; i++) table[i][i] = true;
+
+        for (int length = 2; length <= n; length++) {
+            for (int i = 0; i + length - 1 < n; i++) {
+                int j = i + length - 1;
+                if (s.charAt(i) != s.charAt(j)) continue;
+                if (length == 2 || table[i + 1][j - 1]) table[i][j] = true;
+            }
+        }
+        return table;
+    }
 }
 ```
 
 ```cpp
-int knapsack(vector<int>& weights, vector<int>& values, int cap) {
-    vector<int> dp(cap + 1, 0);
-    for (size_t i = 0; i < weights.size(); ++i)
-        for (int w = cap; w >= weights[i]; --w)
-            dp[w] = max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+#include <string>
+#include <vector>
+using namespace std;
+
+// dp[i][j] = LCS length of a[:i] and b[:j]; reads up / left / diagonal.
+int lcsLength(const string& a, const string& b) {
+    int m = (int)a.size(), n = (int)b.size();
+    vector<vector<int>> dp(m + 1, vector<int>(n + 1, 0)); // empty-prefix borders
+
+    for (int i = 1; i <= m; ++i) {
+        for (int j = 1; j <= n; ++j) {
+            if (a[i - 1] == b[j - 1])
+                dp[i][j] = dp[i - 1][j - 1] + 1;          // extend the diagonal
+            else
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1]);
+        }
+    }
+    return dp[m][n];
+}
+
+// table[i][j] = is s[i..j] a palindrome. Fill SHORT spans first: the
+// recurrence reads table[i + 1][j - 1], which lives one row below.
+vector<vector<bool>> palindromeTable(const string& s) {
+    int n = (int)s.size();
+    vector<vector<bool>> table(n, vector<bool>(n, false));
+    for (int i = 0; i < n; ++i) table[i][i] = true;
+
+    for (int length = 2; length <= n; ++length) {
+        for (int i = 0; i + length - 1 < n; ++i) {
+            int j = i + length - 1;
+            if (s[i] != s[j]) continue;
+            if (length == 2 || table[i + 1][j - 1]) table[i][j] = true;
+        }
+    }
+    return table;
 }
 ```
 
@@ -241,39 +477,110 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — Edit Distance (LeetCode 72)
-Return the minimum number of single-character insert / delete / replace operations to turn `word1` into `word2`.
+Return the minimum number of single-character insert / delete / replace operations needed to turn `word1` into `word2`.
 
 ### Thought Process
-1. Let `dp[i][j]` = edit distance between the first `i` chars of `word1` and first `j` chars of `word2`.
-2. Base cases: `dp[i][0] = i` (delete all), `dp[0][j] = j` (insert all).
-3. If `word1[i-1] == word2[j-1]`, characters align: `dp[i][j] = dp[i-1][j-1]`.
-4. Otherwise take `1 + min(dp[i-1][j]` delete, `dp[i][j-1]` insert, `dp[i-1][j-1]` replace`)`.
+1. **What does `dp[i][j]` mean?** *The minimum number of operations to turn the first `i` characters of `word1` into the first `j` characters of `word2`.* Not "the answer at `i`" — a complete, standalone question.
+2. **How do we compute it?** Look at the last character of each prefix. If `word1[i-1] == word2[j-1]` they already agree, so `dp[i][j] = dp[i-1][j-1]` — free. Otherwise pay 1 and pick the cheapest repair: `dp[i-1][j]` (**delete** `word1[i-1]`), `dp[i][j-1]` (**insert** `word2[j-1]`), `dp[i-1][j-1]` (**replace** one with the other).
+3. **Base case?** `dp[i][0] = i`: turning `i` characters into the empty string costs `i` deletions. `dp[0][j] = j`: building `j` characters from nothing costs `j` insertions. `dp[0][0] = 0`.
+4. **Direction?** Every read is up (`i-1`), left (`j-1`), or diagonal — never down or right. So `i` ascending, `j` ascending is legal: those neighbours are already written.
+5. Answer is the corner `dp[m][n]`.
 
 ### Dry Run
-`word1="horse", word2="ros"` → answer 3.
-- `horse → rorse` (replace h→r), then `rorse → rose` (delete r), then `rose → ros` (delete e).
-- Table corner `dp[5][3] = 3`, matching the three operations traced above.
+
+Input: `word1 = "sea"`, `word2 = "eat"`
+
+Base row `dp[0] = [0,1,2,3]`; base column `dp[i][0] = i`.
+
+| i | j | `word1[i-1]` | `word2[j-1]` | match? | up `dp[i-1][j]` | left `dp[i][j-1]` | diag `dp[i-1][j-1]` | `dp[i][j]` |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 1 | s | e | no  | 1 | 1 | 0 | `1 + min(1,1,0)` = **1** |
+| 1 | 2 | s | a | no  | 2 | 1 | 1 | `1 + min(2,1,1)` = **2** |
+| 1 | 3 | s | t | no  | 3 | 2 | 2 | `1 + min(3,2,2)` = **3** |
+| 2 | 1 | e | e | **yes** | — | — | 1 | diag = **1** |
+| 2 | 2 | e | a | no  | 2 | 1 | 1 | `1 + min(2,1,1)` = **2** |
+| 2 | 3 | e | t | no  | 3 | 2 | 2 | `1 + min(3,2,2)` = **3** |
+| 3 | 1 | a | e | no  | 1 | 3 | 2 | `1 + min(1,3,2)` = **2** |
+| 3 | 2 | a | a | **yes** | — | — | 1 | diag = **1** |
+| 3 | 3 | a | t | no  | 3 | 1 | 2 | `1 + min(3,1,2)` = **2** |
+
+Output: **2** — `"sea"` → `"ea"` (delete `s`) → `"eat"` (insert `t`).
+
+Row `i=2, j=1` is the one to stare at: `e` matches `e`, so the cell copies the diagonal `dp[1][0] = 1` *unchanged*. A match never costs anything and never consults the up/left neighbours — the algorithm is only allowed to charge for a mismatch.
 
 ### Visualization
-```
-input  ──▶ [ fill dp[i][j] over the two strings ]
-state  ──▶ each cell reuses the three neighbors above/left/diagonal
-output ──▶ dp[m][n] holds the minimum edit distance
+
+```text
+            ""    e     a     t
+       ""  [ 0 ]  1     2     3
+       s     1  [ 1 ]   2     3
+       e     2  [ 1 ]   2     3
+       a     3    2   [ 1 ] [ 2 ]  <- answer
+
+the cheapest path traced backwards from dp[3][3]:
+
+  dp[3][3]=2  --left--> dp[3][2]=1   (insert 't')
+  dp[3][2]=1  --diag--> dp[2][1]=1   (match 'a')
+  dp[2][1]=1  --diag--> dp[1][0]=1   (match 'e')
+  dp[1][0]=1  --up----> dp[0][0]=0   (delete 's')
+
+  two paid moves  =>  edit distance 2
 ```
 
 ### Code
+
+```go
+// minDistance returns the edit distance between word1 and word2.
+// dp[i][j] = ops to turn word1[:i] into word2[:j].
+func minDistance(word1 string, word2 string) int {
+    m, n := len(word1), len(word2)
+
+    dp := make([][]int, m+1)
+    for i := range dp {
+        dp[i] = make([]int, n+1)
+    }
+    for i := 0; i <= m; i++ {
+        dp[i][0] = i // delete every remaining character
+    }
+    for j := 0; j <= n; j++ {
+        dp[0][j] = j // insert every needed character
+    }
+
+    for i := 1; i <= m; i++ {
+        for j := 1; j <= n; j++ {
+            if word1[i-1] == word2[j-1] {
+                dp[i][j] = dp[i-1][j-1] // characters agree: free
+                continue
+            }
+            del, ins, rep := dp[i-1][j], dp[i][j-1], dp[i-1][j-1]
+            best := del
+            if ins < best {
+                best = ins
+            }
+            if rep < best {
+                best = rep
+            }
+            dp[i][j] = 1 + best
+        }
+    }
+    return dp[m][n]
+}
+```
+
 ```python
 def minDistance(word1, word2):
     m, n = len(word1), len(word2)
     dp = [[0] * (n + 1) for _ in range(m + 1)]
+
     for i in range(m + 1):
-        dp[i][0] = i
+        dp[i][0] = i                    # delete every remaining character
     for j in range(n + 1):
-        dp[0][j] = j
+        dp[0][j] = j                    # insert every needed character
+
     for i in range(1, m + 1):
         for j in range(1, n + 1):
             if word1[i - 1] == word2[j - 1]:
-                dp[i][j] = dp[i - 1][j - 1]
+                dp[i][j] = dp[i - 1][j - 1]      # agree: free
             else:
                 dp[i][j] = 1 + min(dp[i - 1][j],      # delete
                                    dp[i][j - 1],      # insert
@@ -282,7 +589,9 @@ def minDistance(word1, word2):
 ```
 
 ### Complexity
-Time O(m·n), Space O(m·n) (reducible to O(n) with a rolling row).
+Time O(m·n) — one constant-time decision per grid cell. Space O(m·n) for the table, reducible to O(n) because a row only ever reads the row directly above it.
+
+---
 
 ## 10. Solved Example 2
 
@@ -290,95 +599,252 @@ Time O(m·n), Space O(m·n) (reducible to O(n) with a rolling row).
 Return the longest contiguous substring of `s` that reads the same forwards and backwards.
 
 ### Thought Process
-1. Every palindrome has a center: either one character (odd length) or a gap between two characters (even length).
-2. For each of the `2n-1` possible centers, expand outward while the two ends match.
-3. Track the widest `[left, right]` window found and return that slice at the end.
+1. **What does `dp[i][j]` mean?** *A boolean: is the substring `s[i..j]` (inclusive on both ends) a palindrome?*
+2. **How do we compute it?** A span is a palindrome exactly when its two ends match **and** its interior is a palindrome: `dp[i][j] = (s[i] == s[j]) && dp[i+1][j-1]`. The second term is the whole reason this is DP and not a rescan — the interior was already decided.
+3. **Base case?** `dp[i][i] = true` — one character always reads the same both ways. And a span of length 2 has an *empty* interior, which is vacuously a palindrome, so `dp[i][i+1] = (s[i] == s[i+1])`. Without that second base case the code would index `dp[i+1][i]`, a cell below the diagonal that means nothing.
+4. **Direction?** `dp[i][j]` reads `dp[i+1][j-1]` — one row **below**, one column left. Ascending `i` would read row `i+1` before it exists. Iterating by **increasing span length** guarantees the interior (which is exactly 2 shorter) is already final.
+5. Track the widest `true` span as you go and slice it out at the end.
 
 ### Dry Run
-`s = "babad"` → answer "bab" (or "aba").
-- Center at index 1 ('a'): expand to `b a b` → length 3, record [0,2].
-- Center at index 2 ('b'): expand to `a b a` → length 3, no improvement; best stays "bab".
+
+Input: `s = "babad"` (indices `b=0 a=1 b=2 a=3 d=4`)
+
+| length | i | j | `s[i]`,`s[j]` | ends match? | interior `dp[i+1][j-1]` | `dp[i][j]` | best so far |
+|--------|---|---|---------------|-------------|--------------------------|-----------|-------------|
+| 1 | 0..4 | = i | — | — | — | all **true** | `"b"` (len 1) |
+| 2 | 0 | 1 | b, a | no | — | false | `"b"` |
+| 2 | 1 | 2 | a, b | no | — | false | `"b"` |
+| 2 | 2 | 3 | b, a | no | — | false | `"b"` |
+| 2 | 3 | 4 | a, d | no | — | false | `"b"` |
+| 3 | 0 | 2 | b, b | **yes** | `dp[1][1]` = true | **true** | **`"bab"` (len 3)** |
+| 3 | 1 | 3 | a, a | **yes** | `dp[2][2]` = true | **true** | `"bab"` (tie, keep first) |
+| 3 | 2 | 4 | b, d | no | — | false | `"bab"` |
+| 4 | 0 | 3 | b, a | no | — | false | `"bab"` |
+| 4 | 1 | 4 | a, d | no | — | false | `"bab"` |
+| 5 | 0 | 4 | b, d | no | — | false | `"bab"` |
+
+Output: **`"bab"`** (`"aba"` is an equally valid answer; LeetCode accepts either.)
+
+The length-3 rows are the point of the whole ordering: `dp[0][2]` consults `dp[1][1]`, which was written in the **length-1** round. Had we swept `i` upward instead, `dp[0][2]` would have been asked before `dp[1][1]` existed.
 
 ### Visualization
-```
-input  ──▶ [ try each center, expand outward ]
-state  ──▶ best [left, right] window widens only when both ends match
-output ──▶ s[left : right + 1] is the longest palindrome
+
+```text
+s = b  a  b  a  d
+    0  1  2  3  4
+
+fill order (each number is the round that writes the cell):
+
+      j=  0    1    2    3    4
+  i=0     1    2    3    4    5
+  i=1     -    1    2    3    4
+  i=2     -    -    1    2    3
+  i=3     -    -    -    1    2
+  i=4     -    -    -    -    1
+
+  round = span length. Diagonals fill outward from the main diagonal.
+
+dp[0][2] "bab"          dp[0][3] "baba"
+   ends  b == b  OK        ends  b != a  -> false immediately
+   inner dp[1][1] "a"      (no need to look inside at all)
+   -> true, length 3
 ```
 
 ### Code
+
+```go
+// longestPalindrome returns the longest palindromic substring of s using an
+// interval DP table filled by INCREASING span length.
+func longestPalindrome(s string) string {
+    n := len(s)
+    if n == 0 {
+        return ""
+    }
+
+    // isPal[i][j] = true when s[i..j] reads the same both ways.
+    isPal := make([][]bool, n)
+    for i := range isPal {
+        isPal[i] = make([]bool, n)
+        isPal[i][i] = true // base case: one character
+    }
+
+    bestStart, bestLen := 0, 1
+
+    for length := 2; length <= n; length++ { // shorter spans are already final
+        for i := 0; i+length-1 < n; i++ {
+            j := i + length - 1
+            if s[i] != s[j] {
+                continue // ends disagree: cannot be a palindrome
+            }
+            // length 2 has an empty interior; longer spans read the interior,
+            // which was decided in the round for length-2.
+            if length == 2 || isPal[i+1][j-1] {
+                isPal[i][j] = true
+                if length > bestLen {
+                    bestStart, bestLen = i, length
+                }
+            }
+        }
+    }
+    return s[bestStart : bestStart+bestLen]
+}
+```
+
 ```python
 def longestPalindrome(s):
-    if not s:
+    n = len(s)
+    if n == 0:
         return ""
-    start, end = 0, 0
 
-    def expand(l, r):
-        while l >= 0 and r < len(s) and s[l] == s[r]:
-            l -= 1
-            r += 1
-        return l + 1, r - 1        # last valid window
+    # is_pal[i][j] = does s[i..j] read the same both ways?
+    is_pal = [[False] * n for _ in range(n)]
+    for i in range(n):
+        is_pal[i][i] = True                  # base case: one character
 
-    for i in range(len(s)):
-        l1, r1 = expand(i, i)      # odd-length center
-        l2, r2 = expand(i, i + 1)  # even-length center
-        if r1 - l1 > end - start:
-            start, end = l1, r1
-        if r2 - l2 > end - start:
-            start, end = l2, r2
-    return s[start:end + 1]
+    best_start, best_len = 0, 1
+
+    for length in range(2, n + 1):           # shorter spans are already final
+        for i in range(0, n - length + 1):
+            j = i + length - 1
+            if s[i] != s[j]:
+                continue                     # ends disagree
+            if length == 2 or is_pal[i + 1][j - 1]:
+                is_pal[i][j] = True
+                if length > best_len:
+                    best_start, best_len = i, length
+
+    return s[best_start:best_start + best_len]
 ```
 
 ### Complexity
-Time O(n²), Space O(1).
+Time O(n²) — one cell per `(i, j)` pair with `i <= j`, each O(1). Space O(n²) for the table.
+
+> **Follow-up:** the same answer comes out of *expand around centre* in O(n²) time but **O(1)** space — for each of the `2n-1` centres, walk outward while the ends match. Mention it as the space-optimal alternative; the DP table is the one to reach for when the problem also asks *how many* palindromic substrings there are, or needs the table reused (e.g. palindrome partitioning).
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Regex Match (LeetCode 10)
-Return whether the full string `s` matches pattern `p`, where `.` matches any single char and `*` matches zero or more of the preceding element.
+Return whether the **entire** string `s` matches pattern `p`, where `.` matches any single character and `*` matches zero or more of the element immediately before it.
 
 ### Thought Process
-1. Let `dp[i][j]` = does `s[:i]` match `p[:j]`. Answer is `dp[len(s)][len(p)]`.
-2. A plain char or `.` at `p[j-1]` consumes one char: `dp[i][j] = dp[i-1][j-1]` if they align.
-3. A `*` gives two choices — zero occurrences: `dp[i][j-2]`; or one more occurrence when `p[j-2]` matches `s[i-1]`: `dp[i-1][j]`.
-4. Seed `dp[0][0]=True` and precompute empty-string-vs-pattern for leading `x*` groups.
+1. **What does `dp[i][j]` mean?** *Does the first `i` characters of `s` match the first `j` characters of `p`, completely?* Prefix-pair DP again — the `*` only changes the transitions, not the shape.
+2. **How do we compute it?** Two cases at `p[j-1]`:
+   - Not a `*`: it must consume exactly one character, so `dp[i][j] = dp[i-1][j-1]` **and** `p[j-1]` matches `s[i-1]` (equal, or `p[j-1] == '.'`).
+   - A `*`: it and its preceding element `p[j-2]` form one unit with two choices. **Zero copies:** throw the whole `x*` away → `dp[i][j-2]`. **One more copy:** only if `p[j-2]` matches `s[i-1]`; then consume that one character but keep the `x*` available → `dp[i-1][j]`. `dp[i][j]` is the OR of the two.
+3. **Base case?** `dp[0][0] = true` (empty matches empty). Row 0 is not all false: a pattern like `a*b*` matches the empty string, so for each `j` where `p[j-1] == '*'`, set `dp[0][j] = dp[0][j-2]`. Column 0 beyond `dp[0][0]` is false — a non-empty string cannot match an empty pattern.
+4. **Direction?** `dp[i][j]` reads `dp[i-1][j-1]`, `dp[i][j-2]`, `dp[i-1][j]` — all up and/or left. Forward `i`, forward `j` is legal.
+5. Answer is `dp[len(s)][len(p)]`.
 
 ### Dry Run
-`s = "aab", p = "c*a*b"` → True.
-- `c*` matches zero 'c' → `dp[0][2]=True`.
-- `a*` absorbs both 'a's → `dp[2][4]=True`.
-- final `b` matches `b` → `dp[3][5]=True`.
+
+Input: `s = "aab"`, `p = "c*a*b"`
+
+Pattern positions: `j=1` → `c`, `j=2` → `*`, `j=3` → `a`, `j=4` → `*`, `j=5` → `b`.
+
+Row 0 (empty `s`): `dp[0][0]=T`; `dp[0][2] = dp[0][0] = T` (`c*` takes zero `c`s); `dp[0][4] = dp[0][2] = T` (`a*` takes zero `a`s). All other row-0 cells are false.
+
+| i | `s[i-1]` | j | `p[j-1]` | rule applied | value |
+|---|----------|---|----------|--------------|-------|
+| 1 | a | 1 | c | plain char, `c != a` | F |
+| 1 | a | 2 | `*` | zero: `dp[1][0]=F`; more: `p[0]='c' != 'a'` | F |
+| 1 | a | 3 | a | plain char, `a == a` → `dp[0][2]` = T | **T** |
+| 1 | a | 4 | `*` | zero: `dp[1][2]=F`; more: `p[2]='a' == 'a'` → `dp[0][4]` = T | **T** |
+| 1 | a | 5 | b | plain char, `b != a` | F |
+| 2 | a | 3 | a | `a == a` → `dp[1][2]` = F | F |
+| 2 | a | 4 | `*` | zero: `dp[2][2]=F`; more: `p[2]='a' == 'a'` → `dp[1][4]` = T | **T** |
+| 2 | a | 5 | b | `b != a` | F |
+| 3 | b | 4 | `*` | zero: `dp[3][2]=F`; more: `p[2]='a' != 'b'` | F |
+| 3 | b | 5 | b | `b == b` → `dp[2][4]` = T | **T** |
+
+Output: **true**
+
+Follow `dp[2][4]` → `dp[1][4]` → `dp[0][4]`. That chain is `a*` eating its second `a`, then its first `a`, then finally taking the zero-copies exit. The `dp[i-1][j]` transition — *stay on the same `j`* — is what lets one `*` absorb an arbitrary run.
 
 ### Visualization
-```
-input  ──▶ [ fill dp[i][j] over string s and pattern p ]
-state  ──▶ '*' branches into zero-use (j-2) or one-more-use (i-1)
-output ──▶ dp[len(s)][len(p)] is the match verdict
+
+```text
+p prefix:   ""    c    c*   c*a  c*a*  c*a*b
+     j =     0    1    2     3     4     5
+  ""  i=0    T    F    T     F     T     F
+  a   i=1    F    F    F     T     T     F
+  a   i=2    F    F    F     F     T     F
+  b   i=3    F    F    F     F     F   [ T ]  <- answer
+
+the two moves a '*' can make, drawn:
+
+    zero copies                one more copy
+    dp[i][j-2] ────► dp[i][j]  dp[i-1][j] ────► dp[i][j]
+    (skip "x*" entirely)       (same j: the star stays reusable)
 ```
 
 ### Code
+
+```go
+// isMatch reports whether s matches the regex p ('.' = any char, '*' = zero or
+// more of the previous element). dp[i][j] = does s[:i] match p[:j].
+func isMatch(s string, p string) bool {
+    m, n := len(s), len(p)
+
+    dp := make([][]bool, m+1)
+    for i := range dp {
+        dp[i] = make([]bool, n+1)
+    }
+    dp[0][0] = true // empty matches empty
+
+    // Empty s against patterns like "a*b*": each x* may take zero copies.
+    for j := 2; j <= n; j++ {
+        if p[j-1] == '*' {
+            dp[0][j] = dp[0][j-2]
+        }
+    }
+
+    matches := func(i, j int) bool { // does p[j-1] cover s[i-1]?
+        return p[j-1] == '.' || p[j-1] == s[i-1]
+    }
+
+    for i := 1; i <= m; i++ {
+        for j := 1; j <= n; j++ {
+            if p[j-1] == '*' {
+                dp[i][j] = dp[i][j-2] // zero copies of p[j-2]
+                if !dp[i][j] && (p[j-2] == '.' || p[j-2] == s[i-1]) {
+                    dp[i][j] = dp[i-1][j] // one more copy, star stays available
+                }
+            } else if matches(i, j) {
+                dp[i][j] = dp[i-1][j-1] // consume one character each
+            }
+        }
+    }
+    return dp[m][n]
+}
+```
+
 ```python
 def isMatch(s, p):
     m, n = len(s), len(p)
     dp = [[False] * (n + 1) for _ in range(m + 1)]
-    dp[0][0] = True
-    for j in range(1, n + 1):                 # empty s vs pattern (x* groups)
+    dp[0][0] = True                              # empty matches empty
+
+    for j in range(2, n + 1):                    # empty s vs "a*b*" patterns
         if p[j - 1] == '*':
             dp[0][j] = dp[0][j - 2]
+
     for i in range(1, m + 1):
         for j in range(1, n + 1):
             if p[j - 1] == '*':
-                dp[i][j] = dp[i][j - 2]        # zero of preceding element
-                if p[j - 2] == s[i - 1] or p[j - 2] == '.':
-                    dp[i][j] = dp[i][j] or dp[i - 1][j]
-            elif p[j - 1] == '.' or p[j - 1] == s[i - 1]:
-                dp[i][j] = dp[i - 1][j - 1]
+                dp[i][j] = dp[i][j - 2]          # zero copies of p[j-2]
+                if not dp[i][j] and p[j - 2] in ('.', s[i - 1]):
+                    dp[i][j] = dp[i - 1][j]      # one more copy, star reusable
+            elif p[j - 1] in ('.', s[i - 1]):
+                dp[i][j] = dp[i - 1][j - 1]      # consume one character each
     return dp[m][n]
 ```
 
 ### Complexity
-Time O(m·n), Space O(m·n).
+Time O(m·n) — each cell does O(1) work (a `*` inspects two neighbours). Space O(m·n), reducible to O(n) since only the previous row is read.
 
+---
 
 ## 12. LeetCode Practice Set
 

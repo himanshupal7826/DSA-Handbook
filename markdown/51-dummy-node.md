@@ -41,32 +41,163 @@ dummy node, sentinel, head, remove, edge case.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"What if the node I need to insert or delete is the head?"*
+
+Running example: delete every node with value `1` from `1 → 2 → 3`.
+
 ### Intuition
-Copy to an array, manipulate, rebuild — O(n) extra space.
+To unlink a node you need its **predecessor**, because deletion is the single assignment
+`prev.Next = curr.Next`. Every node has a predecessor… except the head. So the brute-force
+answer is: handle the head separately with an `if`, and handle everything else with the loop.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. While `head != nil && head.Val == val`, move `head = head.Next` — peel off leading matches.
+2. If `head == nil`, return `nil` (the whole list matched).
+3. Set `prev = head` and walk `curr = head.Next` through the rest.
+4. If `curr.Val == val`, unlink it with `prev.Next = curr.Next`; otherwise advance `prev`.
+5. Return `head` — which may not be the `head` you were passed.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: O(n) — one pass.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Dummy Node Pattern pattern is built to use.
+- The complexity is fine; the **shape** is the problem. There are now two deletion code
+  paths — one that moves `head`, one that writes `prev.Next` — doing the same conceptual job.
+- Here is the version everyone writes first, with step 1 missing:
+
+  ```go
+  func removeElementsBuggy(head *ListNode, val int) *ListNode {
+      prev := head
+      for curr := head; curr != nil; curr = curr.Next {
+          if curr.Val == val {
+              prev.Next = curr.Next // unlink
+          } else {
+              prev = curr
+          }
+      }
+      return head // <- BUG: head itself was never allowed to change
+  }
+  ```
+
+  On `1 → 2 → 3` with `val = 1` it returns `1 → 2 → 3`: the loop dutifully sets
+  `prev.Next = curr.Next` where `prev == curr == head`, i.e. `head.Next = head.Next` — a
+  no-op — and then hands back the very node it was asked to remove. **The answer is wrong
+  and nothing crashed**, which is the worst kind of bug.
+- The same missing branch reappears in *every* list problem that can touch the front:
+  insert-at-front, remove-nth-from-end when `n` equals the length, build-a-new-list. Five
+  problems, five copies of the same `if`.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Dummy Node Pattern invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Put one fake node in front of the list, so the real head has a predecessor and "delete the head" becomes an ordinary delete.**
+
+A train station platform with a buffer stop at the end: every carriage, including the first
+one, is coupled to *something*. You can now uncouple any carriage with the same motion —
+there is no "but this is the front one" case to remember.
+
+The fake node is called a **dummy**, a **sentinel**, or a **header node**. It is thrown
+away at the end; you return `dummy.Next`.
+
+### The thought process
+
+```text
+We need    : insert/delete anywhere in a list, including at the front.
+Obvious way: an `if node == head` branch beside the normal path.
+Problem    : two code paths for one operation; the head branch is the one
+             people forget, and forgetting it fails silently.
+Notice     : the head is only special because it has no predecessor.
+Therefore  : give it one — a fake node whose Next is the head.
+Now        : every real node has a predecessor, the branch disappears,
+             and the new head is just dummy.Next.
+```
+
+### Why the dummy actually removes the special case
+
+Look at the two operations side by side.
+
+| | without a dummy | with a dummy |
+|---|---|---|
+| delete the head | `head = head.Next` | `prev.Next = prev.Next.Next` |
+| delete node *i* | `prev.Next = prev.Next.Next` | `prev.Next = prev.Next.Next` |
+| what you return | `head` (must be reassigned) | `dummy.Next` (read once, at the end) |
+
+With the dummy the two rows are **literally the same line of code**, so the `if` has
+nothing left to distinguish. And because the answer is read from `dummy.Next` at the very
+end, the loop never has to track "did the head change?".
+
+Here is the buggy example from section 3, fixed by three characters of setup:
+
+```text
+without dummy       head → [1] → [2] → [3]
+                     ↑
+                 no predecessor  ⇒  needs a special case
+
+with dummy    [dummy] → [1] → [2] → [3]
+                 ↑
+              prev starts here  ⇒  dummy.Next = node2 deletes the head
+                                    with the ordinary line
+```
+
+### Why it is safe
+
+- The dummy is **local**: it is allocated inside the function and never returned, so no
+  caller can observe it.
+- Its `Val` is never read. Only its `Next` matters. (Set it to `0` and ignore it.)
+- `dummy.Next` is the source of truth for the head at all times, including when the list
+  becomes empty — then `dummy.Next` is `nil`, which is exactly the right answer.
+
+### The two shapes you will use
+
+```text
+DELETE shape                        BUILD shape
+  dummy.Next = head                   dummy = empty node
+  prev = dummy                        tail  = dummy
+  walk with prev.Next                 tail.Next = newNode; tail = tail.Next
+  return dummy.Next                   return dummy.Next
+```
+
+The delete shape removes the "is it the head?" branch. The build shape removes the "is this
+the first node I've appended?" branch. Same trick, both directions.
+
+### Steps
+
+```text
+Step 1 → dummy = &Node{Next: head}     (delete shape)   or   &Node{} (build shape)
+Step 2 → prev / tail = dummy
+Step 3 → run the loop using ONLY prev.Next (or tail.Next); never touch `head`
+Step 4 → after a deletion do NOT advance prev — the new prev.Next is unexamined
+Step 5 → return dummy.Next
+```
+
+Step 4 is the one people trip on: after `prev.Next = prev.Next.Next`, `prev` already points
+at a node it has not inspected. Advancing as well would skip it, so `6 → 6 → 1` with
+`val = 6` would leave one `6` behind.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "remove / delete / insert" in a linked list
+  "the head may change", "return the new head"
+  building a result list node by node (merge, add two numbers, partition, copy)
+  a solution draft where you wrote `if node == head`
+        ↓
+Think about...
+  "Is the head special only because it has no predecessor?"
+        ↓
+Use...
+  dummy := &Node{Next: head} ; prev := dummy ; ... ; return dummy.Next
+    · deleting   → walk with prev.Next, don't advance prev after a cut
+    · building   → tail := dummy, append with tail.Next
+    · both ends  → two dummies (e.g. partition into a "less" and a "ge" chain)
+```
 
 ### Visual explanation
 
@@ -94,32 +225,68 @@ Most list problems are pointer-rewiring; a dummy sentinel removes head edge case
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Dummy Node Pattern: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+delete every node with value 1 from  1 → 2 → 3
+
+  dummy → [1] → [2] → [3]
+    ↑
+   prev
+
+step 1  prev.Next = node(1), value matches
+        prev.Next = prev.Next.Next        →  dummy → [2] → [3]
+        prev stays on dummy (its Next is now unexamined)
+
+step 2  prev.Next = node(2), no match     →  prev = node(2)
+step 3  prev.Next = node(3), no match     →  prev = node(3)
+step 4  prev.Next == nil                  →  stop
+
+return dummy.Next = 2 → 3      (the head changed, and no `if` was needed)
 ```
 
 ### Interview explanation
-"This is a Dummy Node Pattern problem. I'll most list problems are pointer-rewiring; a dummy sentinel removes head edge cases and fast/slow pointers locate structure. That brings the complexity down to O(n) time and O(1) space — here's the template."
+"The head of a list is awkward only because it has no predecessor, and deletion is written
+in terms of the predecessor. So I allocate one dummy node whose `Next` is the head; now
+every real node has a predecessor and 'delete the head' is the same assignment as 'delete
+any node'. I walk with `prev.Next` instead of the head variable and return `dummy.Next` at
+the end, which is correct even if the list becomes empty. It costs one node of memory and
+removes an entire class of edge-case bugs — the same trick gives me a clean `tail` when I'm
+building a result list."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Linked Lists** family template. Adapt the comparison/condition to the specific problem.
+> `dummy := &Node{Next: head}`; walk with `prev.Next`; `return dummy.Next`.
 
 ```go
-// Reverse a singly linked list in place.
-type ListNode struct { Val int; Next *ListNode }
-func reverseList(head *ListNode) *ListNode {
-    var prev *ListNode
-    for head != nil {
-        next := head.Next   // save
-        head.Next = prev    // reverse pointer
-        prev = head         // advance prev
-        head = next         // advance head
+type ListNode struct {
+    Val  int
+    Next *ListNode
+}
+
+// Filter removes every node for which drop returns true. The head may change.
+func Filter(head *ListNode, drop func(int) bool) *ListNode {
+    dummy := &ListNode{Next: head} // gives the head a predecessor
+    prev := dummy
+    for prev.Next != nil {
+        if drop(prev.Next.Val) {
+            prev.Next = prev.Next.Next // unlink; prev stays put on purpose
+        } else {
+            prev = prev.Next
+        }
     }
-    return prev
+    return dummy.Next // nil when everything was removed
+}
+
+// Build appends nodes one at a time with no "first node" special case.
+func Build(vals []int) *ListNode {
+    dummy := &ListNode{} // tail always has somewhere to write
+    tail := dummy
+    for _, v := range vals {
+        tail.Next = &ListNode{Val: v}
+        tail = tail.Next
+    }
+    return dummy.Next
 }
 ```
 
@@ -128,41 +295,65 @@ class ListNode:
     def __init__(self, val=0, nxt=None):
         self.val, self.next = val, nxt
 
-def reverse_list(head):
-    prev = None
-    while head:
-        nxt = head.next      # save next
-        head.next = prev     # reverse pointer
-        prev = head          # advance
-        head = nxt
-    return prev
+
+def filter_list(head, drop):
+    """Remove every node where drop(val) is true. The head may change."""
+    dummy = ListNode(0, head)        # gives the head a predecessor
+    prev = dummy
+    while prev.next:
+        if drop(prev.next.val):
+            prev.next = prev.next.next   # unlink; prev stays put on purpose
+        else:
+            prev = prev.next
+    return dummy.next                # None when everything was removed
+
+
+def build(vals):
+    """Append nodes with no 'first node' special case."""
+    dummy = ListNode()               # tail always has somewhere to write
+    tail = dummy
+    for v in vals:
+        tail.next = ListNode(v)
+        tail = tail.next
+    return dummy.next
 ```
 
 ```java
-class ListNode { int val; ListNode next; ListNode(int v){val=v;} }
-ListNode reverseList(ListNode head) {
-    ListNode prev = null;
-    while (head != null) {
-        ListNode next = head.next;
-        head.next = prev;
-        prev = head;
-        head = next;
+class ListNode { int val; ListNode next; ListNode(int v) { val = v; } }
+
+ListNode removeValue(ListNode head, int val) {
+    ListNode dummy = new ListNode(0); // gives the head a predecessor
+    dummy.next = head;
+    ListNode prev = dummy;
+    while (prev.next != null) {
+        if (prev.next.val == val) prev.next = prev.next.next; // prev stays put
+        else                      prev = prev.next;
     }
-    return prev;
+    return dummy.next;                // null when everything was removed
 }
 ```
 
 ```cpp
-struct ListNode { int val; ListNode* next; ListNode(int v):val(v),next(nullptr){} };
-ListNode* reverseList(ListNode* head) {
-    ListNode* prev = nullptr;
-    while (head) {
-        ListNode* next = head->next;
-        head->next = prev;
-        prev = head;
-        head = next;
+struct ListNode {
+    int val;
+    ListNode* next;
+    ListNode(int v) : val(v), next(nullptr) {}
+};
+
+ListNode* removeValue(ListNode* head, int val) {
+    ListNode dummy(0);                // sentinel on the stack
+    dummy.next = head;
+    ListNode* prev = &dummy;
+    while (prev->next) {
+        if (prev->next->val == val) {
+            ListNode* dead = prev->next;
+            prev->next = dead->next;  // prev stays put on purpose
+            delete dead;              // C++ owns its nodes
+        } else {
+            prev = prev->next;
+        }
     }
-    return prev;
+    return dummy.next;                // nullptr when everything was removed
 }
 ```
 
@@ -248,114 +439,290 @@ ListNode* reverseList(ListNode* head) {
 ## 9. Solved Example 1
 
 ### Problem — Remove Nth (LeetCode 19)
-A representative **Dummy Node Pattern** problem. The signal: a sentinel head node erases head-edge special cases.
+Remove the `n`-th node **from the end** of the list and return the head. One pass.
 
 ### Thought Process
-1. Put a dummy before the head so removing the real head is not a special case.
-2. Advance a `fast` pointer n steps ahead, then move `fast` and `slow` together until `fast` reaches the last node.
-3. `slow` now sits just before the target; splice it out with `slow.next = slow.next.next`.
+1. "From the end" is unknown until you know the length — but a fixed **gap** between two
+   pointers survives without knowing it.
+2. Move `fast` forward `n + 1` nodes from the dummy. Now `fast` is `n + 1` ahead of `slow`.
+3. Advance both until `fast` falls off the end. The gap is preserved, so `slow` stops on the
+   node *just before* the one to delete — exactly the predecessor deletion needs.
+4. Delete with `slow.Next = slow.Next.Next`.
+5. When `n` equals the length, the node to delete **is** the head — and the dummy means that
+   case runs the identical line.
 
 ### Dry Run
-Input `1→2→3→4→5`, n=2.
-- fast advances 2 → at node 2; slow at dummy
-- move together until fast at node 5 → slow at node 3
-- slow.next = node5 → result `1→2→3→5`
+
+Input: `1 → 2 → 3 → 4 → 5`, `n = 2`
+
+Setup: `dummy → 1 → 2 → 3 → 4 → 5`; advance `fast` `n + 1 = 3` times.
+
+| phase | `slow` | `fast` | note |
+|-------|--------|--------|------|
+| after setup | `dummy` | `3` | gap = 3 nodes |
+| move 1 | `1` | `4` | gap held |
+| move 2 | `2` | `5` | gap held |
+| move 3 | `3` | `nil` | `fast` off the end → stop |
+
+`slow = node 3`, so `slow.Next = node 4` is the 2nd from the end. Unlink it:
+`3.Next = 5`.
+
+Output: **`1 → 2 → 3 → 5`**
+
+Now the head case, `[1]` with `n = 1`: `fast` advances twice — to `node 1`, then to `nil` —
+so the move loop never runs and `slow` is still `dummy`. The same line
+`slow.Next = slow.Next.Next` sets `dummy.Next = nil`, and `dummy.Next` returns `nil`.
+Without the dummy this input needs its own `if`.
 
 ### Visualization
-```
-input  ──▶ [ apply Dummy Node Pattern step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+gap = n + 1 = 3
+
+dummy → 1 → 2 → 3 → 4 → 5 → nil
+  ↑             ↑
+ slow          fast                after setup
+
+        1 → 2 → 3 → 4 → 5 → nil
+            ↑             ↑
+           slow          fast      after 2 moves
+
+        1 → 2 → 3 → 4 → 5 → nil
+                ↑             ↑
+               slow          fast(nil)
+
+slow.Next is the target ──┘
+            1 → 2 → 3 ─────────▶ 5
 ```
 
+The gap never changes, so wherever `fast` stops, `slow` is always `n + 1` behind it —
+which is `n` behind the end, i.e. one before the target.
+
 ### Code
+
+```go
+func removeNthFromEnd(head *ListNode, n int) *ListNode {
+    dummy := &ListNode{Next: head} // the target may be the head
+    slow, fast := dummy, dummy
+    for i := 0; i <= n; i++ { // open a gap of n+1 nodes
+        fast = fast.Next
+    }
+    for fast != nil { // keep the gap, slide both to the end
+        slow = slow.Next
+        fast = fast.Next
+    }
+    slow.Next = slow.Next.Next // slow is the target's predecessor
+    return dummy.Next
+}
+```
+
 ```python
 def removeNthFromEnd(head, n):
-    dummy = ListNode(0, head)
-    fast = slow = dummy
-    for _ in range(n):            # gap of n between fast and slow
+    dummy = ListNode(0, head)        # the target may be the head
+    slow = fast = dummy
+    for _ in range(n + 1):           # open a gap of n+1 nodes
         fast = fast.next
-    while fast.next:              # move both to the end
-        fast = fast.next
-        slow = slow.next
-    slow.next = slow.next.next    # unlink nth-from-end
+    while fast:                      # keep the gap, slide both to the end
+        slow, fast = slow.next, fast.next
+    slow.next = slow.next.next       # slow is the target's predecessor
     return dummy.next
 ```
 
 ### Complexity
-Time O(n), Space O(1). Single pass with two pointers, dummy removes the head case.
+Time O(n) — `fast` traverses the list once and `slow` follows. Space O(1) — one sentinel
+and two pointers.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Remove Elements (LeetCode 203)
-A representative **Dummy Node Pattern** problem. The signal: a sentinel head node erases head-edge special cases.
+Delete **every** node whose value equals `val` and return the head of the resulting list.
 
 ### Thought Process
-1. A dummy before the head lets us delete matching head nodes with the same code as any other node.
-2. Walk a `curr` pointer; whenever `curr.next` holds the target value, unlink it by skipping over it.
-3. Only advance `curr` when it does not delete, so consecutive matches are all removed.
+1. Deletion is `prev.Next = prev.Next.Next`, so every candidate needs a predecessor — give
+   the head one with a dummy.
+2. Inspect `prev.Next` rather than a separate `curr`. Then "should I delete?" and "what do I
+   delete?" are the same expression.
+3. On a match, unlink and **leave `prev` where it is** — its new `Next` has not been checked yet.
+4. On a miss, advance `prev`.
+5. Stop when `prev.Next` is `nil`, and return `dummy.Next` — correct even if every node went.
 
 ### Dry Run
-Input `1→2→6→3→6`, val=6.
-- curr=dummy: next=1 keep → curr=1
-- 1.next=2 keep → curr=2; 2.next=6 delete → 2→3
-- curr=2: next=3 keep → curr=3; 3.next=6 delete → 3→None → `1→2→3`
+
+Input: `6 → 1 → 6`, `val = 6` (the head matches *and* the tail matches)
+
+| step | `prev` | `prev.Next` | match? | action | list after |
+|------|--------|-------------|--------|--------|------------|
+| 1 | `dummy` | `6` (1st) | yes | `dummy.Next = node(1)`; `prev` **stays** | `dummy → 1 → 6` |
+| 2 | `dummy` | `1`       | no  | `prev = node(1)` | `dummy → 1 → 6` |
+| 3 | `1`     | `6` (2nd) | yes | `1.Next = nil`; `prev` stays | `dummy → 1` |
+| 4 | `1`     | `nil`     | —   | loop guard fails → stop | `dummy → 1` |
+
+Output: **`1`**
+
+Step 1 is the one the no-dummy version gets wrong — and step 1 → step 2 shows why `prev`
+must not advance after a cut. On `6 → 6 → 1`, advancing would jump straight past the second
+`6` and leave it in the output.
 
 ### Visualization
-```
-input  ──▶ [ apply Dummy Node Pattern step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+      prev
+       ↓
+   [dummy] → [6] → [1] → [6] → nil
+
+step 1  cut the first 6, prev unchanged
+   [dummy] ─────▶ [1] → [6] → nil
+       ↑
+      prev        (its Next is a node we have not looked at yet)
+
+step 2  1 != 6, advance
+   [dummy] → [1] → [6] → nil
+              ↑
+             prev
+
+step 3  cut the second 6
+   [dummy] → [1] → nil
+              ↑
+             prev
+
+return dummy.Next = 1
 ```
 
 ### Code
+
+```go
+func removeElements(head *ListNode, val int) *ListNode {
+    dummy := &ListNode{Next: head} // the head may itself be removed
+    prev := dummy
+    for prev.Next != nil {
+        if prev.Next.Val == val {
+            prev.Next = prev.Next.Next // unlink; prev stays: new Next is unchecked
+        } else {
+            prev = prev.Next
+        }
+    }
+    return dummy.Next // nil if every node matched
+}
+```
+
 ```python
 def removeElements(head, val):
-    dummy = ListNode(0, head)
-    curr = dummy
-    while curr.next:
-        if curr.next.val == val:
-            curr.next = curr.next.next   # skip the match
+    dummy = ListNode(0, head)            # the head may itself be removed
+    prev = dummy
+    while prev.next:
+        if prev.next.val == val:
+            prev.next = prev.next.next   # unlink; prev stays: new Next unchecked
         else:
-            curr = curr.next             # advance only when kept
-    return dummy.next
+            prev = prev.next
+    return dummy.next                    # None if every node matched
 ```
 
 ### Complexity
-Time O(n), Space O(1). One pass, dummy removes the leading-match edge case.
+Time O(n) — each node is examined once; a deletion is O(1). Space O(1).
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Add Two Numbers (LeetCode 2)
-A representative **Dummy Node Pattern** problem. The signal: a sentinel head node erases head-edge special cases.
+Two non-negative integers are stored as linked lists with their digits in **reverse** order
+(ones digit first). Add them and return the sum in the same format.
 
 ### Thought Process
-1. Digits are stored least-significant first, so add position by position while carrying like grade-school addition.
-2. A dummy head lets us append result digits uniformly without a special first-node case.
-3. Keep looping while either list has digits or a carry remains; use `divmod` to split sum into carry and digit.
+1. Reverse order is a gift: the heads are the ones digits, so you can add left to right
+   exactly like long addition on paper.
+2. Walk both lists together, adding `a + b + carry`; the output digit is `sum % 10` and the
+   new carry is `sum / 10`.
+3. The lists may differ in length — treat a missing digit as `0` instead of writing a second
+   loop.
+4. Building the answer front-to-back needs a `tail`, and a **build-shape dummy** removes the
+   "is this the first digit?" branch.
+5. Keep looping while *either* list has digits **or** a carry survives — `99 + 1` must grow
+   the answer by a node.
 
 ### Dry Run
-Input `2→4→3` (342) and `5→6→4` (465).
-- 2+5=7 → digit 7, carry 0
-- 4+6=10 → digit 0, carry 1
-- 3+4+1=8 → digit 8 → result `7→0→8` (807)
+
+Input: `l1 = 2 → 4 → 3` (342), `l2 = 5 → 6 → 4` (465)
+
+| step | `a` | `b` | carry in | `sum` | digit `sum%10` | carry out | output so far |
+|------|-----|-----|----------|-------|----------------|-----------|---------------|
+| 1 | `2` | `5` | 0 | 7  | `7` | 0 | `7` |
+| 2 | `4` | `6` | 0 | 10 | `0` | 1 | `7 → 0` |
+| 3 | `3` | `4` | 1 | 8  | `8` | 0 | `7 → 0 → 8` |
+| 4 | — | — | 0 | — | — | — | both lists empty and carry 0 → stop |
+
+Output: **`7 → 0 → 8`** = 807 = 342 + 465 ✓
+
+Now the growth case, `l1 = 9 → 9` (99) and `l2 = 1` (1):
+
+| step | `a` | `b` | carry in | `sum` | digit | carry out |
+|------|-----|-----|----------|-------|-------|-----------|
+| 1 | `9` | `1` | 0 | 10 | `0` | 1 |
+| 2 | `9` | — (0) | 1 | 10 | `0` | 1 |
+| 3 | — (0) | — (0) | 1 | 1 | `1` | 0 |
+
+Result `0 → 0 → 1` = 100. Step 3 only happens because the loop condition includes
+`carry != 0`; drop that clause and the answer is `00` — wrong by a whole digit.
 
 ### Visualization
-```
-input  ──▶ [ apply Dummy Node Pattern step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+    3   4   2        (l1 read right-to-left)
++   4   6   5        (l2 read right-to-left)
+    ─────────
+    8   0   7
+
+list order (ones first):
+  l1:  2 → 4 → 3
+  l2:  5 → 6 → 4
+        ↓   ↓   ↓
+carry:  0   1   0
+  out:  7 → 0 → 8
+
+dummy → 7 → 0 → 8
+  ↑
+build-shape sentinel: tail always has somewhere to append
 ```
 
 ### Code
+
+```go
+func addTwoNumbers(l1, l2 *ListNode) *ListNode {
+    dummy := &ListNode{} // build shape: no "first node" special case
+    tail := dummy
+    carry := 0
+    for l1 != nil || l2 != nil || carry != 0 { // carry can outlive both lists
+        sum := carry
+        if l1 != nil {
+            sum += l1.Val
+            l1 = l1.Next
+        }
+        if l2 != nil { // a missing digit counts as 0
+            sum += l2.Val
+            l2 = l2.Next
+        }
+        carry = sum / 10
+        tail.Next = &ListNode{Val: sum % 10}
+        tail = tail.Next
+    }
+    return dummy.Next
+}
+```
+
 ```python
 def addTwoNumbers(l1, l2):
-    dummy = tail = ListNode()
-    carry = 0
-    while l1 or l2 or carry:
+    dummy = ListNode()                 # build shape: no "first node" special case
+    tail, carry = dummy, 0
+    while l1 or l2 or carry:           # carry can outlive both lists
         total = carry
-        if l1: total, l1 = total + l1.val, l1.next
-        if l2: total, l2 = total + l2.val, l2.next
+        if l1:
+            total += l1.val
+            l1 = l1.next
+        if l2:                         # a missing digit counts as 0
+            total += l2.val
+            l2 = l2.next
         carry, digit = divmod(total, 10)
         tail.next = ListNode(digit)
         tail = tail.next
@@ -363,8 +730,10 @@ def addTwoNumbers(l1, l2):
 ```
 
 ### Complexity
-Time O(max(n, m)), Space O(max(n, m)) for the result list.
+Time O(max(n, m)) — one node of output per digit position, plus at most one for the final
+carry. Space O(max(n, m)) for the result; O(1) beyond it.
 
+---
 
 ## 12. LeetCode Practice Set
 
