@@ -41,32 +41,154 @@ scc, kosaraju, tarjan, condensation, directed cycle.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Which nodes can reach each other **both ways** — and therefore sit on a common cycle?"*
+
 ### Intuition
-Direct per-query computation or full recomputation — too slow for large/online workloads.
+Test every pair for mutual reachability.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each pair `(u, v)`:
+2. &nbsp;&nbsp;Run a DFS from `u` to see whether `v` is reachable.
+3. &nbsp;&nbsp;Run another from `v` back to `u`.
+4. &nbsp;&nbsp;If both succeed, they belong to the same strongly connected component.
+5. Group the pairs into components.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(V² · (V + E))** — a traversal per ordered pair.
+- Space: O(V).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Strongly Connected Components pattern is built to use.
+- Hopeless past a few hundred nodes.
+- And it misses the structure: strong connectivity is an **equivalence relation**, so the components partition the graph. Discovering that partition should take one pass, not `V²` of them.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Strongly Connected Components invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **A single DFS already knows enough: track, for each node, the oldest node its subtree can reach via a back edge — and where that "reach back" stops, a component ends.**
+
+That value is the **low-link**, and it powers this whole family.
+
+### The thought process
+
+```text
+We need    : the groups of mutually reachable nodes.
+Obvious way: test every pair both ways.
+Too slow   : O(V^2 (V+E)).
+Notice     : strong connectivity is an equivalence relation, so the
+             components PARTITION the graph — one pass should find all.
+Notice too : during a DFS, a node closes off a component exactly when
+             nothing in its subtree can reach anything older than itself.
+Therefore  : record a discovery index per node and propagate the
+             oldest reachable index back up.
+Now        : O(V + E), one traversal.
+```
+
+### The two numbers every low-link algorithm keeps
+
+```text
+discovery[u] = when u was first visited (a counter, incremented per node)
+low[u]       = the SMALLEST discovery index reachable from u's subtree,
+               using tree edges plus AT MOST ONE back edge
+```
+
+The update rules, applied while exploring `u`'s neighbours:
+
+```text
+v not yet visited  →  recurse, then  low[u] = min(low[u], low[v])
+v already visited  →  a back edge:   low[u] = min(low[u], discovery[v])
+```
+
+Note the asymmetry: a **tree edge** propagates the child's `low`, while a **back edge** contributes only the target's `discovery`. Using `low[v]` for a back edge would let information leak across components.
+
+### What low-link tells you, in two different graphs
+
+The same two numbers answer two famous questions, depending on the graph type:
+
+**Directed — strongly connected components.** `u` is the *root* of a component exactly when
+
+```text
+low[u] == discovery[u]
+```
+
+meaning nothing in `u`'s subtree can reach any node discovered earlier. Everything still on the stack above `u` forms its component.
+
+**Undirected — bridges.** The edge `u → v` (a tree edge) is a **bridge** exactly when
+
+```text
+low[v] > discovery[u]
+```
+
+meaning `v`'s entire subtree has no back edge reaching `u` or anything above it, so removing that edge disconnects the subtree.
+
+```text
+low[v] >  discovery[u]   →  bridge (nothing routes around it)
+low[v] <= discovery[u]   →  a cycle bypasses this edge
+```
+
+### The condensation, and why it is useful
+
+Collapse every strongly connected component to a single node and you get the **condensation** — which is always a **DAG**, because a cycle between two components would have merged them.
+
+That makes a whole class of problems easy:
+
+| Question | On the condensation |
+|---|---|
+| Is a node on a cycle? | its component has size > 1 (or a self-loop) |
+| Longest cycle | the largest component's size |
+| Nodes that cannot reach a cycle | reachability in the DAG |
+| Minimum nodes to reach everything | components with in-degree 0 |
+
+### Tarjan or Kosaraju?
+
+| | Tarjan | Kosaraju |
+|---|---|---|
+| Passes over the graph | **one** | two |
+| Needs the reversed graph | no | **yes** |
+| Extra state | stack + `low` + `discovery` | finish order + reversed adjacency |
+| Easier to remember | — | **often** |
+
+Both are O(V + E). Kosaraju — DFS to get finish times, then DFS the reversed graph in decreasing finish order — is easier to reconstruct under pressure; Tarjan is one pass and gives low-link, which you need for bridges anyway.
+
+### Recursion depth
+
+Both algorithms recurse to the depth of the DFS tree, which is `O(V)`. At `V = 10⁵` that can overflow the stack in several languages. Convert to an explicit stack if the constraints are large — the logic is identical, only the bookkeeping changes.
+
+### Steps
+
+```text
+Step 1 → give every node discovery = low = timer++, push it, mark it on-stack.
+Step 2 → for each neighbour v:
+           unvisited  → recurse, then low[u] = min(low[u], low[v])
+           on-stack   → low[u] = min(low[u], discovery[v])
+           visited but off-stack → ignore it (finished component)
+Step 3 → after the loop, if low[u] == discovery[u], pop the stack down to u:
+           that popped block is one strongly connected component.
+Step 4 → restart from any node still unvisited, so disconnected parts are covered.
+Step 5 → undirected variant: drop the stack, skip the parent edge, and report
+           u–v as a bridge whenever low[v] > discovery[u].
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  a DIRECTED graph plus "cycle", "mutually reachable", "can return to"
+  "eventual safe states", "longest cycle", "condense the graph"
+  an UNDIRECTED graph plus "critical connection", "bridge", "single point
+  of failure"
+        ↓
+Think about...
+  "Can this subtree reach back past its parent?"
+        ↓
+Use...
+  directed   → Tarjan/Kosaraju SCC; the condensation is a DAG
+  undirected → the same low-link, with low[v] > discovery[u] for bridges
+```
 
 ### Visual explanation
 
@@ -111,66 +233,321 @@ Match the data structure to the operation mix: range queries → segment/Fenwick
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Strongly Connected: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+directed graph:   0 → 1 → 2 → 0        and   2 → 3
+
+DFS from 0, discovery indices in order:
+
+   node :  0   1   2   3
+   disc :  0   1   2   3
+   low  :  0   0   0   3
+                        ↑
+              3 reaches nothing older than itself
+              → low[3] == disc[3] → 3 is its own component
+
+   0, 1, 2 all reach back to discovery 0
+              → low == disc only at node 0
+              → {0, 1, 2} is one component
+
+condensation:   {0,1,2} → {3}        a DAG, as it must be
 ```
 
 ### Interview explanation
-"This is a Strongly Connected Components problem. I'll match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP. That brings the complexity down to Varies (often O(log n) per op) time and O(n) to O(n log n) space — here's the template."
+"I'll use a single DFS carrying two numbers per node: `discovery`, the order it was first visited, and `low`, the oldest discovery index reachable from its subtree using at most one back edge. A tree edge propagates the child's `low` upward; a back edge contributes only the target's `discovery`, which matters because using the child's `low` there would leak information across components. In a directed graph, a node whose `low` equals its own `discovery` is the root of a strongly connected component — nothing beneath it reaches anything older — and everything above it on the stack is that component. In an undirected graph the same two numbers find bridges: a tree edge to `v` is a bridge exactly when `low[v] > discovery[u]`, meaning nothing in `v`'s subtree routes back around it. Both are O(V + E) in one pass. Collapsing each component gives the condensation, which is always a DAG — that's what makes 'longest cycle' or 'which nodes can reach a cycle' straightforward afterwards."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Advanced** family template. Adapt the comparison/condition to the specific problem.
+> One DFS, two numbers per node. `low == discovery` closes a component; `low[v] > discovery[u]` marks a bridge.
 
 ```go
-// Fenwick (Binary Indexed) Tree: prefix sums with point updates, O(log n).
-type Fenwick struct{ tree []int }
-func NewFenwick(n int) *Fenwick { return &Fenwick{make([]int, n+1)} }
-func (f *Fenwick) Update(i, delta int) {
-    for ; i < len(f.tree); i += i & (-i) { f.tree[i] += delta }
+// TarjanSCC returns the strongly connected components of a directed graph.
+// One pass, O(V + E).
+func TarjanSCC(graph [][]int) [][]int {
+    n := len(graph)
+
+    const unvisited = -1
+    discovery := make([]int, n)
+    low := make([]int, n)
+    onStack := make([]bool, n)
+    for i := range discovery {
+        discovery[i] = unvisited
+    }
+
+    stack := []int{}
+    timer := 0
+    components := [][]int{}
+
+    var explore func(u int)
+    explore = func(u int) {
+        discovery[u] = timer
+        low[u] = timer
+        timer++
+        stack = append(stack, u)
+        onStack[u] = true
+
+        for _, v := range graph[u] {
+            if discovery[v] == unvisited {
+                explore(v)
+                // Tree edge: propagate the child's low.
+                if low[v] < low[u] {
+                    low[u] = low[v]
+                }
+            } else if onStack[v] {
+                // Back edge: use DISCOVERY, not low — using low here
+                // would leak reachability across components.
+                if discovery[v] < low[u] {
+                    low[u] = discovery[v]
+                }
+            }
+        }
+
+        // Nothing beneath u reaches anything older: u closes a component.
+        if low[u] == discovery[u] {
+            component := []int{}
+            for {
+                top := stack[len(stack)-1]
+                stack = stack[:len(stack)-1]
+                onStack[top] = false
+                component = append(component, top)
+                if top == u {
+                    break
+                }
+            }
+            components = append(components, component)
+        }
+    }
+
+    for u := 0; u < n; u++ {
+        if discovery[u] == unvisited {
+            explore(u)
+        }
+    }
+    return components
 }
-func (f *Fenwick) Query(i int) int { // prefix sum [1..i]
-    s := 0
-    for ; i > 0; i -= i & (-i) { s += f.tree[i] }
-    return s
+
+// FindBridges returns the bridges of an UNDIRECTED graph using the same
+// low-link machinery.
+func FindBridges(n int, graph [][]int) [][]int {
+    const unvisited = -1
+    discovery := make([]int, n)
+    low := make([]int, n)
+    for i := range discovery {
+        discovery[i] = unvisited
+    }
+
+    timer := 0
+    bridges := [][]int{}
+
+    var explore func(u, parent int)
+    explore = func(u, parent int) {
+        discovery[u] = timer
+        low[u] = timer
+        timer++
+
+        for _, v := range graph[u] {
+            if v == parent {
+                continue // do not walk straight back up the tree edge
+            }
+            if discovery[v] == unvisited {
+                explore(v, u)
+                if low[v] < low[u] {
+                    low[u] = low[v]
+                }
+                // v's subtree cannot reach u or above → this edge is critical.
+                if low[v] > discovery[u] {
+                    bridges = append(bridges, []int{u, v})
+                }
+            } else if discovery[v] < low[u] {
+                low[u] = discovery[v] // back edge
+            }
+        }
+    }
+
+    for u := 0; u < n; u++ {
+        if discovery[u] == unvisited {
+            explore(u, -1)
+        }
+    }
+    return bridges
 }
 ```
 
 ```python
-class Fenwick:
-    def __init__(self, n):
-        self.tree = [0] * (n + 1)
-    def update(self, i, delta):          # 1-indexed
-        while i < len(self.tree):
-            self.tree[i] += delta
-            i += i & (-i)
-    def query(self, i):                  # prefix sum [1..i]
-        s = 0
-        while i > 0:
-            s += self.tree[i]
-            i -= i & (-i)
-        return s
+def tarjan_scc(graph):
+    """Strongly connected components of a directed graph, in one pass."""
+    n = len(graph)
+    UNVISITED = -1
+    discovery = [UNVISITED] * n
+    low = [0] * n
+    on_stack = [False] * n
+    stack, components = [], []
+    timer = 0
+
+    def explore(u):
+        nonlocal timer
+        discovery[u] = low[u] = timer
+        timer += 1
+        stack.append(u)
+        on_stack[u] = True
+
+        for v in graph[u]:
+            if discovery[v] == UNVISITED:
+                explore(v)
+                low[u] = min(low[u], low[v])        # tree edge: child's low
+            elif on_stack[v]:
+                low[u] = min(low[u], discovery[v])  # back edge: DISCOVERY
+
+        if low[u] == discovery[u]:                  # u closes a component
+            component = []
+            while True:
+                top = stack.pop()
+                on_stack[top] = False
+                component.append(top)
+                if top == u:
+                    break
+            components.append(component)
+
+    for u in range(n):
+        if discovery[u] == UNVISITED:
+            explore(u)
+    return components
+
+def find_bridges(n, graph):
+    """Bridges of an UNDIRECTED graph, same low-link machinery."""
+    UNVISITED = -1
+    discovery = [UNVISITED] * n
+    low = [0] * n
+    bridges = []
+    timer = 0
+
+    def explore(u, parent):
+        nonlocal timer
+        discovery[u] = low[u] = timer
+        timer += 1
+
+        for v in graph[u]:
+            if v == parent:
+                continue                            # do not re-cross the tree edge
+            if discovery[v] == UNVISITED:
+                explore(v, u)
+                low[u] = min(low[u], low[v])
+                if low[v] > discovery[u]:           # nothing routes around it
+                    bridges.append([u, v])
+            else:
+                low[u] = min(low[u], discovery[v])  # back edge
+
+    for u in range(n):
+        if discovery[u] == UNVISITED:
+            explore(u, -1)
+    return bridges
 ```
 
 ```java
-class Fenwick {
-    long[] tree;
-    Fenwick(int n) { tree = new long[n + 1]; }
-    void update(int i, long d) { for (; i < tree.length; i += i & (-i)) tree[i] += d; }
-    long query(int i) { long s = 0; for (; i > 0; i -= i & (-i)) s += tree[i]; return s; }
+import java.util.*;
+
+public class StronglyConnected {
+    private int[] discovery, low;
+    private boolean[] onStack;
+    private Deque<Integer> stack;
+    private int timer;
+    private List<List<Integer>> components;
+
+    public List<List<Integer>> tarjanSCC(List<List<Integer>> graph) {
+        int n = graph.size();
+        discovery = new int[n];
+        low = new int[n];
+        onStack = new boolean[n];
+        Arrays.fill(discovery, -1);
+        stack = new ArrayDeque<>();
+        components = new ArrayList<>();
+        timer = 0;
+
+        for (int u = 0; u < n; u++)
+            if (discovery[u] == -1) explore(graph, u);
+        return components;
+    }
+
+    private void explore(List<List<Integer>> graph, int u) {
+        discovery[u] = low[u] = timer++;
+        stack.push(u);
+        onStack[u] = true;
+
+        for (int v : graph.get(u)) {
+            if (discovery[v] == -1) {
+                explore(graph, v);
+                low[u] = Math.min(low[u], low[v]);          // tree edge
+            } else if (onStack[v]) {
+                low[u] = Math.min(low[u], discovery[v]);    // back edge
+            }
+        }
+
+        if (low[u] == discovery[u]) {                       // component root
+            List<Integer> component = new ArrayList<>();
+            int top;
+            do {
+                top = stack.pop();
+                onStack[top] = false;
+                component.add(top);
+            } while (top != u);
+            components.add(component);
+        }
+    }
 }
 ```
 
 ```cpp
-struct Fenwick {
-    vector<long long> tree;
-    Fenwick(int n) : tree(n + 1, 0) {}
-    void update(int i, long long d) { for (; i < (int)tree.size(); i += i & (-i)) tree[i] += d; }
-    long long query(int i) { long long s = 0; for (; i > 0; i -= i & (-i)) s += tree[i]; return s; }
-};
+#include <algorithm>
+#include <vector>
+using namespace std;
+
+vector<int> discoveryTime, lowLink;
+vector<bool> onStack;
+vector<int> sccStack;
+int sccTimer;
+vector<vector<int>> sccComponents;
+
+void exploreSCC(const vector<vector<int>>& graph, int u) {
+    discoveryTime[u] = lowLink[u] = sccTimer++;
+    sccStack.push_back(u);
+    onStack[u] = true;
+
+    for (int v : graph[u]) {
+        if (discoveryTime[v] == -1) {
+            exploreSCC(graph, v);
+            lowLink[u] = min(lowLink[u], lowLink[v]);           // tree edge
+        } else if (onStack[v]) {
+            lowLink[u] = min(lowLink[u], discoveryTime[v]);     // back edge
+        }
+    }
+
+    if (lowLink[u] == discoveryTime[u]) {                       // component root
+        vector<int> component;
+        while (true) {
+            int top = sccStack.back();
+            sccStack.pop_back();
+            onStack[top] = false;
+            component.push_back(top);
+            if (top == u) break;
+        }
+        sccComponents.push_back(component);
+    }
+}
+
+vector<vector<int>> tarjanSCC(const vector<vector<int>>& graph) {
+    int n = (int)graph.size();
+    discoveryTime.assign(n, -1);
+    lowLink.assign(n, 0);
+    onStack.assign(n, false);
+    sccStack.clear();
+    sccComponents.clear();
+    sccTimer = 0;
+
+    for (int u = 0; u < n; ++u)
+        if (discoveryTime[u] == -1) exploreSCC(graph, u);
+    return sccComponents;
+}
 ```
 
 ---
@@ -254,124 +631,546 @@ struct Fenwick {
 
 ## 9. Solved Example 1
 
-### Problem — Critical Connections (LeetCode 1192)
-A representative **Strongly Connected Components** problem. The signal: kosaraju/tarjan group mutually reachable nodes in directed graphs.
+### Problem — Eventual Safe States (LeetCode 802)
+In a directed graph, a node is **safe** if *every* path leaving it ends at a terminal node (a node with no outgoing edges). Return all safe nodes in ascending order.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (scc, kosaraju, tarjan, condensation, directed cycle).
-2. Reach for the Strongly Connected Components template below and map the problem's entities onto it.
-3. Match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP.
+1. A walk fails to terminate only by looping forever, so a node is **unsafe** exactly when it can reach a cycle.
+2. Cycles are precisely what SCCs expose: a component is *cyclic* when it has more than one node, or one node with a self-loop.
+3. So: every node of a cyclic component is unsafe, and so is every node that can reach such a component.
+4. "Can reach" over the condensation is easy because the condensation is a **DAG** — one sweep in reverse topological order settles it.
+5. Tarjan already **emits components in reverse topological order** (sinks first), so by the time a component pops, all components it points to are already labelled. One pass, no extra sort.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `graph = [[1,2],[2,3],[5],[0],[5],[],[]]`
+
+Edges: `0→1, 0→2, 1→2, 1→3, 2→5, 3→0, 4→5`; nodes `5` and `6` are terminal.
+
+DFS from node 0, `timer` starting at 0:
+
+| # | at node | discovery | low | what happens |
+|---|---|---|---|---|
+| 1 | 0 | 0 | 0 | push 0, follow `0→1` |
+| 2 | 1 | 1 | 1 | push 1, follow `1→2` |
+| 3 | 2 | 2 | 2 | push 2, follow `2→5` |
+| 4 | 5 | 3 | 3 | terminal; `low == discovery` → **pop {5} = C0** |
+| 5 | back at 2 | 2 | 2 | `low[5]=3` doesn't lower it; `low == discovery` → **pop {2} = C1** |
+| 6 | 3 | 4 | **0** | back edge `3→0`, 0 is on the stack → `low[3] = discovery[0] = 0` |
+| 7 | back at 1 | 1 | **0** | `low[1] = min(1, low[3]=0) = 0 ≠ 1` → stays on the stack |
+| 8 | back at 0 | 0 | 0 | `0→2`: visited but **off** the stack → ignored; `low == discovery` → **pop {3,1,0} = C2** |
+| 9 | 4 | 5 | 5 | `4→5`: off the stack → ignored → **pop {4} = C3** |
+| 10 | 6 | 6 | 6 | terminal → **pop {6} = C4** |
+
+Now walk the components in that same emission order — each one's successors are already decided:
+
+| component | members | cyclic? | points to | unsafe? |
+|---|---|---|---|---|
+| C0 | {5} | no (size 1, no self-loop) | — | no |
+| C1 | {2} | no | C0 (safe) | no |
+| C2 | {0,1,3} | **yes** (size 3) | C1 | **yes** |
+| C3 | {4} | no | C0 (safe) | no |
+| C4 | {6} | no | — | no |
+
+Output: **[2, 4, 5, 6]**
+
+Row 8 is the one to stare at. Node 2 was already popped when `0→2` was examined, so `onStack[2]` is false and the edge is skipped — exactly right, because 2 lives in a *finished* component and cannot lead back to 0. Had we used `low[2]` there instead of ignoring it, reachability would have leaked between components.
 
 ### Visualization
-```
-input  ──▶ [ apply Strongly Connected Components step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+original graph                     condensation (a DAG)
+
+  0 ⇄ 1 → 3                          ┌─────────┐
+  │   │   │                          │ C2      │  cyclic → unsafe
+  ↓   ↓   └──→ 0                     │ {0,1,3} │
+  2   2                              └────┬────┘
+  │                                       ↓
+  ↓          4 → 5     6                ┌────┐      ┌────┐
+  5                                     │ C1 │      │ C3 │
+                                        │{2} │      │{4} │
+  cycle: 0 → 1 → 3 → 0                  └─┬──┘      └─┬──┘
+                                          └────┬──────┘
+                                               ↓
+                                            ┌────┐   ┌────┐
+                                            │ C0 │   │ C4 │
+                                            │{5} │   │{6} │
+                                            └────┘   └────┘
+
+Tarjan pops sinks first:  C0, C1, C2, C3, C4
+                          ^^^^^^^^ successors always resolved first
 ```
 
 ### Code
+
+```go
+// eventualSafeNodes: a node is unsafe iff it can reach a cycle.
+// Tarjan finds the cycles (components) and pops them sinks-first,
+// so one sweep over the condensation labels everything.
+func eventualSafeNodes(graph [][]int) []int {
+    n := len(graph)
+    const unseen = -1
+
+    discovery := make([]int, n)
+    low := make([]int, n)
+    onStack := make([]bool, n)
+    compOf := make([]int, n)
+    for i := 0; i < n; i++ {
+        discovery[i] = unseen
+    }
+
+    stack := []int{}
+    timer := 0
+    comps := [][]int{} // emitted in REVERSE topological order: sinks first
+
+    var explore func(u int)
+    explore = func(u int) {
+        discovery[u], low[u] = timer, timer
+        timer++
+        stack = append(stack, u)
+        onStack[u] = true
+
+        for _, v := range graph[u] {
+            if discovery[v] == unseen {
+                explore(v)
+                if low[v] < low[u] { // tree edge: child's low
+                    low[u] = low[v]
+                }
+            } else if onStack[v] {
+                if discovery[v] < low[u] { // back edge: DISCOVERY
+                    low[u] = discovery[v]
+                }
+            }
+        }
+
+        if low[u] == discovery[u] { // u closes a component
+            id := len(comps)
+            members := []int{}
+            for {
+                top := stack[len(stack)-1]
+                stack = stack[:len(stack)-1]
+                onStack[top] = false
+                compOf[top] = id
+                members = append(members, top)
+                if top == u {
+                    break
+                }
+            }
+            comps = append(comps, members)
+        }
+    }
+
+    for u := 0; u < n; u++ {
+        if discovery[u] == unseen {
+            explore(u)
+        }
+    }
+
+    // Sinks first, so every successor component is already labelled.
+    compUnsafe := make([]bool, len(comps))
+    for id, members := range comps {
+        unsafe := len(members) > 1 // more than one node ⇒ a real cycle
+        for _, u := range members {
+            for _, v := range graph[u] {
+                if compOf[v] == id {
+                    unsafe = true // self-loop: a cycle of length 1
+                } else if compUnsafe[compOf[v]] {
+                    unsafe = true // reaches a cyclic component
+                }
+            }
+        }
+        compUnsafe[id] = unsafe
+    }
+
+    safe := []int{}
+    for u := 0; u < n; u++ {
+        if !compUnsafe[compOf[u]] {
+            safe = append(safe, u) // ascending by construction
+        }
+    }
+    return safe
+}
+```
+
 ```python
-class Fenwick:
-    def __init__(self, n):
-        self.tree = [0] * (n + 1)
-    def update(self, i, delta):          # 1-indexed
-        while i < len(self.tree):
-            self.tree[i] += delta
-            i += i & (-i)
-    def query(self, i):                  # prefix sum [1..i]
-        s = 0
-        while i > 0:
-            s += self.tree[i]
-            i -= i & (-i)
-        return s
+def eventual_safe_nodes(graph):
+    """A node is unsafe iff it can reach a cycle; Tarjan finds the cycles."""
+    n = len(graph)
+    UNSEEN = -1
+    discovery = [UNSEEN] * n
+    low = [0] * n
+    on_stack = [False] * n
+    comp_of = [0] * n
+    stack, comps = [], []          # comps: sinks first
+    timer = 0
+
+    def explore(u):
+        nonlocal timer
+        discovery[u] = low[u] = timer
+        timer += 1
+        stack.append(u)
+        on_stack[u] = True
+
+        for v in graph[u]:
+            if discovery[v] == UNSEEN:
+                explore(v)
+                low[u] = min(low[u], low[v])        # tree edge
+            elif on_stack[v]:
+                low[u] = min(low[u], discovery[v])  # back edge
+
+        if low[u] == discovery[u]:
+            comp_id = len(comps)
+            members = []
+            while True:
+                top = stack.pop()
+                on_stack[top] = False
+                comp_of[top] = comp_id
+                members.append(top)
+                if top == u:
+                    break
+            comps.append(members)
+
+    for u in range(n):
+        if discovery[u] == UNSEEN:
+            explore(u)
+
+    comp_unsafe = [False] * len(comps)
+    for comp_id, members in enumerate(comps):
+        unsafe = len(members) > 1                   # a real cycle inside
+        for u in members:
+            for v in graph[u]:
+                if comp_of[v] == comp_id:
+                    unsafe = True                   # self-loop
+                elif comp_unsafe[comp_of[v]]:
+                    unsafe = True                   # reaches a cycle
+        comp_unsafe[comp_id] = unsafe
+
+    return [u for u in range(n) if not comp_unsafe[comp_of[u]]]
 ```
 
 ### Complexity
-Time Varies (often O(log n) per op), Space O(n) to O(n log n). Build cost amortized over many fast queries/updates.
+Time O(V + E) — one DFS, then one pass over every component member and its edges. Space O(V) for `discovery`, `low`, the stack and the component labels.
 
 ## 10. Solved Example 2
 
-### Problem — Longest Cycle (LeetCode 2360)
-A representative **Strongly Connected Components** problem. The signal: kosaraju/tarjan group mutually reachable nodes in directed graphs.
+### Problem — Longest Cycle in a Graph (LeetCode 2360)
+Each node has **at most one** outgoing edge, given as `edges[i]` (or `-1` for none). Return the length of the longest cycle, or `-1` if there is none.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (scc, kosaraju, tarjan, condensation, directed cycle).
-2. Reach for the Strongly Connected Components template below and map the problem's entities onto it.
-3. Match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP.
+1. "Longest cycle" is the condensation table entry: the answer is the size of the **largest strongly connected component**.
+2. With at most one edge out per node, every component with ≥ 2 nodes *is* a cycle — no chords are possible, so component size = cycle length exactly.
+3. Components of size 1 mean "no cycle through this node" (the constraints forbid `edges[i] == i`, so there are no self-loops).
+4. Run Tarjan; when a component pops, its size is known immediately — no need to store members.
+5. If no component exceeds size 1, answer `-1`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `edges = [3,3,4,2,3]` — that is `0→3, 1→3, 2→4, 3→2, 4→3`.
+
+| # | at node | discovery | low | what happens |
+|---|---|---|---|---|
+| 1 | 0 | 0 | 0 | push 0, follow `0→3` |
+| 2 | 3 | 1 | 1 | push 3, follow `3→2` |
+| 3 | 2 | 2 | 2 | push 2, follow `2→4` |
+| 4 | 4 | 3 | **1** | `4→3`, 3 is on the stack → `low[4] = discovery[3] = 1` |
+| 5 | back at 2 | 2 | **1** | `low[2] = min(2, low[4]=1) = 1` |
+| 6 | back at 3 | 1 | 1 | `low[3] = min(1, low[2]=1) = 1 == discovery[3]` → **pop {4,2,3}, size 3** → best = 3 |
+| 7 | back at 0 | 0 | 0 | `low[0] = min(0, low[3]=1) = 0 == discovery[0]` → **pop {0}, size 1** → ignored |
+| 8 | 1 | 4 | 4 | `1→3`: visited and **off** the stack → ignored → **pop {1}, size 1** → ignored |
+
+Output: **3**
+
+Rows 7 and 8 are the whole point: 0 and 1 both *feed into* the cycle but are not on it, and the `onStack` test is what keeps them out of it. Node 3's discovery index (1) is lower than 0's low would suggest, yet `low[0]` stays 0 because a component root never inherits anything older than itself.
+
+Second case: `edges = [2,-1,3,1]` — `0→2, 2→3, 3→1, 1→` nothing. Every node pops as its own component (sizes 1,1,1,1), so no component reaches size 2 → output **-1**.
 
 ### Visualization
-```
-input  ──▶ [ apply Strongly Connected Components step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+edges = [3,3,4,2,3]
+
+     0 ──┐            the cycle:      2 ──→ 4
+         ↓                            ↑     │
+     1 ──→ 3 ⇄ 2 → 4                  └── 3 ←┘
+              ↖___/
+                                      size 3  ⇒  answer 3
+
+stack over time:
+  [0]        push 0
+  [0,3]      push 3
+  [0,3,2]    push 2
+  [0,3,2,4]  push 4      4→3 is a back edge (3 on stack) → low[4]=1
+  [0]        pop 4,2,3   low[3]==discovery[3]  ⇒ component {3,2,4}, size 3
+  []         pop 0                              ⇒ component {0},    size 1
+  [1] → []   node 1 alone                       ⇒ component {1},    size 1
 ```
 
 ### Code
+
+```go
+// longestCycle: with one edge out per node, every SCC of size > 1 is
+// itself a cycle, so the answer is the largest component size.
+func longestCycle(edges []int) int {
+    n := len(edges)
+    const unseen = -1
+
+    discovery := make([]int, n)
+    low := make([]int, n)
+    onStack := make([]bool, n)
+    for i := 0; i < n; i++ {
+        discovery[i] = unseen
+    }
+
+    stack := []int{}
+    timer := 0
+    best := -1
+
+    var explore func(u int)
+    explore = func(u int) {
+        discovery[u], low[u] = timer, timer
+        timer++
+        stack = append(stack, u)
+        onStack[u] = true
+
+        if v := edges[u]; v != -1 { // at most one outgoing edge
+            if discovery[v] == unseen {
+                explore(v)
+                if low[v] < low[u] { // tree edge
+                    low[u] = low[v]
+                }
+            } else if onStack[v] {
+                if discovery[v] < low[u] { // back edge: DISCOVERY
+                    low[u] = discovery[v]
+                }
+            }
+        }
+
+        if low[u] == discovery[u] { // u closes a component
+            size := 0
+            for {
+                top := stack[len(stack)-1]
+                stack = stack[:len(stack)-1]
+                onStack[top] = false
+                size++
+                if top == u {
+                    break
+                }
+            }
+            if size > 1 && size > best { // size 1 = no cycle here
+                best = size
+            }
+        }
+    }
+
+    for u := 0; u < n; u++ {
+        if discovery[u] == unseen {
+            explore(u)
+        }
+    }
+    return best
+}
+```
+
 ```python
-class Fenwick:
-    def __init__(self, n):
-        self.tree = [0] * (n + 1)
-    def update(self, i, delta):          # 1-indexed
-        while i < len(self.tree):
-            self.tree[i] += delta
-            i += i & (-i)
-    def query(self, i):                  # prefix sum [1..i]
-        s = 0
-        while i > 0:
-            s += self.tree[i]
-            i -= i & (-i)
-        return s
+def longest_cycle(edges):
+    """One edge out per node ⇒ every SCC of size > 1 is exactly a cycle."""
+    n = len(edges)
+    UNSEEN = -1
+    discovery = [UNSEEN] * n
+    low = [0] * n
+    on_stack = [False] * n
+    stack = []
+    timer = 0
+    best = -1
+
+    def explore(u):
+        nonlocal timer, best
+        discovery[u] = low[u] = timer
+        timer += 1
+        stack.append(u)
+        on_stack[u] = True
+
+        v = edges[u]
+        if v != -1:
+            if discovery[v] == UNSEEN:
+                explore(v)
+                low[u] = min(low[u], low[v])        # tree edge
+            elif on_stack[v]:
+                low[u] = min(low[u], discovery[v])  # back edge
+
+        if low[u] == discovery[u]:
+            size = 0
+            while True:
+                top = stack.pop()
+                on_stack[top] = False
+                size += 1
+                if top == u:
+                    break
+            if size > 1:
+                best = max(best, size)
+
+    for u in range(n):
+        if discovery[u] == UNSEEN:
+            explore(u)
+    return best
 ```
 
 ### Complexity
-Time Varies (often O(log n) per op), Space O(n) to O(n log n). Build cost amortized over many fast queries/updates.
+Time O(n) — each node is pushed and popped once, and there are at most `n` edges. Space O(n) for the three arrays plus the stack.
 
 ## 11. Solved Example 3
 
-### Problem — Eventual Safe (LeetCode 802)
-A representative **Strongly Connected Components** problem. The signal: kosaraju/tarjan group mutually reachable nodes in directed graphs.
+### Problem — Critical Connections in a Network (LeetCode 1192)
+Given `n` servers and a list of **undirected** connections, return every connection whose removal disconnects some server from the rest — the *bridges*.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (scc, kosaraju, tarjan, condensation, directed cycle).
-2. Reach for the Strongly Connected Components template below and map the problem's entities onto it.
-3. Match the data structure to the operation mix: range queries → segment/Fenwick; prefix lookups → trie; static idempotent ranges → sparse table; subset states → bitmask DP.
+1. This is the **undirected analogue** of the same machinery. In an undirected graph, asking "which nodes are mutually reachable?" is trivial — every connected component already is — so the interesting question moves from *nodes* to *edges*: which edges is that mutual reachability relying on?
+2. Keep `discovery` and `low` exactly as before. Only the test at the end changes: `low[u] == discovery[u]` closes a strongly connected component, while `low[v] > discovery[u]` marks a bridge.
+3. Read `low[v] > discovery[u]` as: nothing in `v`'s subtree reaches `u` or anything discovered earlier, so the only route into that subtree is this edge.
+4. Undirected edges are stored both ways, so skip the immediate parent — otherwise every tree edge would look like a back edge to itself and no bridge would survive.
+5. Chapter 99 derives all of this in full; here the point is only that it is the *same* two numbers, read with a different comparison.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `n = 4, connections = [[0,1],[1,2],[2,0],[1,3]]`
+
+Adjacency (each edge stored twice): `0: [1,2]`, `1: [0,2,3]`, `2: [1,0]`, `3: [1]`
+
+| # | at node (parent) | discovery | low | what happens |
+|---|---|---|---|---|
+| 1 | 0 (—) | 0 | 0 | follow `0→1` |
+| 2 | 1 (0) | 1 | 1 | neighbour 0 is the parent → skipped; follow `1→2` |
+| 3 | 2 (1) | 2 | **0** | neighbour 1 is the parent → skipped; `2→0` visited → `low[2] = discovery[0] = 0` |
+| 4 | back at 1 | 1 | **0** | `low[1] = min(1, 0) = 0`. Bridge? `low[2]=0 > discovery[1]=1` → **no** |
+| 5 | 3 (1) | 3 | 3 | only neighbour is the parent 1 → nothing to explore |
+| 6 | back at 1 | 1 | 0 | Bridge? `low[3]=3 > discovery[1]=1` → **yes, edge (1,3)** |
+| 7 | back at 0 | 0 | 0 | Bridge? `low[1]=0 > discovery[0]=0` → no. Then `0→2` visited → `low[0] = min(0, 2) = 0` |
+
+Output: **[[1,3]]**
+
+Compare rows 4 and 6. Node 2 could climb back to discovery `0`, which is `≤ discovery[1]`, so the triangle routes around edge (1,2). Node 3 could only ever reach discovery `3` — itself — so its single edge is critical.
 
 ### Visualization
-```
-input  ──▶ [ apply Strongly Connected Components step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+         0 ──── 1 ════ 3        ════ = bridge
+         │     ╱
+         │    ╱
+         2 ──┘
+
+discovery/low after the DFS:
+
+   node :  0   1   2   3
+   disc :  0   1   2   3
+   low  :  0   0   0   3
+                        ↑
+              low[3] = 3 > disc[1] = 1  → (1,3) is a bridge
+
+   the triangle {0,1,2} all share low = 0: every one of its edges
+   has an alternate route, so none of them is critical.
+
+directed reading            undirected reading
+  low[u] == disc[u]           low[v] > disc[u]
+  → u roots an SCC            → edge u–v is a bridge
 ```
 
 ### Code
-```python
-class Fenwick:
-    def __init__(self, n):
-        self.tree = [0] * (n + 1)
-    def update(self, i, delta):          # 1-indexed
-        while i < len(self.tree):
-            self.tree[i] += delta
-            i += i & (-i)
-    def query(self, i):                  # prefix sum [1..i]
-        s = 0
-        while i > 0:
-            s += self.tree[i]
-            i -= i & (-i)
-        return s
+
+```go
+// criticalConnections: same discovery/low as Tarjan's SCC, but the
+// closing test becomes low[v] > discovery[u] — v's subtree has no way
+// back around this edge.
+func criticalConnections(n int, connections [][]int) [][]int {
+    graph := make([][]int, n)
+    for _, e := range connections { // undirected: store both directions
+        graph[e[0]] = append(graph[e[0]], e[1])
+        graph[e[1]] = append(graph[e[1]], e[0])
+    }
+
+    const unseen = -1
+    discovery := make([]int, n)
+    low := make([]int, n)
+    for i := 0; i < n; i++ {
+        discovery[i] = unseen
+    }
+
+    timer := 0
+    bridges := [][]int{}
+
+    var explore func(u, parent int)
+    explore = func(u, parent int) {
+        discovery[u], low[u] = timer, timer
+        timer++
+
+        for _, v := range graph[u] {
+            if v == parent {
+                continue // do not walk straight back up the tree edge
+            }
+            if discovery[v] == unseen {
+                explore(v, u)
+                if low[v] < low[u] {
+                    low[u] = low[v]
+                }
+                if low[v] > discovery[u] { // no route around u–v
+                    bridges = append(bridges, []int{u, v})
+                }
+            } else if discovery[v] < low[u] {
+                low[u] = discovery[v] // back edge: DISCOVERY
+            }
+        }
+    }
+
+    for u := 0; u < n; u++ {
+        if discovery[u] == unseen {
+            explore(u, -1)
+        }
+    }
+    return bridges
+}
 ```
 
-### Complexity
-Time Varies (often O(log n) per op), Space O(n) to O(n log n). Build cost amortized over many fast queries/updates.
+```python
+def critical_connections(n, connections):
+    """Same low-link, undirected: low[v] > discovery[u] marks a bridge."""
+    graph = [[] for _ in range(n)]
+    for a, b in connections:
+        graph[a].append(b)
+        graph[b].append(a)
 
+    UNSEEN = -1
+    discovery = [UNSEEN] * n
+    low = [0] * n
+    bridges = []
+    timer = 0
+
+    def explore(u, parent):
+        nonlocal timer
+        discovery[u] = low[u] = timer
+        timer += 1
+
+        for v in graph[u]:
+            if v == parent:
+                continue                            # never re-cross the tree edge
+            if discovery[v] == UNSEEN:
+                explore(v, u)
+                low[u] = min(low[u], low[v])
+                if low[v] > discovery[u]:           # nothing routes around it
+                    bridges.append([u, v])
+            else:
+                low[u] = min(low[u], discovery[v])  # back edge
+
+    for u in range(n):
+        if discovery[u] == UNSEEN:
+            explore(u, -1)
+    return bridges
+```
+
+Skipping by parent *node* is fine here because LeetCode guarantees no repeated connections; with parallel edges you must skip by parent *edge index* instead, or a duplicated edge would masquerade as a back edge.
+
+### Complexity
+Time O(V + E) — build the adjacency list, then visit every node once and every edge twice. Space O(V + E) for the adjacency list plus O(V) of DFS state.
+
+---
 
 ## 12. LeetCode Practice Set
 
