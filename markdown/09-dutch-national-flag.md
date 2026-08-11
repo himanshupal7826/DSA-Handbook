@@ -41,32 +41,123 @@ three way partition, sort colors, 0 1 2, pivot, quicksort partition.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Split this array into groups — smaller than X, equal to X, greater than X — in one pass, in place."*
+
+Running example: sort an array containing only `0`, `1`, `2`.
+
 ### Intuition
-Check every pair/triplet with nested loops — O(n^2) or O(n^3).
+Either run a general-purpose sort, or count the values and rewrite the array.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. **Option A** — call a comparison sort. O(n log n).
+2. **Option B** — counting sort: pass 1 tallies how many `0`s, `1`s, `2`s; pass 2 overwrites the array with that many of each. O(n), but **two passes**.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Option A: O(n log n) time, O(1)–O(n) space.
+- Option B: O(n) time, O(1) space, but reads the array twice.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Dutch National Flag pattern is built to use.
+- Option A compares elements when there are only three possible values — far more power than the problem needs.
+- Option B is fine for plain integers, but it **overwrites** rather than rearranges. If the elements carry extra payload (objects keyed by a category), you can't just stamp `0` over them — you must move the actual items. And it can't be done in a single pass over a stream.
+- Neither generalises to the real prize: **partitioning around a pivot**, which is the engine inside quicksort and quickselect.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Dutch National Flag invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Grow three regions at once — "definitely small" on the left, "definitely large" on the right — and scan the shrinking unknown middle.**
+
+The array is always divided into four zones, and the whole algorithm is just three pointers maintaining them:
+
+```text
+[ 0 0 0 | 1 1 1 |   ? ? ? ?   | 2 2 2 ]
+         ↑       ↑             ↑
+        low     mid          high
+  < pivot  == pivot   unknown    > pivot
+```
+
+- Everything **before** `low` is a `0`.
+- Everything from `low` to `mid−1` is a `1`.
+- Everything from `mid` to `high` is **unexamined**.
+- Everything **after** `high` is a `2`.
+
+We finish when the unknown region is empty.
+
+### The thought process
+
+```text
+We need    : three groups, in place, one pass.
+Obvious way: sort, or count and rewrite.
+Not ideal  : sorting is overkill; counting needs two passes and
+             cannot move real objects, only stamp values.
+Notice     : with only three categories, each element needs at most
+             ONE swap to reach the region it belongs in.
+Therefore  : keep a boundary pointer for each region and a scanner
+             for the unknown middle.
+Now        : one pass, O(1) space, works on real objects too.
+```
+
+### Steps
+
+```text
+Step 1 → low = 0, mid = 0, high = n-1.
+Step 2 → While mid <= high, look at nums[mid]:
+Step 3 →     == 0 → swap(low, mid); low++; mid++
+Step 4 →     == 1 → mid++                       (already in place)
+Step 5 →     == 2 → swap(mid, high); high--     (do NOT advance mid)
+Step 6 → Done when mid > high.
+```
+
+### The one rule people get wrong: why `mid` does not advance on a `2`
+
+Look at where each swap brings its value **from**:
+
+- On a `0`, we swap with `nums[low]`. That slot is in the "== 1" region, so it holds a `1` (or is `mid` itself). A `1` is fine where `mid` now stands, so we can safely advance `mid`.
+- On a `2`, we swap with `nums[high]`. That slot is in the **unknown** region — we have never looked at it. It might be another `2`. Advancing `mid` would wave it through unexamined.
+
+So: after a `0`-swap we know what arrived; after a `2`-swap we don't, and must re-inspect the same index.
+
+```text
+[2, 0, 1]   mid=0, high=2
+ ↑       ↑
+swap → [1, 0, 2], high=1
+
+If we advanced mid here, we'd skip the 1 that just landed at index 0.
+Instead we re-check index 0, see a 1, and advance normally.
+```
+
+### Why `mid <= high` and not `mid < high`
+
+When `mid == high` there is still **one** unexamined element sitting at that index. Stopping early leaves it unsorted. Try `[1, 0]`: the loop must run with `mid == high == 1` to place the final element.
+
+### The bigger prize: this *is* quicksort's partition
+
+Replace "0 / 1 / 2" with "less than pivot / equal to pivot / greater than pivot" and you have three-way partitioning. That gives you:
+
+- **Quickselect** — find the k-th smallest in O(n) average, by recursing into only one side.
+- **Quicksort with duplicates** — the equal-block is finished immediately, so arrays full of repeats don't degrade to O(n²).
+
+### How should I recognize this?
+
+```text
+If you see...
+  "sort an array of 0s, 1s and 2s", "three categories / colours"
+  "partition around a pivot", "k-th largest / smallest"
+  "move all X to the front and Y to the back"
+  "in place", "one pass", "O(1) space"
+        ↓
+Think about...
+  "Can I name a left region, a right region, and scan
+   the unknown middle between them?"
+        ↓
+Use...
+  two categories  → two pointers (write pointer + scanner)
+  three categories→ low / mid / high, advancing mid only when safe
+```
 
 ### Visual explanation
 
@@ -96,76 +187,158 @@ Maintain two indices and an invariant that tells you which pointer to advance, e
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Dutch National Fla: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [2, 0, 2, 1, 1, 0]
+
+low mid high  nums[mid]  action                  array
+ 0   0   5       2       swap(mid,high), high--  [0,0,2,1,1,2]
+ 0   0   4       0       swap(low,mid), low++,mid++
+ 1   1   4       0       swap(low,mid), low++,mid++
+ 2   2   4       2       swap(mid,high), high--  [0,0,1,1,2,2]
+ 2   2   3       1       mid++
+ 2   3   3       1       mid++
+ 2   4   3       —       mid > high → stop
+
+result: [0, 0, 1, 1, 2, 2]
 ```
 
 ### Interview explanation
-"This is a Dutch National Flag problem. I'll maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks. That brings the complexity down to O(n) or O(n log n) time and O(1) space — here's the template."
+"I'll keep three pointers: `low` is the boundary of the 0-region, `high` the boundary of the 2-region, and `mid` scans the unknown middle. On a 0, I swap it down to `low` and advance both `low` and `mid` — the value that came back is a known 1. On a 2, I swap it up to `high` and decrement `high`, but I deliberately do **not** advance `mid`, because the value that came back from the right is still unexamined. On a 1, I just advance `mid`. One pass, O(n) time, O(1) space. The same routine is quicksort's three-way partition, which is what makes quickselect O(n)."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Two Pointers** family template. Adapt the comparison/condition to the specific problem.
+> Three pointers, four regions. Advance `mid` on `0` and `1`, never on `2`.
 
 ```go
-// Opposite-direction two pointers on a sorted array (pair sum).
-func twoSumSorted(a []int, target int) (int, int) {
-    l, r := 0, len(a)-1
-    for l < r {
-        s := a[l] + a[r]
-        switch {
-        case s == target:
-            return l, r
-        case s < target:
-            l++ // need a bigger sum
-        default:
-            r-- // need a smaller sum
+// SortColors performs a three-way partition of 0/1/2 in a single pass.
+func SortColors(nums []int) {
+    low, mid, high := 0, 0, len(nums)-1
+
+    for mid <= high { // <= : the element at mid == high is still unknown
+        switch nums[mid] {
+        case 0:
+            nums[low], nums[mid] = nums[mid], nums[low]
+            low++
+            mid++ // what came back from low is a known 1
+        case 1:
+            mid++ // already in the right region
+        default: // 2
+            nums[mid], nums[high] = nums[high], nums[mid]
+            high--
+            // mid does NOT advance: the value from high is unexamined
         }
     }
-    return -1, -1
+}
+
+// ThreeWayPartition splits nums around pivot and returns the bounds of the
+// equal-to-pivot block: nums[lt:gt+1] all equal pivot.
+func ThreeWayPartition(nums []int, pivot int) (lt, gt int) {
+    lt, i, gt := 0, 0, len(nums)-1
+    for i <= gt {
+        switch {
+        case nums[i] < pivot:
+            nums[lt], nums[i] = nums[i], nums[lt]
+            lt++
+            i++
+        case nums[i] > pivot:
+            nums[i], nums[gt] = nums[gt], nums[i]
+            gt--
+        default:
+            i++
+        }
+    }
+    return lt, gt
 }
 ```
 
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
+def sort_colors(nums):
+    """Three-way partition of 0/1/2 in a single pass."""
+    low, mid, high = 0, 0, len(nums) - 1
+    while mid <= high:                 # <= : nums[mid] is still unknown
+        if nums[mid] == 0:
+            nums[low], nums[mid] = nums[mid], nums[low]
+            low += 1
+            mid += 1                   # what came back is a known 1
+        elif nums[mid] == 1:
+            mid += 1
+        else:                          # 2
+            nums[mid], nums[high] = nums[high], nums[mid]
+            high -= 1
+            # mid does NOT advance: the value from high is unexamined
+
+def three_way_partition(nums, pivot):
+    """Returns (lt, gt) where nums[lt:gt+1] all equal pivot."""
+    lt, i, gt = 0, 0, len(nums) - 1
+    while i <= gt:
+        if nums[i] < pivot:
+            nums[lt], nums[i] = nums[i], nums[lt]
+            lt += 1; i += 1
+        elif nums[i] > pivot:
+            nums[i], nums[gt] = nums[gt], nums[i]
+            gt -= 1
         else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+            i += 1
+    return lt, gt
 ```
 
 ```java
-int[] twoSumSorted(int[] a, int target) {
-    int l = 0, r = a.length - 1;
-    while (l < r) {
-        int s = a[l] + a[r];
-        if (s == target) return new int[]{l, r};
-        else if (s < target) l++;
-        else r--;
+public class DutchNationalFlag {
+    public static void sortColors(int[] nums) {
+        int low = 0, mid = 0, high = nums.length - 1;
+        while (mid <= high) {              // <= : nums[mid] is still unknown
+            if (nums[mid] == 0) {
+                swap(nums, low++, mid++);  // what came back is a known 1
+            } else if (nums[mid] == 1) {
+                mid++;
+            } else {
+                swap(nums, mid, high--);   // mid does NOT advance
+            }
+        }
     }
-    return new int[]{-1, -1};
+
+    // Returns {lt, gt}: nums[lt..gt] all equal pivot.
+    public static int[] threeWayPartition(int[] nums, int pivot) {
+        int lt = 0, i = 0, gt = nums.length - 1;
+        while (i <= gt) {
+            if (nums[i] < pivot) swap(nums, lt++, i++);
+            else if (nums[i] > pivot) swap(nums, i, gt--);
+            else i++;
+        }
+        return new int[]{lt, gt};
+    }
+
+    private static void swap(int[] a, int i, int j) {
+        int t = a[i]; a[i] = a[j]; a[j] = t;
+    }
 }
 ```
 
 ```cpp
-pair<int,int> twoSumSorted(vector<int>& a, int target) {
-    int l = 0, r = (int)a.size() - 1;
-    while (l < r) {
-        int s = a[l] + a[r];
-        if (s == target) return {l, r};
-        else if (s < target) ++l;
-        else --r;
+#include <utility>
+#include <vector>
+using namespace std;
+
+void sortColors(vector<int>& nums) {
+    int low = 0, mid = 0, high = (int)nums.size() - 1;
+    while (mid <= high) {                      // <= : nums[mid] still unknown
+        if (nums[mid] == 0)      swap(nums[low++], nums[mid++]); // known 1 returns
+        else if (nums[mid] == 1) ++mid;
+        else                     swap(nums[mid], nums[high--]);  // mid stays put
     }
-    return {-1, -1};
+}
+
+// Returns {lt, gt}: nums[lt..gt] all equal pivot.
+pair<int, int> threeWayPartition(vector<int>& nums, int pivot) {
+    int lt = 0, i = 0, gt = (int)nums.size() - 1;
+    while (i <= gt) {
+        if (nums[i] < pivot)      swap(nums[lt++], nums[i++]);
+        else if (nums[i] > pivot) swap(nums[i], nums[gt--]);
+        else                      ++i;
+    }
+    return {lt, gt};
 }
 ```
 
@@ -251,138 +424,289 @@ pair<int,int> twoSumSorted(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — Sort Colors (LeetCode 75)
-Sort an array of 0s, 1s, and 2s in place in a single pass (the classic Dutch National Flag problem).
+Sort an array of `0`s (red), `1`s (white) and `2`s (blue) in place, in one pass, without a library sort.
 
 ### Thought Process
-1. Keep three regions via `lo` (end of 0s), `mid` (scanner), and `hi` (start of 2s).
-2. At `nums[mid]`: 0 → swap into the `lo` region and advance both `lo` and `mid`; 1 → just advance `mid`.
-3. 2 → swap to the `hi` region and shrink `hi`, but do NOT advance `mid` (the swapped-in value is unexamined).
+1. Three known categories means we can place each element directly instead of comparing.
+2. Maintain four regions with `low`, `mid`, `high`: settled 0s, settled 1s, unknown, settled 2s.
+3. `0` → swap to `low`, advance `low` and `mid` (what returns from `low` is a known `1`).
+4. `1` → already correct, just advance `mid`.
+5. `2` → swap to `high`, decrement `high`, and **hold `mid`** — the value that came back has never been examined.
+6. Continue while `mid <= high`.
 
 ### Dry Run
-nums = [2,0,1].
-- lo=0,mid=0,hi=2: nums[0]=2 → swap with hi → [1,0,2], hi=1.
-- mid=0: nums[0]=1 → mid=1.
-- mid=1: nums[1]=0 → swap with lo → [0,1,2], lo=1,mid=2 → mid>hi, done.
+
+Input: `nums = [2, 0, 2, 1, 1, 0]`, start `low = 0`, `mid = 0`, `high = 5`
+
+| low | mid | high | nums[mid] | action | array after |
+|-----|-----|------|-----------|--------|-------------|
+| 0 | 0 | 5 | **2** | swap(0,5), `high→4`, mid held | `[0,0,2,1,1,2]` |
+| 0 | 0 | 4 | **0** | swap(0,0), `low→1`, `mid→1` | `[0,0,2,1,1,2]` |
+| 1 | 1 | 4 | **0** | swap(1,1), `low→2`, `mid→2` | `[0,0,2,1,1,2]` |
+| 2 | 2 | 4 | **2** | swap(2,4), `high→3`, mid held | `[0,0,1,1,2,2]` |
+| 2 | 2 | 3 | **1** | `mid→3` | `[0,0,1,1,2,2]` |
+| 2 | 3 | 3 | **1** | `mid→4` | `[0,0,1,1,2,2]` |
+| 2 | 4 | 3 | — | `mid > high` → stop | `[0,0,1,1,2,2]` |
+
+Output: **`[0, 0, 1, 1, 2, 2]`**
+
+Look at row 1: after swapping the `2` away, `mid` stayed at 0 — and that mattered, because a `0` had just arrived there and needed handling in row 2. Advancing would have left it stranded on the wrong side.
+
+Look at the last row: the loop ran while `mid == high == 3`, placing the final unknown element. Using `mid < high` would have skipped it.
 
 ### Visualization
-```
-input  ──▶ [ apply Dutch National Flag step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+final regions:
+
+[ 0  0 | 1  1 | 2  2 ]
+        ↑      ↑
+       low    high+1
+  <pivot  ==pivot  >pivot
 ```
 
 ### Code
+
+```go
+func sortColors(nums []int) {
+    low, mid, high := 0, 0, len(nums)-1
+
+    for mid <= high {
+        switch nums[mid] {
+        case 0:
+            nums[low], nums[mid] = nums[mid], nums[low]
+            low++
+            mid++ // the value swapped back from low is a known 1
+        case 1:
+            mid++ // already in the middle region
+        default: // 2
+            nums[mid], nums[high] = nums[high], nums[mid]
+            high--
+            // mid stays: the value from high has not been examined yet
+        }
+    }
+}
+```
+
 ```python
 def sortColors(nums):
-    lo, mid, hi = 0, 0, len(nums) - 1
-    while mid <= hi:
+    low, mid, high = 0, 0, len(nums) - 1
+    while mid <= high:
         if nums[mid] == 0:
-            nums[lo], nums[mid] = nums[mid], nums[lo]
-            lo += 1
-            mid += 1
+            nums[low], nums[mid] = nums[mid], nums[low]
+            low += 1
+            mid += 1          # value from low is a known 1
         elif nums[mid] == 1:
             mid += 1
-        else:
-            nums[mid], nums[hi] = nums[hi], nums[mid]
-            hi -= 1
-    return nums
+        else:                 # 2
+            nums[mid], nums[high] = nums[high], nums[mid]
+            high -= 1
+            # mid stays: value from high is unexamined
 ```
 
 ### Complexity
-Time O(n), Space O(1) — one three-way-partition pass.
+Time O(n) — every iteration either advances `mid` or decrements `high`, so at most `n` iterations. Space O(1).
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Kth Largest (LeetCode 215)
-Find the kth largest element in an unsorted array without fully sorting it.
+### Problem — Kth Largest Element in an Array (LeetCode 215)
+Return the `k`-th largest element (by value, so duplicates count).
 
 ### Thought Process
-1. The kth largest sits at index `n-k` in ascending order — target that index with quickselect.
-2. Partition around a random pivot using a three-way (Dutch flag) split into `< = >` regions.
-3. Compare the target index to the equal region `[lt, gt]`; recurse into only the side that contains it.
+1. Sorting gives the answer in O(n log n) — but we only need **one** position, not the whole order.
+2. Partitioning around a pivot tells us the pivot's final sorted position for free. If that position *is* the one we want, we're done.
+3. If it isn't, the answer lies entirely on one side — so we recurse into **one** half instead of two. That's the difference between quicksort and quickselect.
+4. Convert "k-th largest" to a 0-based index from the left: `target = n − k`.
+5. Use three-way partitioning so arrays full of duplicates don't degrade.
+
+**Why O(n) on average:** each step discards about half the elements, so the work is `n + n/2 + n/4 + … ≈ 2n`.
 
 ### Dry Run
-nums = [3,2,1,5,6,4], k = 2 → target index 4.
-- Pivot say 4: partition → [3,2,1,4,5,6] with equal region at index 3.
-- target 4 > gt(3) → search right half [5,6].
-- Pivot 5: 6 is largest, target index 4 lands on 5 → return 5.
+
+Input: `nums = [3, 2, 1, 5, 6, 4]`, `k = 2` → `n = 6`, `target index = 6 − 2 = 4`
+
+We want the element that would sit at index 4 if the array were sorted: sorted is `[1,2,3,4,5,6]`, so the answer should be `5`.
+
+| step | working range | pivot | equal-block after partition | contains index 4? | next |
+|------|---------------|-------|-----------------------------|-------------------|------|
+| 1 | `[3,2,1,5,6,4]` (0..5) | `4` | indices 3..3 hold `4` → `[3,2,1,4,6,5]` | 4 > 3 → no, go right | search 4..5 |
+| 2 | `[6,5]` (4..5) | `5` | indices 4..4 hold `5` → `[5,6]` | **yes, index 4** | done |
+
+Output: **`5`** ✓
+
+Notice step 1 threw away four of the six elements in one move — that is where the linear average time comes from.
 
 ### Visualization
-```
-input  ──▶ [ apply Dutch National Flag step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+[3, 2, 1, 5, 6, 4]    pivot = 4
+        ↓ three-way partition
+[3, 2, 1 | 4 | 6, 5]
+ < 4       =    > 4
+ idx 0-2   3    idx 4-5
+
+target index 4 > 3  →  recurse right only:  [6, 5]
+                       pivot 5 → [5 | 6] → index 4 holds 5  ✓
 ```
 
 ### Code
-```python
-import random
 
+```go
+func findKthLargest(nums []int, k int) int {
+    // The k-th largest sits at index n-k once sorted ascending.
+    target := len(nums) - k
+    left, right := 0, len(nums)-1
+
+    for {
+        // Three-way partition nums[left..right] around a pivot.
+        pivot := nums[(left+right)/2]
+        lt, i, gt := left, left, right
+        for i <= gt {
+            switch {
+            case nums[i] < pivot:
+                nums[lt], nums[i] = nums[i], nums[lt]
+                lt++
+                i++
+            case nums[i] > pivot:
+                nums[i], nums[gt] = nums[gt], nums[i]
+                gt--
+            default:
+                i++
+            }
+        }
+
+        // nums[lt..gt] all equal pivot and are in their final positions.
+        switch {
+        case target < lt:
+            right = lt - 1 // answer is in the "less than" block
+        case target > gt:
+            left = gt + 1 // answer is in the "greater than" block
+        default:
+            return pivot // target landed inside the equal block
+        }
+    }
+}
+```
+
+```python
 def findKthLargest(nums, k):
     target = len(nums) - k          # index in ascending order
-    lo, hi = 0, len(nums) - 1
+    left, right = 0, len(nums) - 1
     while True:
-        pivot = nums[random.randint(lo, hi)]
-        lt, i, gt = lo, lo, hi       # Dutch-flag three-way partition
-        while i <= gt:
+        pivot = nums[(left + right) // 2]
+        lt, i, gt = left, left, right
+        while i <= gt:              # three-way partition
             if nums[i] < pivot:
                 nums[lt], nums[i] = nums[i], nums[lt]
-                lt += 1
-                i += 1
+                lt += 1; i += 1
             elif nums[i] > pivot:
                 nums[i], nums[gt] = nums[gt], nums[i]
                 gt -= 1
             else:
                 i += 1
         if target < lt:
-            hi = lt - 1
+            right = lt - 1          # recurse into the "less than" block
         elif target > gt:
-            lo = gt + 1
+            left = gt + 1           # recurse into the "greater than" block
         else:
-            return nums[target]
+            return pivot            # target is inside the equal block
 ```
 
 ### Complexity
-Time O(n) average (O(n^2) worst), Space O(1) — in-place quickselect.
+Time **O(n) average**, O(n²) worst case (a pathological pivot sequence); a random pivot makes the worst case vanishingly unlikely. Space O(1) — the loop replaces recursion.
+
+> If you need the top `k` elements rather than just the `k`-th, a size-`k` heap is the better tool — O(n log k) with O(k) space, and it handles streams.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Sort By Parity (LeetCode 905)
-A representative **Dutch National Flag** problem. The signal: three-way partition into <, =, > a pivot in a single o(n) pass.
+### Problem — Sort Array By Parity (LeetCode 905)
+Rearrange the array so every even number comes before every odd number. Any valid arrangement is accepted.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (three way partition, sort colors, 0 1 2, pivot, quicksort partition).
-2. Reach for the Dutch National Flag template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. Only **two** categories here, so we need only two pointers — the simpler sibling of the flag partition.
+2. `left` scans from the front looking for a misplaced odd; `right` scans from the back looking for a misplaced even.
+3. When both have found a violation, one swap fixes both at once.
+4. Stop when the pointers cross.
+5. Because we only swap genuine violations, each swap does real work — no wasted moves.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `nums = [3, 1, 2, 4]`, start `left = 0`, `right = 3`
+
+| left | right | nums[left] | nums[right] | situation | action | array |
+|------|-------|-----------|-------------|-----------|--------|-------|
+| 0 | 3 | 3 (odd) | 4 (even) | both misplaced | swap | `[4,1,2,3]` |
+| 1 | 2 | 1 (odd) | 2 (even) | both misplaced | swap | `[4,2,1,3]` |
+| 2 | 1 | — | — | `left > right` → stop | | `[4,2,1,3]` |
+
+Output: **`[4, 2, 1, 3]`** — evens `4, 2` first, then odds `1, 3`. ✓
+
+(Other outputs like `[2,4,3,1]` are equally valid; the problem only requires the grouping.)
 
 ### Visualization
-```
-input  ──▶ [ apply Dutch National Flag step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+[3, 1, 2, 4]      left→3 is odd (wrong side), right→4 is even (wrong side)
+ ↑        ↑
+ swap  →  [4, 1, 2, 3]
+
+[4, 1, 2, 3]      left→1 is odd, right→2 is even
+    ↑  ↑
+ swap  →  [4, 2, 1, 3]
+
+    evens | odds
+   [4, 2] | [1, 3]
 ```
 
 ### Code
+
+```go
+func sortArrayByParity(nums []int) []int {
+    left, right := 0, len(nums)-1
+
+    for left < right {
+        leftIsEven := nums[left]%2 == 0
+        rightIsOdd := nums[right]%2 != 0
+
+        switch {
+        case leftIsEven:
+            left++ // already on the correct side
+        case rightIsOdd:
+            right-- // already on the correct side
+        default:
+            // left is odd and right is even: one swap fixes both.
+            nums[left], nums[right] = nums[right], nums[left]
+            left++
+            right--
+        }
+    }
+    return nums
+}
+```
+
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+def sortArrayByParity(nums):
+    left, right = 0, len(nums) - 1
+    while left < right:
+        if nums[left] % 2 == 0:        # already on the correct side
+            left += 1
+        elif nums[right] % 2 != 0:     # already on the correct side
+            right -= 1
+        else:                          # left odd, right even: one swap fixes both
+            nums[left], nums[right] = nums[right], nums[left]
+            left += 1
+            right -= 1
+    return nums
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time O(n) — the pointers move toward each other and together cover the array once. Space O(1), sorted in place.
 
+---
 
 ## 12. LeetCode Practice Set
 

@@ -41,32 +41,123 @@ two pointer, slow fast, read write, in place, remove, partition.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Rebuild this array, keeping only the elements I want, without allocating a second array."*
+
+Running example: remove duplicates from a **sorted** array, in place.
+
 ### Intuition
-Check every pair/triplet with nested loops — O(n^2) or O(n^3).
+The obvious move is to physically delete each unwanted element: when you find one, shift everything after it one slot to the left.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Scan from left to right.
+2. When `nums[i] == nums[i-1]` (a duplicate), delete it.
+3. Deleting means shifting every element after `i` one position left.
+4. Shrink the logical length and re-check the same index.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n²)** — a single delete costs O(n), and there can be O(n) of them.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Same Direction Two Pointers pattern is built to use.
+- Every shift moves elements that will very likely be moved again by the next delete. The array is rewritten over and over.
+- The alternative — copying the keepers into a fresh array — is O(n) time but needs O(n) extra space, which the problem forbids.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Same Direction Two Pointers invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Use two pointers moving the same way: one *reads* every element, the other marks where the next *kept* element should be written.**
+
+Nothing is ever shifted. The reader runs ahead; whenever it finds something worth keeping, it hands it back to the writer, which advances by exactly one.
+
+The two pointers have genuinely different jobs, and naming them that way makes the code obvious:
+
+| Pointer | Job | Moves |
+|---|---|---|
+| `read` (fast) | inspects every element | every iteration |
+| `write` (slow) | the slot the next keeper goes into | only when we keep something |
+
+### The thought process
+
+```text
+We need    : to compact an array in place, dropping some elements.
+Obvious way: delete each unwanted element and shift the rest left.
+Too slow   : each delete is O(n) → O(n²), and shifts get redone.
+Notice     : we don't need the array correct at every moment.
+             We only need it correct at the END.
+Notice too : the region we've already written is always BEHIND the
+             region we're still reading, so writing can never clobber
+             anything we haven't read yet.
+Therefore  : one pass — read everything, write only the keepers.
+Now        : O(n) time, O(1) space, zero shifting.
+```
+
+### Why writing can never destroy unread data
+
+This is the invariant that makes it safe:
+
+```text
+write <= read     at all times
+```
+
+`write` only advances when `read` advances, and it starts at or behind `read`. So `nums[write]` is always a slot that has **already been read**. Overwriting it loses nothing.
+
+```text
+[ kept | kept | kept |  ???  |  unread  ...  ]
+                        ↑        ↑
+                      write     read
+       ← finished →         ← still to come →
+```
+
+### Steps (remove duplicates from a sorted array)
+
+```text
+Step 1 → If the array is empty, return 0.
+Step 2 → write = 1  (the first element is always kept).
+Step 3 → For read = 1 .. n-1:
+Step 4 →     if nums[read] != nums[write-1]:      ← new distinct value
+Step 5 →         nums[write] = nums[read]
+Step 6 →         write++
+Step 7 → Return write — the count of kept elements.
+```
+
+### Why compare against `nums[write-1]` and not `nums[read-1]`
+
+`nums[write-1]` is *the last value we actually kept*. `nums[read-1]` is just the previous element in the raw scan, which may be a duplicate we already decided to drop.
+
+On sorted input both happen to work, but only the `write-1` version generalises — for example to "keep at most **two** of each", where you compare against `nums[write-2]`. Anchor the comparison to what you've kept, not to what you've seen.
+
+### The three common conditions
+
+The skeleton never changes; only the keep-test does:
+
+| Problem | Keep `nums[read]` when… |
+|---|---|
+| Remove duplicates (sorted) | `nums[read] != nums[write-1]` |
+| Remove all copies of `val` | `nums[read] != val` |
+| Move zeroes to the end | `nums[read] != 0` |
+| Keep at most `k` of each | `write < k \|\| nums[read] != nums[write-k]` |
+
+### How should I recognize this?
+
+```text
+If you see...
+  "in place", "O(1) extra space", "return the new length"
+  "remove / filter / compact / partition"
+  "move all X to the end", "the first k elements should be..."
+        ↓
+Think about...
+  "Can I keep one pointer scanning and another marking
+   where the next keeper belongs?"
+        ↓
+Use...
+  read  → visits every element
+  write → advances only when an element is kept
+```
 
 ### Visual explanation
 
@@ -91,76 +182,124 @@ Maintain two indices and an invariant that tells you which pointer to advance, e
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Same Direction Two: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [1, 1, 2, 3, 3]      keep an element if it differs from the last kept
+
+read=1  nums[1]=1 == kept 1  → skip
+read=2  nums[2]=2 != kept 1  → nums[1]=2, write=2   [1,2,2,3,3]
+read=3  nums[3]=3 != kept 2  → nums[2]=3, write=3   [1,2,3,3,3]
+read=4  nums[4]=3 == kept 3  → skip
+
+answer: 3, and nums[:3] = [1,2,3]
 ```
 
 ### Interview explanation
-"This is a Same Direction Two Pointers problem. I'll maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks. That brings the complexity down to O(n) or O(n log n) time and O(1) space — here's the template."
+"I'll use two pointers moving the same direction. `read` visits every element; `write` marks where the next kept element goes. Since `write` never gets ahead of `read`, writing only ever touches slots I've already read, so nothing is lost. When `read` finds an element worth keeping, I copy it to `write` and advance `write`. At the end, `write` is the new length. One pass, O(n) time, O(1) space — no shifting at all."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Two Pointers** family template. Adapt the comparison/condition to the specific problem.
+> One reader, one writer. Change only the keep-condition.
 
 ```go
-// Opposite-direction two pointers on a sorted array (pair sum).
-func twoSumSorted(a []int, target int) (int, int) {
-    l, r := 0, len(a)-1
-    for l < r {
-        s := a[l] + a[r]
-        switch {
-        case s == target:
-            return l, r
-        case s < target:
-            l++ // need a bigger sum
-        default:
-            r-- // need a smaller sum
+// CompactInPlace keeps the elements satisfying keep(i) and returns the new length.
+// Elements beyond the returned length are left as garbage.
+func CompactInPlace(nums []int, keep func(i int) bool) int {
+    write := 0
+    for read := 0; read < len(nums); read++ {
+        if keep(read) {
+            nums[write] = nums[read]
+            write++ // only advances for keepers
         }
     }
-    return -1, -1
+    return write
+}
+
+// RemoveDuplicates on a sorted slice: keep a value only if it differs
+// from the last one we kept.
+func RemoveDuplicates(nums []int) int {
+    if len(nums) == 0 {
+        return 0
+    }
+    write := 1 // the first element is always kept
+    for read := 1; read < len(nums); read++ {
+        if nums[read] != nums[write-1] {
+            nums[write] = nums[read]
+            write++
+        }
+    }
+    return write
 }
 ```
 
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+def compact_in_place(nums, keep):
+    """Keep elements where keep(i) is true; return the new length."""
+    write = 0
+    for read in range(len(nums)):
+        if keep(read):
+            nums[write] = nums[read]
+            write += 1                 # only advances for keepers
+    return write
+
+def remove_duplicates(nums):
+    """Sorted input: keep a value only if it differs from the last kept."""
+    if not nums:
+        return 0
+    write = 1                          # first element is always kept
+    for read in range(1, len(nums)):
+        if nums[read] != nums[write - 1]:
+            nums[write] = nums[read]
+            write += 1
+    return write
 ```
 
 ```java
-int[] twoSumSorted(int[] a, int target) {
-    int l = 0, r = a.length - 1;
-    while (l < r) {
-        int s = a[l] + a[r];
-        if (s == target) return new int[]{l, r};
-        else if (s < target) l++;
-        else r--;
+import java.util.function.IntPredicate;
+
+public class SameDirectionTwoPointers {
+    // Keep elements satisfying keep; return the new length.
+    public static int compactInPlace(int[] nums, IntPredicate keep) {
+        int write = 0;
+        for (int read = 0; read < nums.length; read++) {
+            if (keep.test(read)) nums[write++] = nums[read];
+        }
+        return write;
     }
-    return new int[]{-1, -1};
+
+    // Sorted input: keep a value only if it differs from the last kept.
+    public static int removeDuplicates(int[] nums) {
+        if (nums.length == 0) return 0;
+        int write = 1;
+        for (int read = 1; read < nums.length; read++) {
+            if (nums[read] != nums[write - 1]) nums[write++] = nums[read];
+        }
+        return write;
+    }
 }
 ```
 
 ```cpp
-pair<int,int> twoSumSorted(vector<int>& a, int target) {
-    int l = 0, r = (int)a.size() - 1;
-    while (l < r) {
-        int s = a[l] + a[r];
-        if (s == target) return {l, r};
-        else if (s < target) ++l;
-        else --r;
-    }
-    return {-1, -1};
+#include <functional>
+#include <vector>
+using namespace std;
+
+// Keep elements satisfying keep; return the new length.
+int compactInPlace(vector<int>& nums, const function<bool(int)>& keep) {
+    int write = 0;
+    for (int read = 0; read < (int)nums.size(); ++read)
+        if (keep(read)) nums[write++] = nums[read];
+    return write;
+}
+
+// Sorted input: keep a value only if it differs from the last kept.
+int removeDuplicates(vector<int>& nums) {
+    if (nums.empty()) return 0;
+    int write = 1;
+    for (int read = 1; read < (int)nums.size(); ++read)
+        if (nums[read] != nums[write - 1]) nums[write++] = nums[read];
+    return write;
 }
 ```
 
@@ -245,120 +384,225 @@ pair<int,int> twoSumSorted(vector<int>& a, int target) {
 
 ## 9. Solved Example 1
 
-### Problem — Remove Duplicates (LeetCode 26)
-The array is sorted; remove duplicates in place so each element appears once and return the new length.
+### Problem — Remove Duplicates from Sorted Array (LeetCode 26)
+Remove duplicates in place so each value appears once, and return the new length `k`. The first `k` slots must hold the distinct values in order.
 
 ### Thought Process
-1. A writer index `w` marks the end of the deduped prefix; a reader `r` scans the rest.
-2. Because the array is sorted, a value is new exactly when it differs from `nums[w-1]`.
-3. On a new value, write it at `w` and advance `w`; return `w` as the length.
+1. The array is sorted, so duplicates are always adjacent — we never need to look far back.
+2. `write` marks where the next distinct value goes; `write−1` is the last value we kept.
+3. Keep `nums[read]` exactly when it differs from `nums[write-1]`.
+4. `write` starts at 1 because the very first element is always kept.
+5. `write` never passes `read`, so overwriting is always safe.
 
 ### Dry Run
-nums = [1,1,2,3,3].
-- w=1, r=1 (1)==nums[0] → skip.
-- r=2 (2)!=nums[0](1) → nums[1]=2, w=2.
-- r=3 (3)!=nums[1](2) → nums[2]=3, w=3.
-- r=4 (3)==nums[2](3) → skip. Return 3, prefix [1,2,3].
+
+Input: `nums = [1, 1, 2, 3, 3]`, start `write = 1`
+
+| read | nums[read] | last kept = nums[write−1] | different? | action | array | write |
+|------|-----------|---------------------------|------------|--------|-------|-------|
+| 1 | 1 | `nums[0]` = 1 | no  | skip | `[1,1,2,3,3]` | 1 |
+| 2 | 2 | `nums[0]` = 1 | yes | `nums[1] = 2` | `[1,2,2,3,3]` | 2 |
+| 3 | 3 | `nums[1]` = 2 | yes | `nums[2] = 3` | `[1,2,3,3,3]` | 3 |
+| 4 | 3 | `nums[2]` = 3 | no  | skip | `[1,2,3,3,3]` | 3 |
+
+Output: **`3`**, with `nums[0..2] = [1, 2, 3]`.
+
+The trailing `[3,3]` is leftover garbage — the problem explicitly does not care about anything past index `k−1`.
 
 ### Visualization
-```
-input  ──▶ [ apply Same Direction Two Pointers step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+        kept region        garbage
+       ┌──────────┐
+nums = [ 1 , 2 , 3 , 3 , 3 ]
+                   ↑       ↑
+                 write=3  read finished
+
+return 3
 ```
 
 ### Code
+
+```go
+func removeDuplicates(nums []int) int {
+    if len(nums) == 0 {
+        return 0
+    }
+
+    write := 1 // the first element is always kept
+    for read := 1; read < len(nums); read++ {
+        // nums[write-1] is the last value we actually kept.
+        if nums[read] != nums[write-1] {
+            nums[write] = nums[read]
+            write++
+        }
+    }
+    return write
+}
+```
+
 ```python
 def removeDuplicates(nums):
     if not nums:
         return 0
-    w = 1
-    for r in range(1, len(nums)):
-        if nums[r] != nums[w - 1]:
-            nums[w] = nums[r]
-            w += 1
-    return w
+    write = 1                              # first element is always kept
+    for read in range(1, len(nums)):
+        if nums[read] != nums[write - 1]:  # differs from the last kept
+            nums[write] = nums[read]
+            write += 1
+    return write
 ```
 
 ### Complexity
-Time O(n), Space O(1) — one reader pass, in-place writer.
+Time O(n) — one pass. Space O(1) — in place, no shifting.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Remove Element (LeetCode 27)
-Remove every occurrence of `val` from the array in place and return the count of remaining elements.
+Remove every occurrence of `val` in place and return the new length `k`. The order of the remaining elements may change, and anything past `k` is ignored.
 
 ### Thought Process
-1. A writer index `w` collects the elements we keep; a reader `r` scans all positions.
-2. Whenever `nums[r] != val`, copy it to `nums[w]` and advance `w`.
-3. Order need not be preserved among kept elements; `w` is the final length.
+1. Same skeleton, simpler condition: keep `nums[read]` when `nums[read] != val`.
+2. No sortedness is needed here — the test looks only at the current element.
+3. `write` counts the survivors, so it *is* the answer at the end.
 
 ### Dry Run
-nums = [3,2,2,3], val = 3.
-- r=0 (3)==val → skip, w=0.
-- r=1 (2)!=val → nums[0]=2, w=1.
-- r=2 (2)!=val → nums[1]=2, w=2.
-- r=3 (3)==val → skip. Return 2, prefix [2,2].
+
+Input: `nums = [3, 2, 2, 3]`, `val = 3`, start `write = 0`
+
+| read | nums[read] | == val? | action | array | write |
+|------|-----------|---------|--------|-------|-------|
+| 0 | 3 | yes | skip | `[3,2,2,3]` | 0 |
+| 1 | 2 | no  | `nums[0] = 2` | `[2,2,2,3]` | 1 |
+| 2 | 2 | no  | `nums[1] = 2` | `[2,2,2,3]` | 2 |
+| 3 | 3 | yes | skip | `[2,2,2,3]` | 2 |
+
+Output: **`2`**, with `nums[0..1] = [2, 2]`.
+
+Note step `read = 1`: we wrote `2` over the `3` at index 0. That was safe because index 0 had already been read.
 
 ### Visualization
-```
-input  ──▶ [ apply Same Direction Two Pointers step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+read:   3    2    2    3
+        ✗    ✓    ✓    ✗
+             ↓    ↓
+write: [2] [2]  ...            → new length 2
 ```
 
 ### Code
+
+```go
+func removeElement(nums []int, val int) int {
+    write := 0
+    for read := 0; read < len(nums); read++ {
+        if nums[read] != val { // keep everything that isn't val
+            nums[write] = nums[read]
+            write++
+        }
+    }
+    return write
+}
+```
+
 ```python
 def removeElement(nums, val):
-    w = 0
-    for r in range(len(nums)):
-        if nums[r] != val:
-            nums[w] = nums[r]
-            w += 1
-    return w
+    write = 0
+    for read in range(len(nums)):
+        if nums[read] != val:          # keep everything that isn't val
+            nums[write] = nums[read]
+            write += 1
+    return write
 ```
 
 ### Complexity
-Time O(n), Space O(1) — single pass with an in-place writer.
+Time O(n), Space O(1).
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Move Zeroes (LeetCode 283)
-Move all zeroes to the end in place while keeping the relative order of the non-zero elements.
+Move all `0`s to the end of the array in place, keeping the **relative order** of the non-zero elements.
 
 ### Thought Process
-1. A writer index `w` points to where the next non-zero element belongs.
-2. For each reader position with a non-zero value, swap it into `nums[w]` and advance `w`.
-3. Swapping (rather than overwriting) drags the zeroes toward the tail automatically.
+1. First do the familiar compaction: keep every non-zero, writing them to the front in order. That preserves their relative order automatically, since `read` scans left to right.
+2. After that pass, `write` equals the number of non-zeros — and everything from `write` onward is stale.
+3. Second pass: fill `nums[write..n-1]` with `0`.
+4. Two passes, both linear — still O(n), and no extra memory.
+
+> A one-pass variant *swaps* `nums[read]` and `nums[write]` instead of copying. It works and also preserves order, but the two-pass version is easier to read and just as fast.
 
 ### Dry Run
-nums = [0,1,0,3,12].
-- r=0 (0) → skip, w=0.
-- r=1 (1) → swap nums[0],nums[1] → [1,0,0,3,12], w=1.
-- r=3 (3) → swap nums[1],nums[3] → [1,3,0,0,12], w=2.
-- r=4 (12) → swap nums[2],nums[4] → [1,3,12,0,0].
+
+Input: `nums = [0, 1, 0, 3, 12]`
+
+**Pass 1 — compact the non-zeros:**
+
+| read | nums[read] | zero? | action | array | write |
+|------|-----------|-------|--------|-------|-------|
+| 0 | 0  | yes | skip | `[0,1,0,3,12]` | 0 |
+| 1 | 1  | no  | `nums[0] = 1`  | `[1,1,0,3,12]` | 1 |
+| 2 | 0  | yes | skip | `[1,1,0,3,12]` | 1 |
+| 3 | 3  | no  | `nums[1] = 3`  | `[1,3,0,3,12]` | 2 |
+| 4 | 12 | no  | `nums[2] = 12` | `[1,3,12,3,12]`| 3 |
+
+**Pass 2 — zero-fill from index `write = 3`:**
+
+```text
+[1, 3, 12, 0, 0]
+```
+
+Output: **`[1, 3, 12, 0, 0]`** — the non-zeros kept their original order `1, 3, 12`.
 
 ### Visualization
-```
-input  ──▶ [ apply Same Direction Two Pointers step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+after pass 1:   [ 1 , 3 , 12 | 3 , 12 ]
+                 └ non-zeros ┘  └ stale ┘
+                              ↑
+                           write = 3
+
+after pass 2:   [ 1 , 3 , 12 | 0 , 0 ]
 ```
 
 ### Code
+
+```go
+func moveZeroes(nums []int) {
+    // Pass 1: compact the non-zeros to the front, preserving order.
+    write := 0
+    for read := 0; read < len(nums); read++ {
+        if nums[read] != 0 {
+            nums[write] = nums[read]
+            write++
+        }
+    }
+
+    // Pass 2: everything from write onward is stale — zero it out.
+    for i := write; i < len(nums); i++ {
+        nums[i] = 0
+    }
+}
+```
+
 ```python
 def moveZeroes(nums):
-    w = 0
-    for r in range(len(nums)):
-        if nums[r] != 0:
-            nums[w], nums[r] = nums[r], nums[w]
-            w += 1
-    return nums
+    write = 0
+    for read in range(len(nums)):      # pass 1: compact non-zeros
+        if nums[read] != 0:
+            nums[write] = nums[read]
+            write += 1
+    for i in range(write, len(nums)):  # pass 2: zero-fill the tail
+        nums[i] = 0
 ```
 
 ### Complexity
-Time O(n), Space O(1) — a single in-place pass, order preserved.
+Time O(n) — two linear passes. Space O(1) — fully in place.
 
+---
 
 ## 12. LeetCode Practice Set
 

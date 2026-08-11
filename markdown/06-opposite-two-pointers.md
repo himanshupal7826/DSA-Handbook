@@ -41,32 +41,108 @@ two pointer, left right, converge, sorted, pair sum, palindrome.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Which pair of elements — one from somewhere, one from somewhere else — satisfies my condition?"*
+
+Running example: a **sorted** array and a `target`; find the two values that add to it.
+
 ### Intuition
-Check every pair/triplet with nested loops — O(n^2) or O(n^3).
+With no strategy, try every pair.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each index `i` from `0` to `n−1`:
+2. &nbsp;&nbsp;For each index `j` from `i+1` to `n−1`:
+3. &nbsp;&nbsp;&nbsp;&nbsp;If `nums[i] + nums[j] == target`, return the pair.
+4. Otherwise keep going.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n²)**.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Opposite Direction Two Pointers pattern is built to use.
+- It throws away the single most useful fact we were given: **the array is sorted**.
+- When `nums[i] + nums[j]` comes out too large, the brute force learns nothing from that. But it just proved something: with `nums[j]` being the largest remaining candidate, *no* `j' > j` can help either. A whole block of pairs could have been discarded, and wasn't.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Opposite Direction Two Pointers invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Start with the widest possible pair — first and last — and let the comparison tell you which end to move in.**
+
+Because the array is sorted, moving the left pointer right can only **increase** the sum, and moving the right pointer left can only **decrease** it. So the sum has a steering wheel, and the comparison against `target` tells you which way to turn.
+
+### The thought process
+
+```text
+We need    : two values summing to target, in a SORTED array.
+Obvious way: try all pairs.
+Too slow   : O(n²), and it ignores the sortedness.
+Notice     : put left at the smallest value and right at the largest.
+             sum too small?  the only way to grow it is left++
+             sum too big?    the only way to shrink it is right--
+             Each move throws away a whole row of pairs, safely.
+Therefore  : walk the two pointers toward each other.
+Now        : every step eliminates one index for good → O(n).
+```
+
+### Why each move is safe (this is the part worth understanding)
+
+Suppose `nums[left] + nums[right] < target`.
+
+Ask: could `nums[left]` pair with anything at all? Its best possible partner is the biggest remaining value, which is `nums[right]` — and even *that* fell short. So `nums[left]` is hopeless with **every** remaining index. We can discard it entirely and do `left++`.
+
+The mirror argument holds when the sum is too big: `nums[right]` is too large even paired with the smallest remaining value, so `right--`.
+
+Each step permanently removes one index from consideration. There are `n` indices, so the loop runs at most `n` times — that is where O(n) comes from.
+
+### Steps
+
+```text
+Step 1 → left = 0, right = n-1.
+Step 2 → While left < right:
+Step 3 →     sum = nums[left] + nums[right]
+Step 4 →     if sum == target → found it, return.
+Step 5 →     if sum <  target → left++    (need a bigger sum)
+Step 6 →     if sum >  target → right--   (need a smaller sum)
+Step 7 → Loop ended → no such pair exists.
+```
+
+### Why `left < right` and not `left <= right`
+
+`left == right` would mean pairing an element with itself, which isn't a pair. Stopping at `left < right` also guarantees termination: every iteration moves one pointer inward, so the gap strictly shrinks.
+
+### The same shape, different condition
+
+Opposite-direction pointers aren't only for sums. The skeleton is always *"two ends, move the one that can still help"*:
+
+| Problem | Condition checked | Which pointer moves |
+|---|---|---|
+| Pair with sum `target` | `sum` vs `target` | the end that fixes the sum |
+| Palindrome check | `s[left] == s[right]` | both, inward, on a match |
+| Reverse in place | always | both, after swapping |
+| Container with most water | which wall is shorter | the shorter wall |
+
+### How should I recognize this?
+
+```text
+If you see...
+  a SORTED array (or one you're allowed to sort)
+  "find a pair", "two numbers that sum to", "closest pair"
+  "palindrome", "reverse in place", "from both ends"
+  a nested loop where one index counts up and the other counts down
+        ↓
+Think about...
+  "If I stand at both ends, does the comparison tell me
+   which end can be safely thrown away?"
+        ↓
+Use...
+  left = 0, right = n-1, walk inward while left < right.
+```
+
+> **Prerequisite check:** this only works when moving a pointer changes the quantity in a *predictable direction*. Sortedness is the usual source of that guarantee. On unsorted data with arbitrary indices, use a hash map instead.
 
 ### Visual explanation
 
@@ -90,76 +166,156 @@ Maintain two indices and an invariant that tells you which pointer to advance, e
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Opposite Direction: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [2, 3, 5, 7, 9]   target = 12
+
+ [2,  3,  5,  7,  9]      2 + 9 = 11 < 12  → too small → left++
+  ↑               ↑
+ left           right
+
+ [2,  3,  5,  7,  9]      3 + 9 = 12 = 12  → FOUND
+      ↑           ↑
+     left       right
 ```
 
 ### Interview explanation
-"This is a Opposite Direction Two Pointers problem. I'll maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks. That brings the complexity down to O(n) or O(n log n) time and O(1) space — here's the template."
+"The array is sorted, so I'll use two pointers at the ends. If the sum is too small, the left value can't work with anything — its best partner is already the largest element — so I move left in. If the sum is too big, I move right in by the same argument. Each step eliminates one index permanently, so it's O(n) time and O(1) space, versus O(n²) for the brute force."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Two Pointers** family template. Adapt the comparison/condition to the specific problem.
+> Two ends, walk inward, let the comparison choose the pointer.
 
 ```go
-// Opposite-direction two pointers on a sorted array (pair sum).
-func twoSumSorted(a []int, target int) (int, int) {
-    l, r := 0, len(a)-1
-    for l < r {
-        s := a[l] + a[r]
+// TwoSumSorted finds two values in a sorted slice that add to target.
+// Returns their indices, or nil if no such pair exists.
+func TwoSumSorted(nums []int, target int) []int {
+    left, right := 0, len(nums)-1
+    for left < right {
+        sum := nums[left] + nums[right]
         switch {
-        case s == target:
-            return l, r
-        case s < target:
-            l++ // need a bigger sum
+        case sum == target:
+            return []int{left, right}
+        case sum < target:
+            left++ // nums[left] is too small even with the biggest partner
         default:
-            r-- // need a smaller sum
+            right-- // nums[right] is too big even with the smallest partner
         }
     }
-    return -1, -1
+    return nil
+}
+
+// IsPalindrome walks inward comparing mirrored characters.
+func IsPalindrome(s string) bool {
+    left, right := 0, len(s)-1
+    for left < right {
+        if s[left] != s[right] {
+            return false
+        }
+        left++
+        right--
+    }
+    return true
+}
+
+// ReverseInPlace swaps the ends and closes in.
+func ReverseInPlace(nums []int) {
+    for left, right := 0, len(nums)-1; left < right; left, right = left+1, right-1 {
+        nums[left], nums[right] = nums[right], nums[left]
+    }
 }
 ```
 
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
+def two_sum_sorted(nums, target):
+    """Indices of the two values summing to target, in a sorted list."""
+    left, right = 0, len(nums) - 1
+    while left < right:
+        total = nums[left] + nums[right]
+        if total == target:
+            return [left, right]
+        if total < target:
+            left += 1       # too small: nums[left] can never work
         else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+            right -= 1      # too big: nums[right] can never work
+    return None
+
+def is_palindrome(s):
+    left, right = 0, len(s) - 1
+    while left < right:
+        if s[left] != s[right]:
+            return False
+        left += 1
+        right -= 1
+    return True
+
+def reverse_in_place(nums):
+    left, right = 0, len(nums) - 1
+    while left < right:
+        nums[left], nums[right] = nums[right], nums[left]
+        left += 1
+        right -= 1
 ```
 
 ```java
-int[] twoSumSorted(int[] a, int target) {
-    int l = 0, r = a.length - 1;
-    while (l < r) {
-        int s = a[l] + a[r];
-        if (s == target) return new int[]{l, r};
-        else if (s < target) l++;
-        else r--;
+public class OppositeTwoPointers {
+    public static int[] twoSumSorted(int[] nums, int target) {
+        int left = 0, right = nums.length - 1;
+        while (left < right) {
+            int sum = nums[left] + nums[right];
+            if (sum == target) return new int[]{left, right};
+            if (sum < target) left++;      // too small
+            else right--;                  // too big
+        }
+        return null;
     }
-    return new int[]{-1, -1};
+
+    public static boolean isPalindrome(String s) {
+        int left = 0, right = s.length() - 1;
+        while (left < right) {
+            if (s.charAt(left) != s.charAt(right)) return false;
+            left++; right--;
+        }
+        return true;
+    }
+
+    public static void reverseInPlace(int[] nums) {
+        for (int left = 0, right = nums.length - 1; left < right; left++, right--) {
+            int t = nums[left]; nums[left] = nums[right]; nums[right] = t;
+        }
+    }
 }
 ```
 
 ```cpp
-pair<int,int> twoSumSorted(vector<int>& a, int target) {
-    int l = 0, r = (int)a.size() - 1;
-    while (l < r) {
-        int s = a[l] + a[r];
-        if (s == target) return {l, r};
-        else if (s < target) ++l;
-        else --r;
+#include <string>
+#include <vector>
+using namespace std;
+
+vector<int> twoSumSorted(const vector<int>& nums, int target) {
+    int left = 0, right = (int)nums.size() - 1;
+    while (left < right) {
+        int sum = nums[left] + nums[right];
+        if (sum == target) return {left, right};
+        if (sum < target) ++left;      // too small
+        else --right;                  // too big
     }
-    return {-1, -1};
+    return {};
+}
+
+bool isPalindrome(const string& s) {
+    int left = 0, right = (int)s.size() - 1;
+    while (left < right) {
+        if (s[left] != s[right]) return false;
+        ++left; --right;
+    }
+    return true;
+}
+
+void reverseInPlace(vector<int>& nums) {
+    for (int left = 0, right = (int)nums.size() - 1; left < right; ++left, --right)
+        swap(nums[left], nums[right]);
 }
 ```
 
@@ -244,126 +400,284 @@ pair<int,int> twoSumSorted(vector<int>& a, int target) {
 
 ## 9. Solved Example 1
 
-### Problem — Two Sum II (LeetCode 167)
-The array is sorted; return the 1-indexed positions of the two numbers that add up to `target`.
+### Problem — Two Sum II, Input Array Is Sorted (LeetCode 167)
+Given a **1-indexed** sorted array and a `target`, return the two 1-based indices whose values add up to the target. Exactly one solution exists, and you must use O(1) extra space.
 
 ### Thought Process
-1. Sorted input means the sum is monotonic: moving `l` right only raises it, moving `r` left only lowers it.
-2. Start with `l` at the front and `r` at the back and compare the pair sum against `target`.
-3. If the sum is too small advance `l`; if too large retreat `r`; on a match return `[l+1, r+1]`.
+1. O(1) space rules out a hash map — so we must exploit the sortedness instead.
+2. Put `left` at the smallest value and `right` at the largest.
+3. Compare `nums[left] + nums[right]` with `target`:
+   - too small → the only way to grow the sum is `left++`
+   - too big → the only way to shrink it is `right--`
+4. Each move discards an index that provably cannot be part of any answer.
+5. Convert to 1-based indices when returning.
 
 ### Dry Run
-numbers = [2,7,11,15], target = 9.
-- l=0 (2), r=3 (15): sum 17 > 9 → r=2.
-- l=0 (2), r=2 (11): sum 13 > 9 → r=1.
-- l=0 (2), r=1 (7): sum 9 == 9 → return [1, 2].
+
+Input: `numbers = [2, 7, 11, 15]`, `target = 9`
+
+| left | right | nums[left] | nums[right] | sum | vs target | action |
+|------|-------|------------|-------------|-----|-----------|--------|
+| 0    | 3     | 2          | 15          | 17  | too big   | `right--` |
+| 0    | 2     | 2          | 11          | 13  | too big   | `right--` |
+| 0    | 1     | 2          | 7           | 9   | **equal** | return `[1, 2]` |
+
+Output: **`[1, 2]`** (1-based)
+
+Why discarding `15` was safe: `15` paired with the *smallest* value (2) already overshot 9, so it overshoots with every other value too.
 
 ### Visualization
-```
-input  ──▶ [ apply Opposite Direction Two Pointers step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+[ 2,  7, 11, 15]   2+15 = 17 > 9   → right--
+  ↑           ↑
+ left       right
+
+[ 2,  7, 11, 15]   2+11 = 13 > 9   → right--
+  ↑       ↑
+
+[ 2,  7, 11, 15]   2+ 7 =  9 = 9   → FOUND, 1-based [1,2]
+  ↑   ↑
 ```
 
 ### Code
+
+```go
+func twoSumSorted(numbers []int, target int) []int {
+    left, right := 0, len(numbers)-1
+    for left < right {
+        sum := numbers[left] + numbers[right]
+        if sum == target {
+            return []int{left + 1, right + 1} // problem uses 1-based indices
+        }
+        if sum < target {
+            left++ // need a bigger sum
+        } else {
+            right-- // need a smaller sum
+        }
+    }
+    return nil
+}
+```
+
 ```python
 def twoSum(numbers, target):
-    l, r = 0, len(numbers) - 1
-    while l < r:
-        s = numbers[l] + numbers[r]
-        if s == target:
-            return [l + 1, r + 1]
-        elif s < target:
-            l += 1          # need a larger sum
+    left, right = 0, len(numbers) - 1
+    while left < right:
+        total = numbers[left] + numbers[right]
+        if total == target:
+            return [left + 1, right + 1]   # 1-based indices
+        if total < target:
+            left += 1                      # need a bigger sum
         else:
-            r -= 1          # need a smaller sum
+            right -= 1                     # need a smaller sum
     return []
 ```
 
 ### Complexity
-Time O(n), Space O(1) — a single converging scan over the sorted array.
+Time O(n) — each iteration retires one index. Space O(1).
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Valid Palindrome (LeetCode 125)
-Considering only alphanumeric characters and ignoring case, decide whether the string reads the same forwards and backwards.
+Return `true` if `s` reads the same forwards and backwards, considering only alphanumeric characters and ignoring case.
 
 ### Thought Process
-1. Converge two pointers from both ends toward the middle.
-2. Skip any non-alphanumeric character so only letters and digits are compared.
-3. Compare the two characters case-insensitively; a mismatch means it is not a palindrome.
+1. A palindrome is defined by mirrored positions matching — so compare the ends and walk inward.
+2. Building a cleaned copy of the string would work but costs O(n) space; skipping junk in place costs O(1).
+3. Before each comparison, advance `left` past non-alphanumeric characters and pull `right` back past them.
+4. Compare lowercased. On a mismatch, return `false` immediately.
+5. If the pointers meet without a mismatch, it's a palindrome.
 
 ### Dry Run
-s = "A man, a plan" (abbreviated). Focus on ends.
-- l points to 'A', r points to 'n' (skipping the comma/space) → 'a' == 'n'? no in full string, but for "aba": l='a', r='a' → match, move inward.
-- l='b', r='b' (middle) → l >= r, loop ends → return True.
+
+Input: `s = "A man, a plan, a canal: Panama"`
+
+The alphanumeric content is `amanaplanacanalpanama` (lowercased).
+
+| step | left char | right char | note |
+|------|-----------|------------|------|
+| 1 | `A` → `a` | `a` | match, move both inward |
+| 2 | `m`  (space skipped) | `m` | match |
+| 3 | `a` | `a` | match |
+| 4 | `n` (comma skipped) | `n` | match |
+| … | … | … | all mirrored pairs match |
+| last | pointers cross | | → return **`true`** |
+
+A failing case: `s = "race a car"` → cleaned `raceacar`; `r` vs `r` ✓, `a` vs `a` ✓, `c` vs `c` ✓, then `e` vs `a` ✗ → **`false`**.
 
 ### Visualization
-```
-input  ──▶ [ apply Opposite Direction Two Pointers step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+"A man, a plan, a canal: Panama"
+  ↑                            ↑
+ left                        right
+ 'a'                          'a'      match → move inward
+
+"A man, a plan, a canal: Panama"
+     ↑                     ↑
+    'm'   (skipped ' ')   'm'          match → move inward
 ```
 
 ### Code
+
+```go
+func isPalindrome(s string) bool {
+    left, right := 0, len(s)-1
+    for left < right {
+        // Skip anything that is not a letter or digit.
+        for left < right && !isAlnum(s[left]) {
+            left++
+        }
+        for left < right && !isAlnum(s[right]) {
+            right--
+        }
+        if toLower(s[left]) != toLower(s[right]) {
+            return false
+        }
+        left++
+        right--
+    }
+    return true
+}
+
+func isAlnum(c byte) bool {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+}
+
+func toLower(c byte) byte {
+    if c >= 'A' && c <= 'Z' {
+        return c + ('a' - 'A')
+    }
+    return c
+}
+```
+
 ```python
 def isPalindrome(s):
-    l, r = 0, len(s) - 1
-    while l < r:
-        while l < r and not s[l].isalnum():
-            l += 1
-        while l < r and not s[r].isalnum():
-            r -= 1
-        if s[l].lower() != s[r].lower():
+    left, right = 0, len(s) - 1
+    while left < right:
+        while left < right and not s[left].isalnum():   # skip junk
+            left += 1
+        while left < right and not s[right].isalnum():
+            right -= 1
+        if s[left].lower() != s[right].lower():
             return False
-        l += 1
-        r -= 1
+        left += 1
+        right -= 1
     return True
 ```
 
 ### Complexity
-Time O(n), Space O(1) — each character is visited at most once by the two pointers.
+Time O(n) — each character is visited at most once by either pointer. Space O(1) — no cleaned copy is built.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Container Water (LeetCode 11)
-Given wall heights, pick two lines that with the x-axis form a container holding the most water.
+### Problem — Container With Most Water (LeetCode 11)
+Each `height[i]` is a vertical line. Pick two lines that, with the x-axis, hold the most water. Return that maximum area.
 
 ### Thought Process
-1. Area = width × min(height[l], height[r]); start with the widest possible container (l=0, r=n-1).
-2. The shorter wall caps the area, so shrinking width only helps if we replace the shorter wall.
-3. Move the pointer at the shorter wall inward each step, tracking the best area seen.
+1. Area between `left` and `right` is `width × shorter wall = (right − left) × min(h[left], h[right])`.
+2. Start as wide as possible — `left = 0`, `right = n−1` — because width is maximal there.
+3. From now on every move **shrinks the width**, so the only way to improve is to find a taller limiting wall.
+4. Move the **shorter** wall inward. Keeping the shorter wall can never help: it caps the height no matter who it's paired with, and the width only gets smaller.
+5. Track the best area seen.
+
+### Why moving the shorter wall is the right choice
+
+Say `h[left] < h[right]`. Consider keeping `left` fixed and trying every `right' < right`:
+
+```text
+area = (right' - left) × min(h[left], h[right'])
+       └── smaller than before ──┘   └── at most h[left] ──┘
+```
+
+The width strictly decreased, and the height is still capped by `h[left]`. So **no** pairing that keeps `left` can beat the area we just computed. `left` is finished — discard it. That is exactly one index retired per step, giving O(n).
 
 ### Dry Run
-height = [1,8,6,2,5,4,8,3,7].
-- l=0(1), r=8(7): area 8×1=8, move l (shorter).
-- l=1(8), r=8(7): area 7×7=49, move r (shorter).
-- continue; max area stays 49 → return 49.
+
+Input: `height = [1, 8, 6, 2, 5, 4, 8, 3, 7]` (indices 0..8)
+
+| left | right | h[left] | h[right] | width | height=min | area | best | move |
+|------|-------|---------|----------|-------|-----------|------|------|------|
+| 0 | 8 | 1 | 7 | 8 | 1 | 8  | 8  | left is shorter → `left++` |
+| 1 | 8 | 8 | 7 | 7 | 7 | **49** | 49 | right is shorter → `right--` |
+| 1 | 7 | 8 | 3 | 6 | 3 | 18 | 49 | right shorter → `right--` |
+| 1 | 6 | 8 | 8 | 5 | 8 | 40 | 49 | equal → move either, say `right--` |
+| 1 | 5 | 8 | 4 | 4 | 4 | 16 | 49 | `right--` |
+| 1 | 4 | 8 | 5 | 3 | 5 | 15 | 49 | `right--` |
+| 1 | 3 | 8 | 2 | 2 | 2 | 4  | 49 | `right--` |
+| 1 | 2 | 8 | 6 | 1 | 6 | 6  | 49 | `right--` → pointers meet, stop |
+
+Output: **49** — lines at index 1 (height 8) and index 8 (height 7), width 7.
 
 ### Visualization
-```
-input  ──▶ [ apply Opposite Direction Two Pointers step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+index :  0  1  2  3  4  5  6  7  8
+height:  1  8  6  2  5  4  8  3  7
+
+           8 |█                 █
+             |█     █           █
+             |█  █  █     █     █   █
+             |█  █  █  █  █  █  █   █
+           1 |█  █  █  █  █  █  █ █ █
+             └──────────────────────
+                ↑                 ↑
+              left=1           right=8
+       width 7 × min(8,7)=7  →  area 49  ★
 ```
 
 ### Code
+
+```go
+func maxArea(height []int) int {
+    left, right := 0, len(height)-1
+    best := 0
+
+    for left < right {
+        h := height[left]
+        if height[right] < h {
+            h = height[right] // the shorter wall caps the water
+        }
+        area := (right - left) * h
+        if area > best {
+            best = area
+        }
+
+        // Retire the shorter wall: keeping it can never beat this area.
+        if height[left] < height[right] {
+            left++
+        } else {
+            right--
+        }
+    }
+    return best
+}
+```
+
 ```python
 def maxArea(height):
-    l, r = 0, len(height) - 1
+    left, right = 0, len(height) - 1
     best = 0
-    while l < r:
-        best = max(best, (r - l) * min(height[l], height[r]))
-        if height[l] < height[r]:
-            l += 1          # discard the shorter left wall
+    while left < right:
+        h = min(height[left], height[right])    # shorter wall caps the water
+        best = max(best, (right - left) * h)
+        if height[left] < height[right]:        # retire the shorter wall
+            left += 1
         else:
-            r -= 1          # discard the shorter right wall
+            right -= 1
     return best
 ```
 
 ### Complexity
-Time O(n), Space O(1) — one converging pass, no extra storage.
+Time O(n) — one pass, one index retired per step. Space O(1).
 
+---
 
 ## 12. LeetCode Practice Set
 
