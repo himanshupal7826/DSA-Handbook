@@ -41,32 +41,137 @@ two heaps, median, max heap, min heap, balance.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"What sits in the **middle** of my data — or, which item is best among those currently eligible?"*
+
 ### Intuition
-Sort everything to get the k best — O(n log n) — or rescan repeatedly.
+Keep everything in a list. Whenever you need the answer, sort and look.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Append each new value to a list.
+2. When the median is requested, sort the list.
+3. Return the middle element (or the average of the two middle ones).
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n log n) per query**, so O(q · n log n) overall.
+- Space: O(n).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Two Heaps pattern is built to use.
+- The list was *almost* sorted already — one insertion changed it. Re-sorting from scratch throws that away.
+- Inserting into a sorted array instead is O(n) per insert because of the shifting, which is better but still linear.
+- And we sort the **whole** dataset to read **one** position. That is a lot of ordering nobody asked for.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Two Heaps invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Cut the data in half and guard each half with its own heap, arranged so the two heap tops are exactly the middle elements.**
+
+```text
+        small half                 large half
+   ┌──────────────────┐      ┌──────────────────┐
+   │   max-heap       │      │    min-heap      │
+   │   top = LARGEST  │      │  top = SMALLEST  │
+   │   of the small   │      │   of the large   │
+   └──────────────────┘      └──────────────────┘
+              ▲                    ▲
+              └──── the middle ────┘
+```
+
+You never sort anything. The median is always one or two O(1) peeks away.
+
+### The thought process
+
+```text
+We need    : the middle element, repeatedly, as data arrives.
+Obvious way: keep a list and sort on demand.
+Wasteful   : full ordering for one position, redone every query.
+Notice     : we don't need the data sorted. We only need to know
+             where the BOUNDARY between the two halves is.
+Notice too : a max-heap gives the largest of the small half in O(1),
+             and a min-heap gives the smallest of the large half.
+             Those two ARE the middle elements.
+Therefore  : maintain two heaps, balanced in size.
+Now        : O(log n) insert, O(1) median.
+```
+
+### The two invariants
+
+Everything rests on keeping these true at all times:
+
+```text
+1. ORDER:  every value in the low heap  <=  every value in the high heap
+2. SIZE:   0 <= len(low) - len(high) <= 1
+```
+
+Invariant 1 makes the two tops the true middle. Invariant 2 decides which top to read: with an odd count the extra element lives in `low`, so `low`'s top *is* the median; with an even count, average the two tops.
+
+### Why insertion needs three steps, not one
+
+The natural instinct — "push to whichever heap keeps sizes balanced" — silently breaks invariant 1. A value pushed onto `low` might be larger than something already in `high`.
+
+The fix is a fixed three-step ritual that restores both invariants no matter what arrives:
+
+```text
+Step 1 → push the new value onto `low`            (order may now be violated)
+Step 2 → move low's top over to `high`            (order is restored:
+                                                   low's largest is now in high)
+Step 3 → if high is now bigger than low,
+             move high's top back to low          (size is restored)
+```
+
+Step 2 is the one people skip. It is what guarantees the value lands on the correct side without ever comparing it to anything explicitly — the heaps do the comparison for you.
+
+### Reading the median
+
+```text
+len(low) > len(high)   →  odd count   →  median = low.top
+len(low) == len(high)  →  even count  →  median = (low.top + high.top) / 2
+```
+
+Use floating-point division for the even case, and watch for overflow when summing two large integers — `low.top/2.0 + high.top/2.0` sidesteps it.
+
+### The same structure, a different job
+
+Two heaps is not only about medians. The other classic shape is **"unlock, then choose"**:
+
+| Problem | Heap A | Heap B |
+|---|---|---|
+| Streaming median | max-heap of the low half | min-heap of the high half |
+| IPO / capital projects | min-heap by **cost** (what's affordable next) | max-heap by **profit** (best affordable) |
+| Task scheduling | min-heap by available time | max-heap by priority |
+
+In the second shape the heaps hold *different orderings of different things*: one decides **eligibility**, the other decides **choice among the eligible**.
+
+### The limitation to state out loud
+
+A binary heap supports "remove the top", **not** "remove an arbitrary element". So a plain two-heap structure cannot handle a **sliding window**, where an old value must leave from the middle.
+
+Two standard fixes:
+
+- **Lazy deletion** — keep a map of values pending removal; discard them when they surface at a top. Sizes must be tracked separately from `heap.Len()`.
+- **Balanced BST / ordered multiset** — supports arbitrary removal directly (`SortedList` in Python, `multiset` in C++).
+
+### How should I recognize this?
+
+```text
+If you see...
+  "median of a stream", "find the middle", "balance two halves"
+  "maximize X subject to affording it", "schedule by two criteria"
+  a rolling statistic that needs the middle rather than the extremes
+        ↓
+Think about...
+  "Can I split the data into two halves whose BOUNDARY
+   is exactly what I'm being asked for?"
+        ↓
+Use...
+  median      → max-heap (low half) + min-heap (high half), sizes within 1
+  eligibility → min-heap on the cost + max-heap on the value
+  window      → add lazy deletion, or use an ordered multiset instead
+```
 
 ### Visual explanation
 
@@ -100,75 +205,158 @@ A heap gives O(1) access to the extreme element and O(log n) updates — perfect
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Two Heaps         : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+stream: 1, 2, 3
+
+after 1:   low [1]        high []           median = 1        (odd)
+after 2:   low [1]        high [2]          median = 1.5      (even)
+after 3:   low [2, 1]     high [3]          median = 2        (odd)
+                ▲              ▲
+             max-heap      min-heap
+             top = 2       top = 3
+
+every value in low  <=  every value in high
 ```
 
 ### Interview explanation
-"This is a Two Heaps problem. I'll a heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians. That brings the complexity down to O(n log k) time and O(k) space — here's the template."
+"I'll keep two heaps: a max-heap holding the smaller half and a min-heap holding the larger half, sized to differ by at most one. The invariant is that everything in the low heap is at most everything in the high heap, so the two heap tops are exactly the middle elements — the median is an O(1) peek. To insert I always push onto the low heap first, then move its top into the high heap, then move back if the high heap became larger. That middle step is what enforces the ordering invariant without any explicit comparison. Insert is O(log n), median is O(1). If the problem were a sliding window I'd need arbitrary removal, which a heap can't do — so I'd add lazy deletion or switch to an ordered multiset."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Heaps** family template. Adapt the comparison/condition to the specific problem.
+> Two heaps, two invariants, and a fixed three-step insert.
 
 ```go
-// Top-K largest with a min-heap of size k (container/heap).
-import "container/heap"
-type MinHeap []int
-func (h MinHeap) Len() int { return len(h) }
-func (h MinHeap) Less(i, j int) bool { return h[i] < h[j] }
-func (h MinHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-func (h *MinHeap) Push(x any) { *h = append(*h, x.(int)) }
-func (h *MinHeap) Pop() any { old := *h; n := len(old); v := old[n-1]; *h = old[:n-1]; return v }
+// maxHeap keeps the largest value on top (the small half).
+type maxHeap []int
 
-func topK(nums []int, k int) []int {
-    h := &MinHeap{}
-    for _, v := range nums {
-        heap.Push(h, v)
-        if h.Len() > k { heap.Pop(h) } // drop smallest, keep k largest
+func (h maxHeap) Len() int           { return len(h) }
+func (h maxHeap) Less(i, j int) bool { return h[i] > h[j] }
+func (h maxHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *maxHeap) Push(x any)        { *h = append(*h, x.(int)) }
+func (h *maxHeap) Pop() any {
+    old := *h
+    n := len(old)
+    last := old[n-1]
+    *h = old[:n-1]
+    return last
+}
+
+// minHeap keeps the smallest value on top (the large half).
+type minHeap []int
+
+func (h minHeap) Len() int           { return len(h) }
+func (h minHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h minHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *minHeap) Push(x any)        { *h = append(*h, x.(int)) }
+func (h *minHeap) Pop() any {
+    old := *h
+    n := len(old)
+    last := old[n-1]
+    *h = old[:n-1]
+    return last
+}
+
+// MedianKeeper maintains the running median of a stream.
+type MedianKeeper struct {
+    low  *maxHeap // the smaller half; top is its largest
+    high *minHeap // the larger half; top is its smallest
+}
+
+func NewMedianKeeper() *MedianKeeper {
+    return &MedianKeeper{low: &maxHeap{}, high: &minHeap{}}
+}
+
+// Add inserts a value, restoring both invariants.
+func (m *MedianKeeper) Add(value int) {
+    // 1. Always push onto low first.
+    heap.Push(m.low, value)
+    // 2. Move low's largest into high — this is what enforces the ORDER
+    //    invariant without comparing anything explicitly.
+    heap.Push(m.high, heap.Pop(m.low))
+    // 3. Restore the SIZE invariant: low may be equal to or one bigger.
+    if m.high.Len() > m.low.Len() {
+        heap.Push(m.low, heap.Pop(m.high))
     }
-    return *h
+}
+
+// Median is an O(1) peek at one or both tops.
+func (m *MedianKeeper) Median() float64 {
+    if m.low.Len() > m.high.Len() {
+        return float64((*m.low)[0]) // odd count: the extra element is in low
+    }
+    // Halve each side before adding, to avoid overflow on large values.
+    return float64((*m.low)[0])/2.0 + float64((*m.high)[0])/2.0
 }
 ```
 
 ```python
 import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+
+class MedianKeeper:
+    """low is a max-heap (negated); high is a min-heap."""
+
+    def __init__(self):
+        self.low = []                  # max-heap via negation: small half
+        self.high = []                 # min-heap: large half
+
+    def add(self, value):
+        heapq.heappush(self.low, -value)                  # 1. always into low
+        heapq.heappush(self.high, -heapq.heappop(self.low))  # 2. enforce ORDER
+        if len(self.high) > len(self.low):                # 3. enforce SIZE
+            heapq.heappush(self.low, -heapq.heappop(self.high))
+
+    def median(self):
+        if len(self.low) > len(self.high):
+            return float(-self.low[0])                    # odd: extra is in low
+        return (-self.low[0] + self.high[0]) / 2.0
 ```
 
 ```java
-int[] topK(int[] nums, int k) {
-    PriorityQueue<Integer> heap = new PriorityQueue<>(); // min-heap
-    for (int v : nums) {
-        heap.offer(v);
-        if (heap.size() > k) heap.poll();
+import java.util.*;
+
+public class TwoHeaps {
+    private final PriorityQueue<Integer> low  = new PriorityQueue<>(Comparator.reverseOrder());
+    private final PriorityQueue<Integer> high = new PriorityQueue<>();
+
+    public void add(int value) {
+        low.add(value);            // 1. always into low
+        high.add(low.poll());      // 2. enforce ORDER
+        if (high.size() > low.size()) low.add(high.poll());   // 3. enforce SIZE
     }
-    int[] res = new int[k];
-    for (int i = 0; i < k; i++) res[i] = heap.poll();
-    return res;
+
+    public double median() {
+        if (low.size() > high.size()) return low.peek();      // odd count
+        return low.peek() / 2.0 + high.peek() / 2.0;          // avoids overflow
+    }
 }
 ```
 
 ```cpp
-vector<int> topK(vector<int>& nums, int k) {
-    priority_queue<int, vector<int>, greater<int>> heap; // min-heap
-    for (int v : nums) {
-        heap.push(v);
-        if ((int)heap.size() > k) heap.pop();
+#include <queue>
+#include <vector>
+using namespace std;
+
+class TwoHeaps {
+    priority_queue<int> low;                                   // max-heap: small half
+    priority_queue<int, vector<int>, greater<int>> high;       // min-heap: large half
+
+public:
+    void add(int value) {
+        low.push(value);                     // 1. always into low
+        high.push(low.top()); low.pop();     // 2. enforce ORDER
+        if (high.size() > low.size()) {      // 3. enforce SIZE
+            low.push(high.top());
+            high.pop();
+        }
     }
-    vector<int> res;
-    while (!heap.empty()) { res.push_back(heap.top()); heap.pop(); }
-    return res;
-}
+
+    double median() const {
+        if (low.size() > high.size()) return low.top();        // odd count
+        return low.top() / 2.0 + high.top() / 2.0;             // avoids overflow
+    }
+};
 ```
 
 ---
@@ -252,133 +440,355 @@ vector<int> topK(vector<int>& nums, int k) {
 
 ## 9. Solved Example 1
 
-### Problem — Median Stream (LeetCode 295)
-A representative **Two Heaps** problem. The signal: a max-heap + min-heap split keeps the median at the heaps' tops.
+### Problem — Find Median from Data Stream (LeetCode 295)
+Support `addNum(num)` and `findMedian()` on an unbounded stream.
 
 ### Thought Process
-1. Keep a max-heap `small` for the lower half and a min-heap `large` for the upper half.
-2. On each insert, push to `small`, move its max into `large`, then rebalance so `small` never gets smaller than `large`.
-3. The median is `small`'s top when sizes differ, else the average of both tops.
+1. Sorting on every query is O(n log n) per call — far too slow for a stream.
+2. Split the data into a small half (max-heap) and a large half (min-heap). The two tops are the middle elements.
+3. Insert with the fixed ritual: push onto `low`, move `low`'s top to `high`, then move back if `high` grew larger.
+4. Read the median from the tops: `low`'s top when the count is odd, the average of both when even.
+5. `low` is allowed to hold the extra element, which is why an odd count reads from `low`.
 
 ### Dry Run
-add 1 → small=[1]. add 2 → small=[1], large=[2], median=(1+2)/2=1.5.
-add 3 → push→balance → small=[2,1], large=[3], median=small top = 2.
-Stream so far → medians 1, 1.5, 2.
+
+Operations: `addNum(1)`, `addNum(2)`, `findMedian()`, `addNum(3)`, `findMedian()`
+
+| operation | step 1: push to low | step 2: move low→high | step 3: rebalance | low (max-heap) | high (min-heap) | median |
+|-----------|--------------------|-----------------------|--------------------|----------------|-----------------|--------|
+| `addNum(1)` | low `[1]` | high `[1]`, low `[]` | high bigger → move back | `[1]` | `[]` | — |
+| `addNum(2)` | low `[2,1]` | move `2` → high `[2]`, low `[1]` | sizes equal, no move | `[1]` | `[2]` | — |
+| `findMedian()` | | | | `[1]` | `[2]` | `(1+2)/2` = **1.5** |
+| `addNum(3)` | low `[3,1]` | move `3` → high `[2,3]`, low `[1]` | high bigger → move `2` back | `[2,1]` | `[3]` | — |
+| `findMedian()` | | | | `[2,1]` | `[3]` | low.top = **2** |
+
+Output: **1.5**, then **2** ✓
+
+Verify by hand: after three inserts the sorted data is `[1,2,3]`, whose median is `2`. ✓
+
+Watch `addNum(3)`: pushing `3` onto the max-heap `low` puts it on top, and step 2 immediately ships it to `high` where it belongs. We never compared `3` against anything — the heap ordering did it.
 
 ### Visualization
-```
-input  ──▶ [ apply Two Heaps step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+after addNum(3):
+
+     low (max-heap)          high (min-heap)
+        [2, 1]                   [3]
+          ▲                       ▲
+        top = 2                 top = 3
+
+  sorted view:   1   2 │ 3
+                       ↑
+                  median = 2   (low has the extra element)
 ```
 
 ### Code
+
+```go
+type MedianFinder struct {
+    low  *maxIntHeap // smaller half; top is its largest
+    high *minIntHeap // larger half; top is its smallest
+}
+
+func NewMedianFinder() MedianFinder {
+    return MedianFinder{low: &maxIntHeap{}, high: &minIntHeap{}}
+}
+
+func (m *MedianFinder) AddNum(num int) {
+    heap.Push(m.low, num)                    // 1. always into low
+    heap.Push(m.high, heap.Pop(m.low))       // 2. enforce the ORDER invariant
+    if m.high.Len() > m.low.Len() {          // 3. enforce the SIZE invariant
+        heap.Push(m.low, heap.Pop(m.high))
+    }
+}
+
+func (m *MedianFinder) FindMedian() float64 {
+    if m.low.Len() > m.high.Len() {
+        return float64((*m.low)[0]) // odd count: the extra element sits in low
+    }
+    return float64((*m.low)[0])/2.0 + float64((*m.high)[0])/2.0
+}
+
+type maxIntHeap []int
+
+func (h maxIntHeap) Len() int           { return len(h) }
+func (h maxIntHeap) Less(i, j int) bool { return h[i] > h[j] }
+func (h maxIntHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *maxIntHeap) Push(x any)        { *h = append(*h, x.(int)) }
+func (h *maxIntHeap) Pop() any {
+    old := *h
+    last := old[len(old)-1]
+    *h = old[:len(old)-1]
+    return last
+}
+
+type minIntHeap []int
+
+func (h minIntHeap) Len() int           { return len(h) }
+func (h minIntHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h minIntHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *minIntHeap) Push(x any)        { *h = append(*h, x.(int)) }
+func (h *minIntHeap) Pop() any {
+    old := *h
+    last := old[len(old)-1]
+    *h = old[:len(old)-1]
+    return last
+}
+```
+
 ```python
 import heapq
+
 class MedianFinder:
     def __init__(self):
-        self.small = []   # max-heap (values negated)
-        self.large = []   # min-heap
+        self.low = []                  # max-heap via negation
+        self.high = []                 # min-heap
 
     def addNum(self, num):
-        heapq.heappush(self.small, -num)
-        heapq.heappush(self.large, -heapq.heappop(self.small))
-        if len(self.large) > len(self.small):
-            heapq.heappush(self.small, -heapq.heappop(self.large))
+        heapq.heappush(self.low, -num)                        # 1. into low
+        heapq.heappush(self.high, -heapq.heappop(self.low))   # 2. ORDER
+        if len(self.high) > len(self.low):                    # 3. SIZE
+            heapq.heappush(self.low, -heapq.heappop(self.high))
 
     def findMedian(self):
-        if len(self.small) > len(self.large):
-            return float(-self.small[0])
-        return (-self.small[0] + self.large[0]) / 2
+        if len(self.low) > len(self.high):
+            return float(-self.low[0])
+        return (-self.low[0] + self.high[0]) / 2.0
 ```
 
 ### Complexity
-Time O(log n) per insert, O(1) per query. Space O(n) across the two heaps.
+`addNum` **O(log n)** — a constant number of heap operations. `findMedian` **O(1)**. Space O(n).
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Sliding Median (LeetCode 480)
-A representative **Two Heaps** problem. The signal: a max-heap + min-heap split keeps the median at the heaps' tops.
+### Problem — Sliding Window Median (LeetCode 480)
+Return the median of every window of size `k`.
 
 ### Thought Process
-1. A window's median needs order statistics under both insert and delete — a balanced multiset does both in O(log k).
-2. Use a `SortedList`: slide by adding the incoming element and removing the outgoing one.
-3. Read the median directly by index: middle element for odd k, average of the two middles for even k.
+1. This is the streaming median **plus removal from the middle** — and that is precisely what a binary heap cannot do. A heap removes its top, not an arbitrary element.
+2. Two ways out:
+   - **Lazy deletion**: keep the two heaps, plus a map of values pending removal, and track the logical sizes separately from `heap.Len()`. Discard stale values only when they surface at a top.
+   - **Keep the window sorted**: binary search where the new value goes, and where the departing one is.
+3. The sorted-window version is chosen here because it is short and obviously correct. Insertion and deletion are O(k) because of the shifting, giving O(n·k) overall — fine for the problem's constraints and much easier to defend.
+4. Reading the median from a sorted window is a direct index lookup.
+5. Use floating-point care on the even case: `(a + b) / 2` can overflow with values near the integer limit, so halve each side first.
 
 ### Dry Run
-nums=[1,3,-1,-3,5,3,6,7], k=3. Window [1,3,-1]→sorted[-1,1,3], median 1.
-Slide → [3,-1,-3]→[-3,-1,3], median -1. Slide → [-1,-3,5]→[-3,-1,5], median -1.
-Medians so far → 1, -1, -1, ...
+
+Input: `nums = [1, 3, -1, -3, 5, 3, 6, 7]`, `k = 3`
+
+| window | sorted window | median |
+|--------|---------------|--------|
+| `[1, 3, -1]`  | `[-1, 1, 3]`  | **1** |
+| `[3, -1, -3]` | `[-3, -1, 3]` | **−1** |
+| `[-1, -3, 5]` | `[-3, -1, 5]` | **−1** |
+| `[-3, 5, 3]`  | `[-3, 3, 5]`  | **3** |
+| `[5, 3, 6]`   | `[3, 5, 6]`   | **5** |
+| `[3, 6, 7]`   | `[3, 6, 7]`   | **6** |
+
+Output: **`[1, -1, -1, 3, 5, 6]`** ✓
+
+Trace one slide in detail — from window 1 to window 2:
+
+```text
+sorted window: [-1, 1, 3]
+  remove nums[0] = 1  →  binary search finds it at index 1  →  [-1, 3]
+  insert nums[3] = -3 →  binary search says index 0         →  [-3, -1, 3]
+  median = element at index k/2 = 1  →  -1
+```
+
+The window stays sorted at all times, so the median is never searched for — it is read directly.
 
 ### Visualization
-```
-input  ──▶ [ apply Two Heaps step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+nums:   1    3   -1   -3    5    3    6    7
+       └────────┘                              sorted [-1, 1, 3]   → 1
+            └────────┘                         sorted [-3,-1, 3]   → -1
+                 └────────┘                    sorted [-3,-1, 5]   → -1
+                      └────────┘               sorted [-3, 3, 5]   → 3
+                           └────────┘          sorted [ 3, 5, 6]   → 5
+                                └────────┘     sorted [ 3, 6, 7]   → 6
 ```
 
 ### Code
+
+```go
+func medianSlidingWindow(nums []int, k int) []float64 {
+    // window is kept sorted at all times, so the median is a direct lookup.
+    window := make([]int, k)
+    copy(window, nums[:k])
+    sort.Ints(window)
+
+    medians := make([]float64, 0, len(nums)-k+1)
+    medians = append(medians, medianOfSorted(window, k))
+
+    for i := k; i < len(nums); i++ {
+        // Remove the departing value: find it, then splice it out.
+        out := sort.SearchInts(window, nums[i-k])
+        window = append(window[:out], window[out+1:]...)
+
+        // Insert the arriving value at its sorted position.
+        in := sort.SearchInts(window, nums[i])
+        window = append(window, 0)
+        copy(window[in+1:], window[in:])
+        window[in] = nums[i]
+
+        medians = append(medians, medianOfSorted(window, k))
+    }
+    return medians
+}
+
+// medianOfSorted reads the median directly from a sorted window.
+func medianOfSorted(window []int, k int) float64 {
+    if k%2 == 1 {
+        return float64(window[k/2])
+    }
+    // Halve each side before adding: avoids overflow near the integer limit.
+    return float64(window[k/2-1])/2.0 + float64(window[k/2])/2.0
+}
+```
+
 ```python
-from sortedcontainers import SortedList
+import bisect
+
 def medianSlidingWindow(nums, k):
-    window = SortedList(nums[:k])
-    res = []
-    for i in range(k, len(nums) + 1):
-        if k % 2:
-            res.append(float(window[k // 2]))
-        else:
-            res.append((window[k // 2 - 1] + window[k // 2]) / 2)
-        if i < len(nums):
-            window.add(nums[i])
-            window.remove(nums[i - k])
-    return res
+    window = sorted(nums[:k])          # kept sorted at all times
+
+    def median():
+        if k % 2 == 1:
+            return float(window[k // 2])
+        return (window[k // 2 - 1] + window[k // 2]) / 2.0
+
+    medians = [median()]
+    for i in range(k, len(nums)):
+        window.pop(bisect.bisect_left(window, nums[i - k]))   # remove departing
+        bisect.insort(window, nums[i])                        # insert arriving
+        medians.append(median())
+    return medians
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). Each add/remove on the size-k ordered structure is O(log k).
+Time **O(n · k)** — each slide does an O(log k) search but an O(k) shift. Space O(k).
+
+> The lazy-deletion two-heap version reaches O(n log k). It is the right answer when `k` is large, but it needs a pending-removal map and manual size tracking — worth mentioning in an interview, and worth writing only if asked.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — IPO (LeetCode 502)
-A representative **Two Heaps** problem. The signal: a max-heap + min-heap split keeps the median at the heaps' tops.
+You may complete at most `k` projects. Project `i` needs `capital[i]` to start and yields `profits[i]`, which is added to your capital. Starting with `w`, maximise the final capital.
 
 ### Thought Process
-1. Sort projects by capital so cheaper-to-start ones unlock first (min-heap-by-capital behaviour).
-2. As capital `w` grows, push every affordable project's profit into a max-heap.
-3. Each of the k rounds greedily takes the highest available profit from the max-heap.
+1. This is the **other** two-heap shape: one heap decides *what is eligible*, the other decides *what is best among the eligible*.
+2. Greedy claim: at each step, take the most profitable project you can currently **afford**. Profits are non-negative, so your capital never decreases — anything affordable now stays affordable later. Taking the biggest profit first can therefore never close a door.
+3. Sort the projects by capital ascending. Keep a pointer into that list.
+4. Before each pick, advance the pointer, pushing every newly-affordable project's **profit** into a max-heap.
+5. Pop the max profit, add it to `w`, and repeat up to `k` times. If the heap is ever empty, nothing is affordable and we stop early.
 
 ### Dry Run
-k=2, w=0, profits=[1,2,3], capital=[0,1,1]. Sorted: (0,1),(1,2),(1,3).
-Round1: affordable {1} → take 1 → w=1. Round2: affordable {2,3} → take 3 → w=4.
-Answer → `4`.
+
+Input: `k = 2`, `w = 0`, `profits = [1, 2, 3]`, `capital = [0, 1, 1]`
+
+Sorted by capital: `(cost 0, profit 1)`, `(cost 1, profit 2)`, `(cost 1, profit 3)`
+
+| round | capital `w` | newly affordable (cost ≤ w) | profit max-heap | pop | new `w` |
+|-------|-------------|------------------------------|-----------------|-----|---------|
+| 1 | 0 | `(0, 1)` | `[1]` | **1** | `0 + 1 = 1` |
+| 2 | 1 | `(1, 2)`, `(1, 3)` | `[3, 2]` | **3** | `1 + 3 = 4` |
+
+Output: **4** ✓
+
+Round 2 is the point of the pattern: raising `w` to 1 *unlocked* two projects at once, and only then could we compare them and take the better one. Neither heap alone could have made that decision.
 
 ### Visualization
-```
-input  ──▶ [ apply Two Heaps step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+projects sorted by cost:   (0,1)   (1,2)   (1,3)
+                             │       │       │
+w = 0  → unlocks ────────────┘       │       │      profit heap: [1]  → take 1
+w = 1  → unlocks ────────────────────┴───────┘      profit heap: [3,2] → take 3
+
+final capital = 0 + 1 + 3 = 4
 ```
 
 ### Code
+
+```go
+// profitHeap is a max-heap of profits among currently affordable projects.
+type profitHeap []int
+
+func (h profitHeap) Len() int           { return len(h) }
+func (h profitHeap) Less(i, j int) bool { return h[i] > h[j] } // max-heap
+func (h profitHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *profitHeap) Push(x any)        { *h = append(*h, x.(int)) }
+func (h *profitHeap) Pop() any {
+    old := *h
+    last := old[len(old)-1]
+    *h = old[:len(old)-1]
+    return last
+}
+
+func findMaximizedCapital(k int, w int, profits []int, capital []int) int {
+    type project struct{ cost, profit int }
+
+    projects := make([]project, len(profits))
+    for i := range profits {
+        projects[i] = project{cost: capital[i], profit: profits[i]}
+    }
+    // Cheapest first, so one forward pointer unlocks projects in order.
+    sort.Slice(projects, func(a, b int) bool {
+        return projects[a].cost < projects[b].cost
+    })
+
+    affordable := &profitHeap{}
+    heap.Init(affordable)
+    next := 0
+
+    for round := 0; round < k; round++ {
+        // Unlock everything the current capital can now afford.
+        for next < len(projects) && projects[next].cost <= w {
+            heap.Push(affordable, projects[next].profit)
+            next++
+        }
+        if affordable.Len() == 0 {
+            break // nothing affordable: no further project can ever be taken
+        }
+        w += heap.Pop(affordable).(int) // take the most profitable
+    }
+    return w
+}
+```
+
 ```python
 import heapq
+
 def findMaximizedCapital(k, w, profits, capital):
-    projects = sorted(zip(capital, profits))     # ascending by capital
-    available = []                               # max-heap of profits (negated)
-    i = 0
+    projects = sorted(zip(capital, profits))   # cheapest first
+    affordable = []                            # max-heap via negation
+    next_index = 0
+
     for _ in range(k):
-        while i < len(projects) and projects[i][0] <= w:
-            heapq.heappush(available, -projects[i][1])
-            i += 1
-        if not available:
-            break
-        w -= heapq.heappop(available)            # add best affordable profit
+        # Unlock everything the current capital can now afford.
+        while next_index < len(projects) and projects[next_index][0] <= w:
+            heapq.heappush(affordable, -projects[next_index][1])
+            next_index += 1
+        if not affordable:
+            break                              # nothing affordable, ever
+        w += -heapq.heappop(affordable)        # take the most profitable
     return w
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sorting dominates; each project is pushed/popped at most once.
+Time **O(n log n + k log n)** — sorting the projects, then at most `n` pushes and `k` pops. Space O(n) for the heap.
 
+> Note the pointer `next` never resets. Across the whole run each project is unlocked exactly once, so the inner `while` is amortised O(1) per project rather than O(n) per round.
+
+---
 
 ## 12. LeetCode Practice Set
 

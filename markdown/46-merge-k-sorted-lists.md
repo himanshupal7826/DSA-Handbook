@@ -41,32 +41,126 @@ merge k, sorted lists, heap, k way merge, priority queue.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"I have `k` sequences that are each already sorted — how do I combine them without throwing that away?"*
+
 ### Intuition
-Sort everything to get the k best — O(n log n) — or rescan repeatedly.
+Dump everything into one array and sort it.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Walk all `k` lists, collecting every value into one array of size `N`.
+2. Sort the array.
+3. Rebuild the answer from it.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(N log N)** where `N` is the total number of elements.
+- Space: O(N).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Merge K Sorted Lists pattern is built to use.
+- The inputs were **already sorted**, and we destroyed that structure just to rebuild it.
+- It needs all `N` elements in memory at once — impossible when the lists are streams, or when `N` is enormous and you only need the first few values.
+
+A second brute force — merge list 1 with list 2, then that with list 3, and so on — is also poor: the accumulated result gets re-walked every time, costing O(k·N).
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Merge K Sorted Lists invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **The next smallest value overall is always at the front of one of the `k` lists — so keep just those `k` fronts in a min-heap and repeatedly take the winner.**
+
+You never look at more than `k` candidates at a time, no matter how long the lists are.
+
+### The thought process
+
+```text
+We need    : one sorted sequence from k sorted sequences.
+Obvious way: concatenate and sort.
+Wasteful   : throws away the sortedness we were given, and needs
+             everything in memory.
+Notice     : because each list is sorted, the global minimum can
+             only be at the FRONT of some list. Never in the middle.
+             So there are only k candidates at any moment.
+Therefore  : keep the k fronts in a min-heap. Pop the winner, then
+             push that list's next element in its place.
+Now        : O(N log k) time and O(k) space, and it streams.
+```
+
+### Why the heap holds exactly `k` items
+
+This is the invariant: **one entry per list — its current front.**
+
+Pop the smallest, and that list's front advances by one, so you push its successor. The heap size stays at `k` (shrinking only as lists run out). That is why the cost per element is `log k`, not `log N`.
+
+Crucially, the popped element **must** carry enough information to find its successor. In a linked list that's just `node.Next`. In a matrix it means storing `(value, row, col)` so you know where to look next. Forgetting to store the origin is the most common bug in this pattern.
+
+### Steps
+
+```text
+Step 1 → Push the first element of every non-empty list into a min-heap.
+          Each entry remembers which list it came from.
+Step 2 → While the heap is non-empty:
+Step 3 →     pop the smallest → append it to the output
+Step 4 →     if that list has a next element, push it
+Step 5 → The output is the fully merged sequence.
+```
+
+### Why O(N log k) beats O(N log N) — and when it matters
+
+Every element is pushed once and popped once, on a heap capped at `k`:
+
+```text
+concatenate + sort   :  O(N log N),  needs all N in memory
+heap merge           :  O(N log k),  needs only k in memory
+```
+
+With `k = 10` lists of a million elements each, `log k ≈ 3.3` versus `log N ≈ 23`. But the memory difference is the bigger win: the heap version works on infinite streams and can stop early after producing just the first few values — which is exactly what "kth smallest" problems need.
+
+### The alternative: divide and conquer
+
+Merging lists pairwise in a tournament — `k` lists → `k/2` → `k/4` → … — also gives **O(N log k)**, with O(1) extra space beyond the merge itself.
+
+| | Heap | Divide and conquer |
+|---|---|---|
+| Time | O(N log k) | O(N log k) |
+| Extra space | O(k) | O(1) iterative, O(log k) recursive |
+| Streams / early exit | **yes** | no — needs all lists up front |
+| Needs a comparator type | yes | no |
+
+Use the heap when you need to stop early or the input streams; use divide and conquer when all data is present and you want minimal memory.
+
+### The other face of this pattern: "kth smallest"
+
+Many problems are secretly a k-way merge you stop early:
+
+```text
+kth smallest in k sorted lists       →  merge, stop after k pops
+kth smallest in a sorted matrix      →  each row is a sorted list
+smallest range covering all k lists  →  merge, and track the current max
+                                        alongside the heap's min
+```
+
+That last one is worth noticing: the heap gives you the minimum of the current frontier for free, and tracking the maximum separately gives you the whole span in O(1).
+
+### How should I recognize this?
+
+```text
+If you see...
+  "merge k sorted ...", "k sorted lists / arrays / rows"
+  "kth smallest in a sorted matrix"
+  "smallest range covering elements from each list"
+  several already-sorted inputs
+        ↓
+Think about...
+  "The answer's next element is at the front of ONE of these.
+   I only ever need k candidates."
+        ↓
+Use...
+  min-heap of the k fronts, each entry remembering its origin
+  (or divide-and-conquer pairwise merging when memory is tight)
+```
 
 ### Visual explanation
 
@@ -110,74 +204,189 @@ A heap gives O(1) access to the extreme element and O(log n) updates — perfect
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Merge K Sorted Lis: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+lists:   A: 1 → 4 → 5
+         B: 1 → 3 → 4
+         C: 2 → 6
+
+heap holds one front per list:
+
+  {1ᴬ, 1ᴮ, 2ᶜ}   pop 1ᴬ → push 4ᴬ    output: 1
+  {1ᴮ, 2ᶜ, 4ᴬ}   pop 1ᴮ → push 3ᴮ    output: 1 1
+  {2ᶜ, 3ᴮ, 4ᴬ}   pop 2ᶜ → push 6ᶜ    output: 1 1 2
+  {3ᴮ, 4ᴬ, 6ᶜ}   pop 3ᴮ → push 4ᴮ    output: 1 1 2 3
+   ...
+
+never more than k = 3 candidates in play
 ```
 
 ### Interview explanation
-"This is a Merge K Sorted Lists problem. I'll a heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians. That brings the complexity down to O(n log k) time and O(k) space — here's the template."
+"Each list is already sorted, so the next value in the merged output has to be at the front of one of them — there are only `k` candidates at any time. I'll put those `k` fronts in a min-heap, and each entry remembers which list it came from so I can push its successor after popping it. Every element is pushed and popped once on a heap of size `k`, giving O(N log k) time and O(k) space. That beats concatenate-and-sort's O(N log N), and more importantly it only ever holds `k` elements — so it works on streams and lets me stop early for a 'kth smallest' variant. Divide-and-conquer pairwise merging is the same time bound with O(1) space if I don't need early exit."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Heaps** family template. Adapt the comparison/condition to the specific problem.
+> One heap entry per list, each remembering its origin so its successor can be found.
 
 ```go
-// Top-K largest with a min-heap of size k (container/heap).
-import "container/heap"
-type MinHeap []int
-func (h MinHeap) Len() int { return len(h) }
-func (h MinHeap) Less(i, j int) bool { return h[i] < h[j] }
-func (h MinHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-func (h *MinHeap) Push(x any) { *h = append(*h, x.(int)) }
-func (h *MinHeap) Pop() any { old := *h; n := len(old); v := old[n-1]; *h = old[:n-1]; return v }
+// entry is one candidate: a value plus where it came from.
+type entry struct {
+    value    int
+    listIdx  int // which list
+    elemIdx  int // position within that list
+}
 
-func topK(nums []int, k int) []int {
-    h := &MinHeap{}
-    for _, v := range nums {
-        heap.Push(h, v)
-        if h.Len() > k { heap.Pop(h) } // drop smallest, keep k largest
+type entryHeap []entry
+
+func (h entryHeap) Len() int           { return len(h) }
+func (h entryHeap) Less(i, j int) bool { return h[i].value < h[j].value } // min-heap
+func (h entryHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *entryHeap) Push(x any)        { *h = append(*h, x.(entry)) }
+func (h *entryHeap) Pop() any {
+    old := *h
+    last := old[len(old)-1]
+    *h = old[:len(old)-1]
+    return last
+}
+
+// MergeKSortedArrays merges k sorted slices into one sorted slice.
+func MergeKSortedArrays(lists [][]int) []int {
+    frontier := &entryHeap{}
+    total := 0
+
+    // Seed with the first element of every non-empty list.
+    for i, list := range lists {
+        total += len(list)
+        if len(list) > 0 {
+            *frontier = append(*frontier, entry{value: list[0], listIdx: i, elemIdx: 0})
+        }
     }
-    return *h
+    heap.Init(frontier)
+
+    merged := make([]int, 0, total)
+    for frontier.Len() > 0 {
+        smallest := heap.Pop(frontier).(entry)
+        merged = append(merged, smallest.value)
+
+        // Replace it with the next element from the SAME list.
+        nextIdx := smallest.elemIdx + 1
+        if nextIdx < len(lists[smallest.listIdx]) {
+            heap.Push(frontier, entry{
+                value:   lists[smallest.listIdx][nextIdx],
+                listIdx: smallest.listIdx,
+                elemIdx: nextIdx,
+            })
+        }
+    }
+    return merged
+}
+
+// MergeTwoSorted is the building block for the divide-and-conquer variant.
+func MergeTwoSorted(a, b []int) []int {
+    out := make([]int, 0, len(a)+len(b))
+    i, j := 0, 0
+    for i < len(a) && j < len(b) {
+        if a[i] <= b[j] {
+            out = append(out, a[i])
+            i++
+        } else {
+            out = append(out, b[j])
+            j++
+        }
+    }
+    out = append(out, a[i:]...)
+    out = append(out, b[j:]...)
+    return out
 }
 ```
 
 ```python
 import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+
+def merge_k_sorted_arrays(lists):
+    """Min-heap of the k fronts; each entry remembers its origin."""
+    frontier = []
+    for list_idx, values in enumerate(lists):
+        if values:
+            # (value, which list, position in that list)
+            frontier.append((values[0], list_idx, 0))
+    heapq.heapify(frontier)
+
+    merged = []
+    while frontier:
+        value, list_idx, elem_idx = heapq.heappop(frontier)
+        merged.append(value)
+
+        next_idx = elem_idx + 1                  # successor from the SAME list
+        if next_idx < len(lists[list_idx]):
+            heapq.heappush(frontier, (lists[list_idx][next_idx], list_idx, next_idx))
+    return merged
+
+def merge_two_sorted(a, b):
+    """Building block for the divide-and-conquer variant."""
+    out, i, j = [], 0, 0
+    while i < len(a) and j < len(b):
+        if a[i] <= b[j]:
+            out.append(a[i]); i += 1
+        else:
+            out.append(b[j]); j += 1
+    out.extend(a[i:])
+    out.extend(b[j:])
+    return out
 ```
 
 ```java
-int[] topK(int[] nums, int k) {
-    PriorityQueue<Integer> heap = new PriorityQueue<>(); // min-heap
-    for (int v : nums) {
-        heap.offer(v);
-        if (heap.size() > k) heap.poll();
+import java.util.*;
+
+public class MergeKSorted {
+    public static List<Integer> mergeKSortedArrays(int[][] lists) {
+        // int[]{value, listIdx, elemIdx}
+        PriorityQueue<int[]> frontier =
+            new PriorityQueue<>((a, b) -> Integer.compare(a[0], b[0]));
+
+        for (int i = 0; i < lists.length; i++)
+            if (lists[i].length > 0) frontier.add(new int[]{lists[i][0], i, 0});
+
+        List<Integer> merged = new ArrayList<>();
+        while (!frontier.isEmpty()) {
+            int[] smallest = frontier.poll();
+            merged.add(smallest[0]);
+
+            int listIdx = smallest[1], nextIdx = smallest[2] + 1;
+            if (nextIdx < lists[listIdx].length)
+                frontier.add(new int[]{lists[listIdx][nextIdx], listIdx, nextIdx});
+        }
+        return merged;
     }
-    int[] res = new int[k];
-    for (int i = 0; i < k; i++) res[i] = heap.poll();
-    return res;
 }
 ```
 
 ```cpp
-vector<int> topK(vector<int>& nums, int k) {
-    priority_queue<int, vector<int>, greater<int>> heap; // min-heap
-    for (int v : nums) {
-        heap.push(v);
-        if ((int)heap.size() > k) heap.pop();
+#include <queue>
+#include <tuple>
+#include <vector>
+using namespace std;
+
+vector<int> mergeKSortedArrays(const vector<vector<int>>& lists) {
+    // (value, listIdx, elemIdx); greater<> makes it a MIN-heap.
+    using Entry = tuple<int, int, int>;
+    priority_queue<Entry, vector<Entry>, greater<Entry>> frontier;
+
+    for (int i = 0; i < (int)lists.size(); ++i)
+        if (!lists[i].empty()) frontier.emplace(lists[i][0], i, 0);
+
+    vector<int> merged;
+    while (!frontier.empty()) {
+        auto [value, listIdx, elemIdx] = frontier.top();
+        frontier.pop();
+        merged.push_back(value);
+
+        int nextIdx = elemIdx + 1;               // successor from the SAME list
+        if (nextIdx < (int)lists[listIdx].size())
+            frontier.emplace(lists[listIdx][nextIdx], listIdx, nextIdx);
     }
-    vector<int> res;
-    while (!heap.empty()) { res.push_back(heap.top()); heap.pop(); }
-    return res;
+    return merged;
 }
 ```
 
@@ -262,109 +471,403 @@ vector<int> topK(vector<int>& nums, int k) {
 
 ## 9. Solved Example 1
 
-### Problem — Merge K Lists (LeetCode 23)
-A representative **Merge K Sorted Lists** problem. The signal: a k-element min-heap merges k sorted sequences in o(n log k).
+### Problem — Merge k Sorted Lists (LeetCode 23)
+Merge `k` sorted linked lists into one sorted linked list.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (merge k, sorted lists, heap, k way merge, priority queue).
-2. Reach for the Merge K Sorted Lists template below and map the problem's entities onto it.
-3. A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
+1. Each list is sorted, so the smallest unmerged value is at the head of one of them — only `k` candidates at any moment.
+2. Put those `k` heads in a min-heap ordered by node value.
+3. Pop the smallest, attach it to the output, then push **that node's `Next`** — the linked list itself remembers the origin, so no index bookkeeping is needed.
+4. Use a dummy head node so appending never needs a "is this the first one?" branch.
+5. Stop when the heap empties.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `lists = [[1,4,5], [1,3,4], [2,6]]` — call them A, B, C
+
+| step | heap (values) | pop | push next | output so far |
+|------|---------------|-----|-----------|---------------|
+| seed | `1ᴬ, 1ᴮ, 2ᶜ` | — | — | — |
+| 1 | `1ᴬ, 1ᴮ, 2ᶜ` | `1ᴬ` | `4ᴬ` | `1` |
+| 2 | `1ᴮ, 2ᶜ, 4ᴬ` | `1ᴮ` | `3ᴮ` | `1 1` |
+| 3 | `2ᶜ, 3ᴮ, 4ᴬ` | `2ᶜ` | `6ᶜ` | `1 1 2` |
+| 4 | `3ᴮ, 4ᴬ, 6ᶜ` | `3ᴮ` | `4ᴮ` | `1 1 2 3` |
+| 5 | `4ᴬ, 4ᴮ, 6ᶜ` | `4ᴬ` | `5ᴬ` | `1 1 2 3 4` |
+| 6 | `4ᴮ, 5ᴬ, 6ᶜ` | `4ᴮ` | — (B exhausted) | `1 1 2 3 4 4` |
+| 7 | `5ᴬ, 6ᶜ` | `5ᴬ` | — (A exhausted) | `1 1 2 3 4 4 5` |
+| 8 | `6ᶜ` | `6ᶜ` | — (C exhausted) | `1 1 2 3 4 4 5 6` |
+
+Output: **`[1, 1, 2, 3, 4, 4, 5, 6]`** ✓
+
+The heap never exceeded 3 entries, even though 8 elements passed through it. That is the O(k) space bound in action.
 
 ### Visualization
-```
-input  ──▶ [ apply Merge K Sorted Lists step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+A:  1 → 4 → 5
+B:  1 → 3 → 4          heap holds one head per list
+C:  2 → 6
+
+  {1ᴬ 1ᴮ 2ᶜ} ──pop 1ᴬ──▶ push 4ᴬ    output: 1
+  {1ᴮ 2ᶜ 4ᴬ} ──pop 1ᴮ──▶ push 3ᴮ    output: 1 1
+  {2ᶜ 3ᴮ 4ᴬ} ──pop 2ᶜ──▶ push 6ᶜ    output: 1 1 2
+                 ...
 ```
 
 ### Code
+
+```go
+// nodeHeap is a min-heap of list nodes ordered by value.
+type nodeHeap []*ListNode
+
+func (h nodeHeap) Len() int           { return len(h) }
+func (h nodeHeap) Less(i, j int) bool { return h[i].Val < h[j].Val }
+func (h nodeHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *nodeHeap) Push(x any)        { *h = append(*h, x.(*ListNode)) }
+func (h *nodeHeap) Pop() any {
+    old := *h
+    last := old[len(old)-1]
+    *h = old[:len(old)-1]
+    return last
+}
+
+func mergeKLists(lists []*ListNode) *ListNode {
+    frontier := &nodeHeap{}
+
+    // Seed with the head of every non-empty list.
+    for _, head := range lists {
+        if head != nil {
+            *frontier = append(*frontier, head)
+        }
+    }
+    heap.Init(frontier)
+
+    // A dummy head removes the "is this the first node?" branch.
+    dummy := &ListNode{}
+    tail := dummy
+
+    for frontier.Len() > 0 {
+        smallest := heap.Pop(frontier).(*ListNode)
+        tail.Next = smallest
+        tail = tail.Next
+
+        // The node itself remembers its origin: just push its successor.
+        if smallest.Next != nil {
+            heap.Push(frontier, smallest.Next)
+        }
+    }
+
+    tail.Next = nil // detach any leftover links from the input
+    return dummy.Next
+}
+```
+
 ```python
 import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+
+def mergeKLists(lists):
+    frontier = []
+    for i, head in enumerate(lists):
+        if head:
+            # i breaks ties: ListNode is not comparable in Python.
+            heapq.heappush(frontier, (head.val, i, head))
+
+    dummy = ListNode()
+    tail = dummy
+    while frontier:
+        _, i, node = heapq.heappop(frontier)
+        tail.next = node
+        tail = tail.next
+        if node.next:
+            heapq.heappush(frontier, (node.next.val, i, node.next))
+
+    tail.next = None
+    return dummy.next
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
+Time **O(N log k)** for `N` total nodes — each is pushed and popped once on a heap of size ≤ `k`. Space **O(k)**.
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Kth Sorted Matrix (LeetCode 378)
-A representative **Merge K Sorted Lists** problem. The signal: a k-element min-heap merges k sorted sequences in o(n log k).
+### Problem — Kth Smallest Element in a Sorted Matrix (LeetCode 378)
+Each row **and** each column of an `n × n` matrix is sorted ascending. Return the `k`-th smallest element.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (merge k, sorted lists, heap, k way merge, priority queue).
-2. Reach for the Merge K Sorted Lists template below and map the problem's entities onto it.
-3. A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
+1. Read the matrix as `n` sorted lists — one per row. Now it is exactly a k-way merge.
+2. But we don't need the full merge: we only need the `k`-th value, so **stop after `k` pops**.
+3. Seed the heap with the first element of each row: `(value, row, col)`. The `col` is what lets us find the successor.
+4. Pop `k` times; after each pop, push the next element from the **same row** if one exists.
+5. The `k`-th popped value is the answer. Only `k` pops happen, so we never touch most of the matrix.
+
+Note we only use the *rows* being sorted. Column sortedness is what makes the alternative binary-search-on-value approach work.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `matrix = [[1,5,9], [10,11,13], [12,13,15]]`, `k = 8`
+
+| pop # | heap before (value@row,col) | popped | push next from that row | heap after |
+|-------|------------------------------|--------|--------------------------|------------|
+| seed | — | — | — | `1@0,0  10@1,0  12@2,0` |
+| 1 | `1, 10, 12`  | **1**  | `5@0,1`  | `5, 10, 12` |
+| 2 | `5, 10, 12`  | **5**  | `9@0,2`  | `9, 10, 12` |
+| 3 | `9, 10, 12`  | **9**  | row 0 exhausted | `10, 12` |
+| 4 | `10, 12`     | **10** | `11@1,1` | `11, 12` |
+| 5 | `11, 12`     | **11** | `13@1,2` | `12, 13` |
+| 6 | `12, 13`     | **12** | `13@2,1` | `13, 13` |
+| 7 | `13, 13`     | **13** (row 1) | row 1 exhausted | `13@2,1` |
+| 8 | `13`         | **13** (row 2) | `15@2,2` | `15` |
+
+Output: **13** ✓
+
+Cross-check by flattening: `[1,5,9,10,11,12,13,13,15]` — the 8th smallest is `13`. ✓
+
+The heap held at most 3 entries and we never looked at `15` until the final push. With a large matrix and small `k`, most of the data is never read.
 
 ### Visualization
-```
-input  ──▶ [ apply Merge K Sorted Lists step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+matrix rows are k sorted lists:
+
+  row 0:   1    5    9
+  row 1:  10   11   13
+  row 2:  12   13   15
+
+heap keeps one front per row and advances only the row that just won:
+
+  {1, 10, 12} → pop 1  → {5, 10, 12}  → pop 5  → {9, 10, 12} → ...
+
+stop after k = 8 pops → 13
 ```
 
 ### Code
+
+```go
+// cell is one candidate from the matrix: a value and where it came from.
+type cell struct {
+    value int
+    row   int
+    col   int
+}
+
+type cellHeap []cell
+
+func (h cellHeap) Len() int           { return len(h) }
+func (h cellHeap) Less(i, j int) bool { return h[i].value < h[j].value }
+func (h cellHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *cellHeap) Push(x any)        { *h = append(*h, x.(cell)) }
+func (h *cellHeap) Pop() any {
+    old := *h
+    last := old[len(old)-1]
+    *h = old[:len(old)-1]
+    return last
+}
+
+func kthSmallest(matrix [][]int, k int) int {
+    n := len(matrix)
+
+    // Seed with the first element of each row. Only n rows can matter,
+    // and never more than k of them.
+    frontier := &cellHeap{}
+    for row := 0; row < n && row < k; row++ {
+        *frontier = append(*frontier, cell{value: matrix[row][0], row: row, col: 0})
+    }
+    heap.Init(frontier)
+
+    result := 0
+    for popped := 0; popped < k; popped++ {
+        smallest := heap.Pop(frontier).(cell)
+        result = smallest.value
+
+        // Advance only the row that just won.
+        if smallest.col+1 < len(matrix[smallest.row]) {
+            heap.Push(frontier, cell{
+                value: matrix[smallest.row][smallest.col+1],
+                row:   smallest.row,
+                col:   smallest.col + 1,
+            })
+        }
+    }
+    return result
+}
+```
+
 ```python
 import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+
+def kthSmallest(matrix, k):
+    n = len(matrix)
+    # (value, row, col) — col is what lets us find the successor.
+    frontier = [(matrix[row][0], row, 0) for row in range(min(n, k))]
+    heapq.heapify(frontier)
+
+    result = 0
+    for _ in range(k):
+        result, row, col = heapq.heappop(frontier)
+        if col + 1 < len(matrix[row]):          # advance only the winning row
+            heapq.heappush(frontier, (matrix[row][col + 1], row, col + 1))
+    return result
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
+Time **O(k log n)** — `k` pops on a heap of at most `n` entries. Space O(n).
+
+> There is also an O(n log(max − min)) binary-search-on-value solution that counts how many elements are ≤ a candidate. It wins when `k` is close to `n²`, and it is the one that genuinely needs the columns to be sorted too.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Smallest Range (LeetCode 632)
-A representative **Merge K Sorted Lists** problem. The signal: a k-element min-heap merges k sorted sequences in o(n log k).
+### Problem — Smallest Range Covering Elements from K Lists (LeetCode 632)
+Given `k` sorted lists, find the smallest range `[a, b]` that contains at least one number from **each** list.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (merge k, sorted lists, heap, k way merge, priority queue).
-2. Reach for the Merge K Sorted Lists template below and map the problem's entities onto it.
-3. A heap gives O(1) access to the extreme element and O(log n) updates — perfect for top-k, merging, and running medians.
+1. A valid range must span one element from every list. Consider a "frontier" of exactly one element per list — the range `[min, max]` of that frontier is always valid.
+2. The heap gives the frontier's **minimum** for free. Track the frontier's **maximum** in a plain variable as we push.
+3. To shrink the range we must raise the minimum — and the only way is to advance the list that currently owns it. So: pop the min, push its successor, update the max.
+4. Record `[min, max]` before each advance, keeping the smallest span seen.
+5. Stop as soon as any list runs out — from then on no frontier covering all `k` lists exists.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `nums = [[4,10,15,24,26], [0,9,12,20], [5,18,22,30]]` — lists A, B, C
+
+| step | frontier (value from each list) | min | max | span | best so far |
+|------|--------------------------------|-----|-----|------|-------------|
+| seed | `4ᴬ, 0ᴮ, 5ᶜ` | 0 | 5 | 5 | **[0,5]** |
+| 1 | pop `0ᴮ`, push `9ᴮ` → `4ᴬ, 9ᴮ, 5ᶜ` | 4 | 9 | 5 | [0,5] (tie, keep first) |
+| 2 | pop `4ᴬ`, push `10ᴬ` → `10ᴬ, 9ᴮ, 5ᶜ` | 5 | 10 | 5 | [0,5] |
+| 3 | pop `5ᶜ`, push `18ᶜ` → `10ᴬ, 9ᴮ, 18ᶜ` | 9 | 18 | 9 | [0,5] |
+| 4 | pop `9ᴮ`, push `12ᴮ` → `10ᴬ, 12ᴮ, 18ᶜ` | 10 | 18 | 8 | [0,5] |
+| 5 | pop `10ᴬ`, push `15ᴬ` → `15ᴬ, 12ᴮ, 18ᶜ` | 12 | 18 | 6 | [0,5] |
+| 6 | pop `12ᴮ`, push `20ᴮ` → `15ᴬ, 20ᴮ, 18ᶜ` | 15 | 20 | 5 | [0,5] |
+| 7 | pop `15ᴬ`, push `24ᴬ` → `24ᴬ, 20ᴮ, 18ᶜ` | 18 | 24 | 6 | [0,5] |
+| 8 | pop `18ᶜ`, push `22ᶜ` → `24ᴬ, 20ᴮ, 22ᶜ` | 20 | 24 | **4** | **[20,24]** ★ |
+| 9 | pop `20ᴮ` → list B is exhausted | — | — | — | stop |
+
+Output: **`[20, 24]`** ✓
+
+Verify: `24 ∈ A`, `20 ∈ B`, `22 ∈ C` — all three lists are represented, and the span is 4.
+
+Step 9 is the stopping rule: once B has no successor, every future frontier would be missing a B element, so no smaller valid range can exist.
 
 ### Visualization
-```
-input  ──▶ [ apply Merge K Sorted Lists step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+A:  4   10   15   24   26
+B:  0    9   12   20
+C:  5   18   22   30
+
+frontier at step 8:      A=24   B=20   C=22
+                                ↑           ↑
+                             min=20      max=24     span = 4  ★
+
+the heap supplies min; max is tracked as we push
 ```
 
 ### Code
+
+```go
+// item is one frontier element plus where it came from.
+type item struct {
+    value   int
+    listIdx int
+    elemIdx int
+}
+
+type itemHeap []item
+
+func (h itemHeap) Len() int           { return len(h) }
+func (h itemHeap) Less(i, j int) bool { return h[i].value < h[j].value }
+func (h itemHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *itemHeap) Push(x any)        { *h = append(*h, x.(item)) }
+func (h *itemHeap) Pop() any {
+    old := *h
+    last := old[len(old)-1]
+    *h = old[:len(old)-1]
+    return last
+}
+
+func smallestRange(nums [][]int) []int {
+    frontier := &itemHeap{}
+    currentMax := math.MinInt32
+
+    // Seed with one element from every list.
+    for i, list := range nums {
+        *frontier = append(*frontier, item{value: list[0], listIdx: i, elemIdx: 0})
+        if list[0] > currentMax {
+            currentMax = list[0]
+        }
+    }
+    heap.Init(frontier)
+
+    bestStart, bestEnd := math.MinInt32, math.MaxInt32
+
+    for {
+        smallest := (*frontier)[0]
+
+        // The frontier covers every list, so [min, max] is a valid range.
+        if currentMax-smallest.value < bestEnd-bestStart {
+            bestStart, bestEnd = smallest.value, currentMax
+        }
+
+        // The only way to shrink the range is to raise the minimum.
+        nextIdx := smallest.elemIdx + 1
+        if nextIdx == len(nums[smallest.listIdx]) {
+            break // this list is exhausted: no future frontier covers all lists
+        }
+
+        nextValue := nums[smallest.listIdx][nextIdx]
+        heap.Pop(frontier)
+        heap.Push(frontier, item{
+            value:   nextValue,
+            listIdx: smallest.listIdx,
+            elemIdx: nextIdx,
+        })
+        if nextValue > currentMax {
+            currentMax = nextValue
+        }
+    }
+
+    return []int{bestStart, bestEnd}
+}
+```
+
 ```python
 import heapq
-def top_k(nums, k):
-    heap = []                        # min-heap of size k
-    for v in nums:
-        heapq.heappush(heap, v)
-        if len(heap) > k:
-            heapq.heappop(heap)      # evict smallest -> keep k largest
-    return heap
+
+def smallestRange(nums):
+    # (value, list index, element index)
+    frontier = [(values[0], i, 0) for i, values in enumerate(nums)]
+    heapq.heapify(frontier)
+    current_max = max(values[0] for values in nums)
+
+    best = [float("-inf"), float("inf")]
+
+    while True:
+        value, list_idx, elem_idx = frontier[0]
+
+        # The frontier covers every list, so [value, current_max] is valid.
+        if current_max - value < best[1] - best[0]:
+            best = [value, current_max]
+
+        next_idx = elem_idx + 1
+        if next_idx == len(nums[list_idx]):
+            break                       # this list is exhausted
+
+        next_value = nums[list_idx][next_idx]
+        heapq.heapreplace(frontier, (next_value, list_idx, next_idx))
+        current_max = max(current_max, next_value)
+
+    return best
 ```
 
 ### Complexity
-Time O(n log k), Space O(k). k-sized heap; pop/push is O(log k).
+Time **O(N log k)** where `N` is the total number of elements — each is pushed and popped at most once. Space O(k).
 
+---
 
 ## 12. LeetCode Practice Set
 
