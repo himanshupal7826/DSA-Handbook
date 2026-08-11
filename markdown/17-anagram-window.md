@@ -41,32 +41,108 @@ anagram, permutation, fixed window, char count, find all.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Where in `s` does a rearrangement of `p` appear?"*
+
 ### Intuition
-Enumerate all subarrays/substrings and evaluate each — O(n^2) or O(n^3).
+An anagram of `p` must have exactly `len(p)` characters with exactly `p`'s letter counts. So check every substring of that length.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Let `m = len(p)`.
+2. For each start `i` from `0` to `n − m`:
+3. &nbsp;&nbsp;Take the substring `s[i..i+m−1]`.
+4. &nbsp;&nbsp;Sort it (or count its letters) and compare against `p`.
+5. &nbsp;&nbsp;If they match, record `i`.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n · m log m)** with sorting, **O(n · m)** with counting.
+- Space: O(m).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Anagram Window pattern is built to use.
+- Consecutive substrings differ by exactly **two** characters, yet we recount all `m` of them each time.
+- Sorting is even more wasteful: it computes an ordering we immediately discard, when all we needed was a tally.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-A window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n).
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Anagram Window invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **An anagram is a statement about counts, and the window has a fixed size — so slide the window and keep the counts up to date incrementally.**
+
+Two patterns compose here:
+
+```text
+Fixed Window      →  one character in, one character out per step
+Frequency Counter →  compare tallies, never orderings
+```
+
+### The thought process
+
+```text
+We need    : all positions where a permutation of p occurs in s.
+Obvious way: check every length-m substring from scratch.
+Too slow   : O(n·m) — and neighbouring substrings share m-1 characters.
+Notice     : "is an anagram" only depends on letter COUNTS, not order.
+Notice too : sliding by one changes exactly two counts.
+Therefore  : maintain a live count table and slide it.
+Now        : O(1) work per position → O(n) total.
+```
+
+### Making the comparison O(1) too
+
+Sliding gets the counts updated in O(1), but naively comparing two 26-slot tables is O(26) per position. That's fine in practice, yet there's a clean way to make it truly O(1):
+
+> Track an integer **`matches`** = *how many of the 26 letters currently have `windowCount[letter] == pCount[letter]`*.
+> The window is an anagram exactly when `matches == 26`.
+
+Since a slide touches only two letters, you only re-evaluate those two:
+
+```text
+before changing a letter's count : if it was matching, matches--
+change the count
+after changing it                : if it now matches, matches++
+```
+
+That "un-match, change, re-match" sandwich is the part worth memorising. Doing it in any other order double-counts.
+
+### Steps
+
+```text
+Step 1 → Build pCount from p. Build windowCount from the first m characters.
+Step 2 → Compute matches = number of letters where the two tables agree.
+Step 3 → If matches == 26, record index 0.
+Step 4 → For right = m .. n-1:
+Step 5 →     add s[right]          (un-match, ++, re-match)
+Step 6 →     remove s[right-m]     (un-match, --, re-match)
+Step 7 →     if matches == 26, record right - m + 1
+```
+
+### Why all 26 letters, not just the ones in `p`
+
+A letter absent from `p` has `pCount = 0`, so it matches only while the window has none of it. Counting all 26 automatically enforces "the window contains nothing extra" — no separate check needed.
+
+### When the alphabet isn't small
+
+For Unicode or arbitrary tokens, swap the array for a hash map and track `matches` against `len(pCount)` distinct keys instead. The logic is unchanged; only the container differs.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "anagram", "permutation of", "rearrangement", "same letters"
+  "find all starting indices", "contains a permutation"
+  a fixed-length target pattern
+        ↓
+Think about...
+  "This is a fixed window whose validity is a COUNT comparison."
+        ↓
+Use...
+  fixed window of size len(p)
+  + a count table maintained incrementally
+  + a `matches` counter so the check is O(1)
+```
 
 ### Visual explanation
 
@@ -98,83 +174,179 @@ A window with incrementally maintained aggregates means each element enters and 
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Anagram Window    : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+s = "cbaebabacd", p = "abc"   → window size 3
+
+c b a e b a b a c d
+└───┘                  "cba"  counts a1 b1 c1 = p  ✓  → index 0
+  └───┘                "bae"  has an 'e'          ✗
+    └───┘              "aeb"                      ✗
+      └───┘            "eba"                      ✗
+        └───┘          "bab"  two b's, no c       ✗
+          └───┘        "aba"                      ✗
+            └───┘      "bac"  counts a1 b1 c1 = p ✓  → index 6
+              └───┘    "acd"                      ✗
+
+answer: [0, 6]
 ```
 
 ### Interview explanation
-"This is a Anagram Window problem. I'll a window with incrementally maintained aggregates means each element enters and leaves at most once — amortized O(n). That brings the complexity down to O(n) time and O(k) space — here's the template."
+"Being an anagram depends only on letter counts, so I never sort. The window has a fixed size `len(p)`, so sliding it changes exactly two counts — one character enters, one leaves. I keep a live 26-slot count table plus an integer `matches` recording how many letters currently agree with `p`'s table. Since a slide touches two letters, I only re-check those two, so each position costs O(1) and the whole scan is O(n) with O(1) space. Tracking all 26 letters rather than just `p`'s also enforces that the window contains nothing extra."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Sliding Window** family template. Adapt the comparison/condition to the specific problem.
+> Fixed window + count table + `matches` counter. The un-match / change / re-match sandwich keeps `matches` honest.
 
 ```go
-// Variable-size window: longest subarray satisfying a constraint.
-func longestWindow(s string) int {
-    count := map[byte]int{}
-    left, best := 0, 0
-    for right := 0; right < len(s); right++ {
-        count[s[right]]++
-        for windowInvalid(count) { // shrink until valid
-            count[s[left]]--
-            if count[s[left]] == 0 { delete(count, s[left]) }
-            left++
-        }
-        if right-left+1 > best { best = right - left + 1 }
+// FindAnagrams returns every start index in s where a permutation of p occurs.
+func FindAnagrams(s, p string) []int {
+    result := []int{}
+    if len(s) < len(p) || len(p) == 0 {
+        return result
     }
-    return best
+
+    var pCount, windowCount [26]int
+    for i := 0; i < len(p); i++ {
+        pCount[p[i]-'a']++
+        windowCount[s[i]-'a']++ // prime the first window at the same time
+    }
+
+    matches := 0 // how many of the 26 letters currently agree
+    for i := 0; i < 26; i++ {
+        if pCount[i] == windowCount[i] {
+            matches++
+        }
+    }
+    if matches == 26 {
+        result = append(result, 0)
+    }
+
+    for right := len(p); right < len(s); right++ {
+        adjust(&windowCount, &pCount, &matches, int(s[right]-'a'), +1)        // entering
+        adjust(&windowCount, &pCount, &matches, int(s[right-len(p)]-'a'), -1) // leaving
+
+        if matches == 26 {
+            result = append(result, right-len(p)+1)
+        }
+    }
+    return result
+}
+
+// adjust applies delta to one letter's count, keeping `matches` correct.
+func adjust(windowCount, pCount *[26]int, matches *int, letter int, delta int) {
+    if windowCount[letter] == pCount[letter] {
+        *matches-- // it was matching; it may not be after the change
+    }
+    windowCount[letter] += delta
+    if windowCount[letter] == pCount[letter] {
+        *matches++ // it matches now
+    }
 }
 ```
 
 ```python
-def longest_window(s):
-    from collections import defaultdict
-    count = defaultdict(int)
-    left = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        while window_invalid(count):      # shrink to restore validity
-            count[s[left]] -= 1
-            if count[s[left]] == 0:
-                del count[s[left]]
-            left += 1
-        best = max(best, right - left + 1)
-    return best
+def find_anagrams(s, p):
+    """Every start index in s where a permutation of p occurs."""
+    result = []
+    if len(s) < len(p) or not p:
+        return result
+
+    p_count = [0] * 26
+    window = [0] * 26
+    for i in range(len(p)):
+        p_count[ord(p[i]) - 97] += 1
+        window[ord(s[i]) - 97] += 1        # prime the first window
+
+    matches = sum(1 for i in range(26) if p_count[i] == window[i])
+
+    def adjust(letter, delta):
+        nonlocal matches
+        if window[letter] == p_count[letter]:
+            matches -= 1                   # was matching
+        window[letter] += delta
+        if window[letter] == p_count[letter]:
+            matches += 1                   # matches now
+
+    if matches == 26:
+        result.append(0)
+
+    for right in range(len(p), len(s)):
+        adjust(ord(s[right]) - 97, 1)              # entering
+        adjust(ord(s[right - len(p)]) - 97, -1)    # leaving
+        if matches == 26:
+            result.append(right - len(p) + 1)
+
+    return result
 ```
 
 ```java
-int longestWindow(String s) {
-    Map<Character,Integer> count = new HashMap<>();
-    int left = 0, best = 0;
-    for (int right = 0; right < s.length(); right++) {
-        count.merge(s.charAt(right), 1, Integer::sum);
-        while (windowInvalid(count)) {
-            char c = s.charAt(left++);
-            if (count.merge(c, -1, Integer::sum) == 0) count.remove(c);
+import java.util.*;
+
+public class AnagramWindow {
+    public static List<Integer> findAnagrams(String s, String p) {
+        List<Integer> result = new ArrayList<>();
+        if (s.length() < p.length() || p.isEmpty()) return result;
+
+        int[] pCount = new int[26], window = new int[26];
+        for (int i = 0; i < p.length(); i++) {
+            pCount[p.charAt(i) - 'a']++;
+            window[s.charAt(i) - 'a']++;          // prime the first window
         }
-        best = Math.max(best, right - left + 1);
+
+        int matches = 0;
+        for (int i = 0; i < 26; i++) if (pCount[i] == window[i]) matches++;
+        if (matches == 26) result.add(0);
+
+        for (int right = p.length(); right < s.length(); right++) {
+            matches = adjust(window, pCount, matches, s.charAt(right) - 'a', 1);
+            matches = adjust(window, pCount, matches, s.charAt(right - p.length()) - 'a', -1);
+            if (matches == 26) result.add(right - p.length() + 1);
+        }
+        return result;
     }
-    return best;
+
+    private static int adjust(int[] window, int[] pCount, int matches, int letter, int delta) {
+        if (window[letter] == pCount[letter]) matches--;   // was matching
+        window[letter] += delta;
+        if (window[letter] == pCount[letter]) matches++;   // matches now
+        return matches;
+    }
 }
 ```
 
 ```cpp
-int longestWindow(const string& s) {
-    unordered_map<char,int> count;
-    int left = 0, best = 0;
-    for (int right = 0; right < (int)s.size(); ++right) {
-        ++count[s[right]];
-        while (windowInvalid(count)) {
-            if (--count[s[left]] == 0) count.erase(s[left]);
-            ++left;
-        }
-        best = max(best, right - left + 1);
+#include <string>
+#include <vector>
+using namespace std;
+
+static void adjust(int* window, const int* pCount, int& matches, int letter, int delta) {
+    if (window[letter] == pCount[letter]) --matches;   // was matching
+    window[letter] += delta;
+    if (window[letter] == pCount[letter]) ++matches;   // matches now
+}
+
+vector<int> findAnagrams(const string& s, const string& p) {
+    vector<int> result;
+    if (s.size() < p.size() || p.empty()) return result;
+
+    int pCount[26] = {0}, window[26] = {0};
+    for (size_t i = 0; i < p.size(); ++i) {
+        ++pCount[p[i] - 'a'];
+        ++window[s[i] - 'a'];                          // prime the first window
     }
-    return best;
+
+    int matches = 0;
+    for (int i = 0; i < 26; ++i) if (pCount[i] == window[i]) ++matches;
+    if (matches == 26) result.push_back(0);
+
+    for (size_t right = p.size(); right < s.size(); ++right) {
+        adjust(window, pCount, matches, s[right] - 'a', 1);
+        adjust(window, pCount, matches, s[right - p.size()] - 'a', -1);
+        if (matches == 26) result.push_back((int)(right - p.size() + 1));
+    }
+    return result;
 }
 ```
 
@@ -259,169 +431,387 @@ int longestWindow(const string& s) {
 
 ## 9. Solved Example 1
 
-### Problem — Find Anagrams (LeetCode 438)
-Return the start indices of every substring of `s` that is an anagram of `p`.
+### Problem — Find All Anagrams in a String (LeetCode 438)
+Return every start index in `s` where an anagram of `p` begins.
 
 ### Thought Process
-1. Any anagram of `p` has length `len(p)` and identical character counts, so use a **fixed window** of size `len(p)`.
-2. Build a `Counter` for `p` and a running `Counter` for the current window.
-3. Slide the window one char right each step: add the entering char, drop the char that fell off the left. When the two counters match, record the window's start index.
+1. An anagram of `p` has length `len(p)` and identical letter counts — so this is a **fixed window** of size `len(p)`.
+2. Maintain `windowCount` incrementally: one letter enters, one leaves per slide.
+3. Keep an integer `matches` = how many of the 26 letters currently agree with `pCount`. The window is an anagram exactly when `matches == 26`.
+4. A slide touches only two letters, so only those two need re-checking — un-match, change, re-match.
+5. Counting all 26 letters (not just `p`'s) automatically rejects windows containing extra letters.
 
 ### Dry Run
-`s = "cbaebabacd", p = "abc"` (window size 3, need `{a:1,b:1,c:1}`):
-- window `cba` (i=0) → counts match → record `0`.
-- windows `bae, aeb, eba, bab, aba` → no match.
-- window `bac` (i=6) → counts match → record `6`.
-- Result `[0, 6]`.
+
+Input: `s = "cbaebabacd"`, `p = "abc"` → window size 3, `pCount = {a:1, b:1, c:1}`
+
+| window (start) | contents | windowCount | equals pCount? | record |
+|----------------|----------|-------------|----------------|--------|
+| 0 | `"cba"` | a:1 b:1 c:1 | **yes** | **0** |
+| 1 | `"bae"` | a:1 b:1 e:1 | no (`e` extra, `c` missing) | |
+| 2 | `"aeb"` | a:1 b:1 e:1 | no | |
+| 3 | `"eba"` | a:1 b:1 e:1 | no | |
+| 4 | `"bab"` | a:1 b:2 | no (`b` is 2, `c` is 0) | |
+| 5 | `"aba"` | a:2 b:1 | no | |
+| 6 | `"bac"` | a:1 b:1 c:1 | **yes** | **6** |
+| 7 | `"acd"` | a:1 c:1 d:1 | no | |
+
+Output: **`[0, 6]`**
+
+Watch one slide in detail — from window 0 (`"cba"`) to window 1 (`"bae"`): `e` enters and `c` leaves. `e` was matching at 0 = 0, so `matches--`; it becomes 1 ≠ 0, so no re-increment. `c` was matching at 1 = 1, so `matches--`; it drops to 0 ≠ 1, so no re-increment. `matches` falls from 26 to 24. Only two letters were ever examined.
 
 ### Visualization
-```
-"cbaebabacd" ──▶ slide fixed window of len(p)=3, compare counts to p
-match at index 0 ("cba") and index 6 ("bac") ──▶ [0, 6]
+
+```text
+s = c  b  a  e  b  a  b  a  c  d
+    0  1  2  3  4  5  6  7  8  9
+
+    └─────┘                            "cba" = anagram of "abc"  ★ index 0
+                          └─────┘      "bac" = anagram of "abc"  ★ index 6
+
+each slide: one letter in, one letter out, two counters touched
 ```
 
 ### Code
-```python
-from collections import Counter
 
-def findAnagrams(s: str, p: str) -> list[int]:
-    if len(p) > len(s):
-        return []
-    need = Counter(p)
-    window = Counter(s[:len(p)])
-    res = []
-    if window == need:
-        res.append(0)
+```go
+func findAnagrams(s string, p string) []int {
+    result := []int{}
+    if len(s) < len(p) || len(p) == 0 {
+        return result
+    }
+
+    var pCount, windowCount [26]int
+    for i := 0; i < len(p); i++ {
+        pCount[p[i]-'a']++
+        windowCount[s[i]-'a']++ // build the first window
+    }
+
+    matches := 0 // letters where windowCount and pCount agree
+    for i := 0; i < 26; i++ {
+        if pCount[i] == windowCount[i] {
+            matches++
+        }
+    }
+    if matches == 26 {
+        result = append(result, 0)
+    }
+
+    // adjust changes one letter's count while keeping `matches` correct.
+    adjust := func(letter, delta int) {
+        if windowCount[letter] == pCount[letter] {
+            matches-- // it was matching
+        }
+        windowCount[letter] += delta
+        if windowCount[letter] == pCount[letter] {
+            matches++ // it matches now
+        }
+    }
+
+    for right := len(p); right < len(s); right++ {
+        adjust(int(s[right]-'a'), +1)          // entering on the right
+        adjust(int(s[right-len(p)]-'a'), -1)   // leaving on the left
+        if matches == 26 {
+            result = append(result, right-len(p)+1)
+        }
+    }
+    return result
+}
+```
+
+```python
+def findAnagrams(s, p):
+    result = []
+    if len(s) < len(p) or not p:
+        return result
+
+    p_count, window = [0] * 26, [0] * 26
+    for i in range(len(p)):
+        p_count[ord(p[i]) - 97] += 1
+        window[ord(s[i]) - 97] += 1            # build the first window
+
+    matches = sum(1 for i in range(26) if p_count[i] == window[i])
+
+    def adjust(letter, delta):
+        nonlocal matches
+        if window[letter] == p_count[letter]:
+            matches -= 1                       # was matching
+        window[letter] += delta
+        if window[letter] == p_count[letter]:
+            matches += 1                       # matches now
+
+    if matches == 26:
+        result.append(0)
+
     for right in range(len(p), len(s)):
-        window[s[right]] += 1               # char enters on the right
-        left = right - len(p)
-        window[s[left]] -= 1                # char leaves on the left
-        if window[s[left]] == 0:
-            del window[s[left]]
-        if window == need:
-            res.append(left + 1)
-    return res
+        adjust(ord(s[right]) - 97, 1)                # entering
+        adjust(ord(s[right - len(p)]) - 97, -1)      # leaving
+        if matches == 26:
+            result.append(right - len(p) + 1)
+
+    return result
 ```
 
 ### Complexity
-Time O(n) with a 26-way count compare per step; Space O(1) (at most 26 keys).
+Time **O(n)** — O(26) to set up, then O(1) per slide. Space O(1).
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Permutation in String (LeetCode 567)
-Return `True` if `s2` contains any permutation of `s1` as a contiguous substring.
+Return `true` if `s2` contains any permutation of `s1`.
 
 ### Thought Process
-1. A permutation of `s1` is just an anagram, so we need a **fixed window** of size `len(s1)` whose char counts equal those of `s1`.
-2. Track how many of the 26 letters currently have the *exact* required count with a single `matches` integer, so each slide is O(1) instead of comparing whole maps.
-3. When `matches == 26`, the window is a permutation → return `True`. Return `False` if we run off the end.
+1. This is the previous problem asking a yes/no question instead of collecting indices — so we return as soon as one window matches.
+2. Since we bail out early, the O(26)-per-window comparison is perfectly acceptable and much easier to read than the `matches` bookkeeping.
+3. Build both 26-slot tables for the first window, compare, then slide and compare again.
+4. In Go, comparing two `[26]int` arrays with `==` is a single expression — arrays are comparable values.
 
 ### Dry Run
-`s1 = "ab", s2 = "eidbaooo"` (window size 2):
-- windows `ei, id, db` → counts differ, no match.
-- window `ba` → counts `{b:1,a:1}` equal `s1` → return `True`.
+
+Input: `s1 = "ab"`, `s2 = "eidbaooo"` → window size 2, `count1 = {a:1, b:1}`
+
+| window (start) | contents | window table | equal to count1? |
+|----------------|----------|--------------|------------------|
+| 0 | `"ei"` | e:1 i:1 | no |
+| 1 | `"id"` | i:1 d:1 | no |
+| 2 | `"db"` | d:1 b:1 | no |
+| 3 | `"ba"` | b:1 a:1 | **yes → return `true`** |
+
+Output: **`true`** — `"ba"` is a permutation of `"ab"`. ✓
+
+A negative case: `s2 = "eidboaoo"` gives windows `"ei"`, `"id"`, `"db"`, `"bo"`, `"oa"`, `"ao"`, `"oo"` — none matches, so **`false`**.
 
 ### Visualization
-```
-"eidbaooo" ──▶ slide window of len(s1)=2, keep 26-letter match count
-window "ba" matches counts of "ab" ──▶ True
+
+```text
+s1 = "ab"   →  a:1  b:1
+
+s2 = e  i  d  b  a  o  o  o
+              └───┘
+              "ba" → b:1 a:1 → identical table → true
 ```
 
 ### Code
+
+```go
+func checkInclusion(s1 string, s2 string) bool {
+    if len(s1) > len(s2) {
+        return false
+    }
+
+    var need, window [26]int
+    for i := 0; i < len(s1); i++ {
+        need[s1[i]-'a']++
+        window[s2[i]-'a']++ // build the first window
+    }
+    if window == need { // Go compares arrays element-wise
+        return true
+    }
+
+    for right := len(s1); right < len(s2); right++ {
+        window[s2[right]-'a']++          // entering on the right
+        window[s2[right-len(s1)]-'a']--  // leaving on the left
+        if window == need {
+            return true
+        }
+    }
+    return false
+}
+```
+
 ```python
-def checkInclusion(s1: str, s2: str) -> bool:
+def checkInclusion(s1, s2):
     if len(s1) > len(s2):
         return False
-    need = [0] * 26
-    window = [0] * 26
-    for ch in s1:
-        need[ord(ch) - 97] += 1
-    matches = sum(1 for i in range(26) if need[i] == window[i])
-    for right in range(len(s2)):
-        r = ord(s2[right]) - 97
-        window[r] += 1
-        if window[r] == need[r]:
-            matches += 1
-        elif window[r] == need[r] + 1:
-            matches -= 1
-        if right >= len(s1):
-            l = ord(s2[right - len(s1)]) - 97
-            window[l] -= 1
-            if window[l] == need[l]:
-                matches += 1
-            elif window[l] == need[l] - 1:
-                matches -= 1
-        if matches == 26:
+
+    need, window = [0] * 26, [0] * 26
+    for i in range(len(s1)):
+        need[ord(s1[i]) - 97] += 1
+        window[ord(s2[i]) - 97] += 1         # build the first window
+    if window == need:
+        return True
+
+    for right in range(len(s1), len(s2)):
+        window[ord(s2[right]) - 97] += 1               # entering
+        window[ord(s2[right - len(s1)]) - 97] -= 1     # leaving
+        if window == need:
             return True
     return False
 ```
 
 ### Complexity
-Time O(n) with O(1) work per slide; Space O(1) (two fixed 26-length arrays).
+Time **O(26·n)** = O(n) with `n = len(s2)`. Space O(1).
+
+> The Fixed Size Window chapter solves this with a `matched` counter instead, which removes the 26-element comparison. Both are O(n); this version is the one to write first under time pressure.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Substring Concat (LeetCode 30)
-All words in `words` share length `L`. Find every start index in `s` where a substring is a concatenation of **every** word exactly once (in any order).
+### Problem — Substring with Concatenation of All Words (LeetCode 30)
+All words in `words` have the **same length**. Return every start index in `s` where a concatenation of all the words — in any order, each used exactly once — begins.
 
 ### Thought Process
-1. A valid substring has length `total = L * len(words)` and is a sequence of back-to-back `L`-sized chunks whose multiset of chunks equals `Counter(words)`.
-2. Since words are all length `L`, any valid start is congruent mod `L`; run `L` independent sliding windows, one per offset `0..L-1`, stepping by `L` words at a time.
-3. In each offset window keep a running `seen` count; when a chunk's count exceeds the need, shrink from the left by whole words. When the window holds exactly `len(words)` words, record its start.
+1. Because every word has the same length `L`, the whole match has a fixed length `L × numWords`. Fixed window again.
+2. **The key move:** don't slide by one character, slide by one **word**. A valid match is always aligned to some offset `0 <= offset < L`, so run the sweep `L` times, once per alignment.
+3. Within one alignment, treat each `L`-character chunk as a single token and run the ordinary "window containing exactly these counts" logic.
+4. Three cases per chunk:
+   - **unknown word** → nothing containing it can be valid: reset the window and restart after it;
+   - **too many copies** of a known word → shrink from the left until the excess is gone;
+   - **all words present** → record the index, then drop one word from the left to keep searching.
+5. Each alignment scans `n/L` chunks, and there are `L` alignments, so the total is O(n) chunk visits.
 
 ### Dry Run
-`s = "barfoothefoobarman", words = ["foo","bar"]` (`L=3, total=6`):
-- offset 0: chunks `bar,foo` → both needed, count 2 → record start `0`; then `the` not a word → reset.
-- later chunks `foo,bar` at index 9 → count 2 → record start `9`.
-- Result `[0, 9]`.
+
+Input: `s = "barfoothefoobarman"`, `words = ["foo", "bar"]` → `L = 3`, `numWords = 2`, total length 6
+
+**Alignment `offset = 0`** — chunks at 0, 3, 6, 9, 12, 15:
+
+| pos | chunk | known? | window counts | matched | action |
+|-----|-------|--------|---------------|---------|--------|
+| 0  | `bar` | yes | bar:1 | 1 | grow |
+| 3  | `foo` | yes | bar:1 foo:1 | **2** | **record index 0**; drop `bar` at left → matched 1, `left = 3` |
+| 6  | `the` | **no** | — | 0 | reset; `left = 9` |
+| 9  | `foo` | yes | foo:1 | 1 | grow |
+| 12 | `bar` | yes | foo:1 bar:1 | **2** | **record index 9**; drop `foo` at left → matched 1, `left = 12` |
+| 15 | `man` | **no** | — | 0 | reset; `left = 18` |
+
+**Alignment `offset = 1`** — chunks `arf`, `oot`, `hef`, `oob`, `arm`: all unknown, nothing found.
+**Alignment `offset = 2`** — chunks `rfo`, `oth`, `efo`, `oba`, `rma`: all unknown, nothing found.
+
+Output: **`[0, 9]`** ✓ (`s[0:6] = "barfoo"` and `s[9:15] = "foobar"`)
 
 ### Visualization
-```
-"barfoothefoobarman" ──▶ L=3 offset windows, match chunk multiset to words
-"barfoo" @0 and "foobar" @9 ──▶ [0, 9]
+
+```text
+s = b a r f o o t h e f o o b a r m a n
+    0     3     6     9    12    15
+
+offset 0 chunks:  [bar][foo][the][foo][bar][man]
+                   └────────┘                        index 0  ★
+                                  └────────┘         index 9  ★
+
+offset 1 chunks:  [arf][oot][hef][oob][arm]   none known
+offset 2 chunks:  [rfo][oth][efo][oba][rma]   none known
+
+slide by a WORD, not by a character — L alignments cover every position
 ```
 
 ### Code
-```python
-from collections import Counter
 
-def findSubstring(s: str, words: list[str]) -> list[int]:
+```go
+func findSubstring(s string, words []string) []int {
+    result := []int{}
+    if len(words) == 0 || len(s) == 0 {
+        return result
+    }
+
+    wordLen, numWords := len(words[0]), len(words)
+    if len(s) < wordLen*numWords {
+        return result
+    }
+
+    need := make(map[string]int, numWords)
+    for _, w := range words {
+        need[w]++
+    }
+
+    // Every valid match starts at some offset in [0, wordLen).
+    for offset := 0; offset < wordLen; offset++ {
+        window := make(map[string]int)
+        left, matched := offset, 0
+
+        for right := offset; right+wordLen <= len(s); right += wordLen {
+            word := s[right : right+wordLen]
+
+            want, known := need[word]
+            if !known {
+                // Nothing spanning this chunk can ever be valid.
+                window = make(map[string]int)
+                matched = 0
+                left = right + wordLen
+                continue
+            }
+
+            window[word]++
+            matched++
+
+            // Too many copies of `word`: drop from the left until it fits.
+            for window[word] > want {
+                out := s[left : left+wordLen]
+                window[out]--
+                matched--
+                left += wordLen
+            }
+
+            if matched == numWords {
+                result = append(result, left)
+                // Drop one word so the search continues past this match.
+                out := s[left : left+wordLen]
+                window[out]--
+                matched--
+                left += wordLen
+            }
+        }
+    }
+    return result
+}
+```
+
+```python
+from collections import defaultdict
+
+def findSubstring(s, words):
+    result = []
     if not words or not s:
-        return []
-    L, n = len(words[0]), len(words)
-    total = L * n
-    need = Counter(words)
-    res = []
-    for offset in range(L):
-        left = offset
-        seen = Counter()
-        count = 0                              # words currently in window
-        for right in range(offset, len(s) - L + 1, L):
-            word = s[right:right + L]
-            if word in need:
-                seen[word] += 1
-                count += 1
-                while seen[word] > need[word]: # too many of this word → shrink
-                    lw = s[left:left + L]
-                    seen[lw] -= 1
-                    count -= 1
-                    left += L
-                if count == n:
-                    res.append(left)
-                    lw = s[left:left + L]       # slide past one word to keep searching
-                    seen[lw] -= 1
-                    count -= 1
-                    left += L
-            else:
-                seen.clear()                   # invalid word breaks the run
-                count = 0
-                left = right + L
-    return res
+        return result
+
+    word_len, num_words = len(words[0]), len(words)
+    if len(s) < word_len * num_words:
+        return result
+
+    need = defaultdict(int)
+    for w in words:
+        need[w] += 1
+
+    for offset in range(word_len):          # every alignment
+        window = defaultdict(int)
+        left, matched = offset, 0
+
+        for right in range(offset, len(s) - word_len + 1, word_len):
+            word = s[right:right + word_len]
+
+            if word not in need:            # nothing spanning it can be valid
+                window.clear()
+                matched = 0
+                left = right + word_len
+                continue
+
+            window[word] += 1
+            matched += 1
+
+            while window[word] > need[word]:      # too many copies
+                out = s[left:left + word_len]
+                window[out] -= 1
+                matched -= 1
+                left += word_len
+
+            if matched == num_words:
+                result.append(left)
+                out = s[left:left + word_len]     # drop one and keep going
+                window[out] -= 1
+                matched -= 1
+                left += word_len
+
+    return result
 ```
 
 ### Complexity
-Time O(len(s) · L) — each of the `L` offsets scans the string once; Space O(len(words) · L) for the counters.
+Time **O(n · L)** where `L` is the word length — `L` alignments, each visiting `n/L` chunks, and each chunk costs O(L) to slice and hash. Space O(numWords · L) for the maps.
 
+---
 
 ## 12. LeetCode Practice Set
 
