@@ -41,32 +41,108 @@ prefix, cumulative, range sum, subarray sum, running total.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"What is the sum of the elements between index `l` and index `r`?"* — asked many times, on the same array.
+
 ### Intuition
-Nested loops re-examine pairs/ranges, giving O(n^2) or worse.
+Just add them up. For each query `(l, r)`, loop from `l` to `r` and accumulate.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Read the query `(l, r)`.
+2. Set `total = 0`.
+3. For `i` from `l` to `r`: `total += nums[i]`.
+4. Return `total`. Repeat for the next query.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n) per query**, so **O(q·n)** for `q` queries.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Prefix Sum pattern is built to use.
+- Two queries that overlap re-add the very same elements. `sumRange(0,5)` and `sumRange(0,6)` share five additions, and we redo all of them.
+- With `q = 10⁴` queries on `n = 10⁴` elements that's 10⁸ additions for information we already computed.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Prefix Sum invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Add everything up once, from the left. Then any range is the difference of two of those totals.**
+
+Think of a running odometer. If the odometer reads 2 km when you pass point `l` and 10 km when you pass point `r`, the distance between them is `10 − 2 = 8`. You don't re-drive the road; you subtract two readings.
+
+### The thought process
+
+```text
+We need    : sums of many ranges of the same array.
+Obvious way: loop over each range and add.
+Too slow   : overlapping ranges re-add the same elements, O(q·n).
+Notice     : sum(l..r) = sum(0..r) - sum(0..l-1).
+             Every range is the difference of two prefixes!
+Therefore  : precompute all prefixes from index 0 in one pass.
+Now        : each query is one subtraction — O(1).
+```
+
+### Why the array has size n+1
+
+Define `pre[i] = nums[0] + nums[1] + … + nums[i-1]`, i.e. **the sum of the first `i` elements** (not "up to index `i`"). That gives `pre[0] = 0`, the sum of no elements.
+
+That extra leading zero is not decoration — it removes every special case:
+
+```text
+sum of nums[l..r]  =  pre[r+1] - pre[l]
+```
+
+If `l = 0`, the formula needs `pre[0]`, and it exists and equals 0. With an `n`-sized array you'd have to write `if l == 0 { return pre[r] }` everywhere. One extra slot buys a branch-free formula.
+
+### Steps
+
+```text
+Step 1 → Allocate pre with n+1 slots; pre[0] = 0.
+Step 2 → For i = 0 .. n-1:  pre[i+1] = pre[i] + nums[i].
+Step 3 → Answer any query (l, r) as pre[r+1] - pre[l].
+```
+
+### Why the subtraction is valid
+
+The sums *telescope*. Writing them out:
+
+```text
+pre[r+1] = nums[0] + nums[1] + ... + nums[l-1] + nums[l] + ... + nums[r]
+pre[l]   = nums[0] + nums[1] + ... + nums[l-1]
+           └──────────── identical prefix ────┘
+subtract:                                      nums[l] + ... + nums[r]
+```
+
+The shared head cancels exactly, leaving the range we wanted. Note this works with **negative numbers too** — nothing here assumes the values are positive.
+
+### The companion trick: prefix + hash map
+
+A second, very common use: *count subarrays whose sum equals `k`*. Since `sum(l..r) = pre[r+1] − pre[l]`, asking for `sum(l..r) == k` is the same as asking
+
+```text
+pre[l] == pre[r+1] - k
+```
+
+So while sweeping, keep a map `prefix value → how many times it occurred`. At each position, the number of subarrays ending here with sum `k` is exactly `count[running − k]`. This is Hash Map Lookup applied to prefixes — the same "compute exactly what you need, then look it up" move.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "sum of the subarray / range", "range query", "running total"
+  "how many subarrays sum to K", "cumulative", "average of a window"
+  the same array queried repeatedly
+        ↓
+Think about...
+  "Can I express this range as (something up to r) minus (something up to l)?"
+        ↓
+Use...
+  prefix array          → repeated range-sum queries, O(1) each
+  prefix + hash map     → counting subarrays with a target sum
+  difference array      → the inverse problem: many range UPDATES
+```
 
 ### Visual explanation
 
@@ -100,59 +176,137 @@ Trade O(n) extra space for O(1) lookups, collapsing nested work into independent
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Prefix Sum        : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums =  [ 2 ,  4 ,  1 ,  3 ,  5 ]
+pre  = [0,  2,   6,   7,  10,  15]
+        ↑                ↑
+      pre[1]=2        pre[4]=10
+
+sum of nums[1..3] = 4+1+3 = 8   and   pre[4] - pre[1] = 10 - 2 = 8  ✓
 ```
 
 ### Interview explanation
-"This is a Prefix Sum problem. I'll trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes. That brings the complexity down to O(n) time and O(n) space — here's the template."
+"Since the array is fixed and the queries are many, I'll spend O(n) once to build a prefix array where `pre[i]` is the sum of the first `i` elements, with `pre[0] = 0`. Then `sumRange(l, r)` is just `pre[r+1] − pre[l]`, because the shared prefix cancels. Build O(n), query O(1), space O(n). If the array could be updated between queries, I'd switch to a Fenwick tree for O(log n) updates."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Foundations** family template. Adapt the comparison/condition to the specific problem.
+> Build once, then subtract. The `n+1` sizing and the `pre[r+1] − pre[l]` formula are the two things to memorise.
 
 ```go
-// Prefix-sum style precompute: range sum in O(1) after O(n) build.
-func prefix(nums []int) []int {
+// BuildPrefix returns pre where pre[i] = sum of the first i elements.
+// pre[0] = 0, so pre has len(nums)+1 entries.
+func BuildPrefix(nums []int) []int {
     pre := make([]int, len(nums)+1)
     for i, v := range nums {
         pre[i+1] = pre[i] + v
     }
     return pre
 }
-func rangeSum(pre []int, l, r int) int { return pre[r+1] - pre[l] }
+
+// RangeSum returns the sum of nums[l..r], inclusive on both ends.
+func RangeSum(pre []int, l, r int) int {
+    return pre[r+1] - pre[l]
+}
+
+// CountSubarraysWithSum counts subarrays summing to k, using prefix + hash map.
+func CountSubarraysWithSum(nums []int, k int) int {
+    countOfPrefix := map[int]int{0: 1} // the empty prefix has sum 0
+    running, total := 0, 0
+    for _, x := range nums {
+        running += x
+        total += countOfPrefix[running-k] // subarrays ending here with sum k
+        countOfPrefix[running]++
+    }
+    return total
+}
 ```
 
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
+def build_prefix(nums):
+    """pre[i] = sum of the first i elements; pre[0] = 0."""
+    pre = [0] * (len(nums) + 1)
     for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
+        pre[i + 1] = pre[i] + v
     return pre
 
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+def range_sum(pre, l, r):
+    """Sum of nums[l..r], inclusive."""
+    return pre[r + 1] - pre[l]
+
+def count_subarrays_with_sum(nums, k):
+    from collections import defaultdict
+    count_of_prefix = defaultdict(int)
+    count_of_prefix[0] = 1           # the empty prefix has sum 0
+    running = total = 0
+    for x in nums:
+        running += x
+        total += count_of_prefix[running - k]
+        count_of_prefix[running] += 1
+    return total
 ```
 
 ```java
-int[] prefix(int[] nums) {
-    int[] pre = new int[nums.length + 1];
-    for (int i = 0; i < nums.length; i++) pre[i+1] = pre[i] + nums[i];
-    return pre;
+import java.util.*;
+
+public class PrefixSum {
+    // pre[i] = sum of the first i elements; pre[0] = 0.
+    public static long[] buildPrefix(int[] nums) {
+        long[] pre = new long[nums.length + 1];
+        for (int i = 0; i < nums.length; i++) pre[i + 1] = pre[i] + nums[i];
+        return pre;
+    }
+
+    // Sum of nums[l..r], inclusive.
+    public static long rangeSum(long[] pre, int l, int r) {
+        return pre[r + 1] - pre[l];
+    }
+
+    public static int countSubarraysWithSum(int[] nums, int k) {
+        Map<Integer, Integer> countOfPrefix = new HashMap<>();
+        countOfPrefix.put(0, 1);           // the empty prefix has sum 0
+        int running = 0, total = 0;
+        for (int x : nums) {
+            running += x;
+            total += countOfPrefix.getOrDefault(running - k, 0);
+            countOfPrefix.merge(running, 1, Integer::sum);
+        }
+        return total;
+    }
 }
-int rangeSum(int[] pre, int l, int r) { return pre[r+1] - pre[l]; }
 ```
 
 ```cpp
-vector<long long> prefix(vector<int>& nums) {
-    vector<long long> pre(nums.size()+1, 0);
-    for (size_t i = 0; i < nums.size(); ++i) pre[i+1] = pre[i] + nums[i];
+#include <vector>
+#include <unordered_map>
+using namespace std;
+
+// pre[i] = sum of the first i elements; pre[0] = 0. long long avoids overflow.
+vector<long long> buildPrefix(const vector<int>& nums) {
+    vector<long long> pre(nums.size() + 1, 0);
+    for (size_t i = 0; i < nums.size(); ++i) pre[i + 1] = pre[i] + nums[i];
     return pre;
 }
-long long rangeSum(vector<long long>& pre, int l, int r) { return pre[r+1] - pre[l]; }
+
+// Sum of nums[l..r], inclusive.
+long long rangeSum(const vector<long long>& pre, int l, int r) {
+    return pre[r + 1] - pre[l];
+}
+
+int countSubarraysWithSum(const vector<int>& nums, int k) {
+    unordered_map<long long, int> countOfPrefix;
+    countOfPrefix[0] = 1;                  // the empty prefix has sum 0
+    long long running = 0;
+    int total = 0;
+    for (int x : nums) {
+        running += x;
+        auto it = countOfPrefix.find(running - k);
+        if (it != countOfPrefix.end()) total += it->second;
+        ++countOfPrefix[running];
+    }
+    return total;
+}
 ```
 
 ---
@@ -236,118 +390,230 @@ long long rangeSum(vector<long long>& pre, int l, int r) { return pre[r+1] - pre
 
 ## 9. Solved Example 1
 
-### Problem — Range Sum (LeetCode 303)
-A representative **Prefix Sum** problem. The signal: precompute cumulative sums so any range query is o(1).
+### Problem — Range Sum Query (LeetCode 303)
+Build a structure over a fixed `nums` that answers many `sumRange(left, right)` queries (inclusive on both ends).
 
 ### Thought Process
-1. Many `sumRange(l, r)` queries hit the same array, so precompute once.
-2. Build `pre` where `pre[i]` = sum of the first `i` elements (`pre[0]=0`).
-3. Any inclusive range sum is then `pre[r+1] - pre[l]` in O(1).
+1. The array never changes, but the queries are many — so precompute.
+2. In the constructor, build `pre` where `pre[i]` = sum of the first `i` elements, `pre[0] = 0`.
+3. Each query is then `pre[right+1] − pre[left]`, a single subtraction.
+4. The leading `0` slot is what makes `left = 0` work without a special case.
 
 ### Dry Run
-`nums=[-2,0,3,-5,2,-1]` → `pre=[0,-2,-2,1,-4,-2,-3]`
-- `sumRange(0,2)` = `pre[3]-pre[0]` = `1-0` = **1**
-- `sumRange(2,5)` = `pre[6]-pre[2]` = `-3-(-2)` = **-1**
+
+Input: `nums = [-2, 0, 3, -5, 2, -1]`
+
+**Build the prefix array** (each entry is the previous one plus the next element):
+
+| i        | 0 | 1  | 2  | 3 | 4  | 5  | 6  |
+|----------|---|----|----|---|----|----|----|
+| nums[i]  |−2 | 0  | 3  |−5 | 2  |−1  | —  |
+| pre[i]   | 0 | −2 | −2 | 1 | −4 | −2 | −3 |
+
+Read it as: `pre[3] = -2 + 0 + 3 = 1` — the sum of the **first 3** elements.
+
+**Answer queries:**
+
+| query           | formula          | numbers      | result |
+|-----------------|------------------|--------------|--------|
+| `sumRange(0,2)` | `pre[3] − pre[0]`| `1 − 0`      | **1**  |
+| `sumRange(2,5)` | `pre[6] − pre[2]`| `−3 − (−2)`  | **−1** |
+
+Check by hand: `-2+0+3 = 1` ✓ and `3-5+2-1 = -1` ✓ (negatives are no problem).
 
 ### Visualization
-```
-pre: [0, -2, -2, 1, -4, -2, -3]
-sumRange(0,2) = pre[3]-pre[0] = 1
+
+```text
+nums :   -2    0    3   -5    2   -1
+pre  : 0   -2   -2    1   -4   -2   -3
+       ↑              ↑
+     pre[0]=0       pre[3]=1
+
+sumRange(0,2) = pre[3] - pre[0] = 1 - 0 = 1
 ```
 
 ### Code
+
+```go
+type NumArray struct {
+    pre []int // pre[i] = sum of the first i elements
+}
+
+func Constructor(nums []int) NumArray {
+    pre := make([]int, len(nums)+1) // pre[0] = 0 already
+    for i, v := range nums {
+        pre[i+1] = pre[i] + v
+    }
+    return NumArray{pre: pre}
+}
+
+// SumRange returns the sum of nums[left..right], inclusive.
+func (a *NumArray) SumRange(left int, right int) int {
+    return a.pre[right+1] - a.pre[left]
+}
+```
+
 ```python
 class NumArray:
     def __init__(self, nums):
-        self.pre = [0]*(len(nums)+1)
+        self.pre = [0] * (len(nums) + 1)     # pre[i] = sum of first i elements
         for i, v in enumerate(nums):
-            self.pre[i+1] = self.pre[i] + v
+            self.pre[i + 1] = self.pre[i] + v
 
-    def sumRange(self, left, right):    # inclusive [left, right]
-        return self.pre[right+1] - self.pre[left]
+    def sumRange(self, left, right):          # inclusive [left, right]
+        return self.pre[right + 1] - self.pre[left]
 ```
 
 ### Complexity
-Time O(n) to build, O(1) per query. Space O(n).
+Time O(n) to build, **O(1) per query**. Space O(n) for the prefix array.
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Subarray Sum K (LeetCode 560)
-A representative **Prefix Sum** problem. The signal: precompute cumulative sums so any range query is o(1).
+### Problem — Subarray Sum Equals K (LeetCode 560)
+Count how many **contiguous** subarrays sum to exactly `k`.
 
 ### Thought Process
-1. A subarray sums to `k` iff `running - k` was a previous prefix sum.
-2. Track the running prefix sum and a map of `prefix → count of occurrences`.
-3. At each step add `count[running - k]` to the answer, then record `running`. Seed `count[0]=1` for subarrays starting at index 0.
+1. Checking all subarrays is O(n²). Can we do it in one pass?
+2. Any subarray sum is `pre[r+1] − pre[l]`. Setting that equal to `k` and rearranging gives `pre[l] = pre[r+1] − k`.
+3. So while sweeping with a running sum, the number of subarrays **ending here** with sum `k` is just how many times the value `running − k` has appeared as an earlier prefix.
+4. Keep a map `prefix value → occurrence count`. Seed it with `{0: 1}` — the empty prefix — so subarrays that start at index 0 are counted.
+5. As in Two Sum: **look up before you insert**, so the prefix you match is strictly earlier.
 
 ### Dry Run
-`nums=[1,1,1], k=2`, count={0:1}
-- x=1: running=1, add count[-1]=0; count={0:1,1:1}
-- x=1: running=2, add count[0]=1 → total=1; count={0:1,1:1,2:1}
-- x=1: running=3, add count[1]=1 → total=2
-Answer: **2**
+
+Input: `nums = [1, 1, 1]`, `k = 2`
+
+Start: `running = 0`, `total = 0`, `count = {0: 1}`
+
+| x | running | need = running − k | count[need] | total | count after       |
+|---|---------|--------------------|-------------|-------|-------------------|
+| 1 | 1       | −1                 | 0           | 0     | `{0:1, 1:1}`      |
+| 1 | 2       | 0                  | **1**       | 1     | `{0:1, 1:1, 2:1}` |
+| 1 | 3       | 1                  | **1**       | 2     | `{0:1, 1:1, 2:1, 3:1}` |
+
+Output: **2** — namely `nums[0..1]` and `nums[1..2]`.
+
+Notice the seed `{0: 1}` earning its keep at step 2: `running − k = 0` matched the empty prefix, which is what represents the subarray starting at index 0.
 
 ### Visualization
-```
-running - k in count?  yes -> that many subarrays end here
+
+```text
+nums:   1    1    1
+run :   1    2    3
+             ↑    ↑
+             |    └ run-k = 1 seen once → subarray [1..2]
+             └ run-k = 0 seen once (empty prefix) → subarray [0..1]
 ```
 
 ### Code
+
+```go
+func subarraySum(nums []int, k int) int {
+    countOfPrefix := map[int]int{0: 1} // empty prefix has sum 0
+    running, total := 0, 0
+    for _, x := range nums {
+        running += x
+        total += countOfPrefix[running-k] // look up BEFORE inserting
+        countOfPrefix[running]++
+    }
+    return total
+}
+```
+
 ```python
 from collections import defaultdict
 
 def subarraySum(nums, k):
-    count = 0
-    running = 0
-    seen = defaultdict(int)
-    seen[0] = 1
+    count_of_prefix = defaultdict(int)
+    count_of_prefix[0] = 1               # empty prefix has sum 0
+    running = total = 0
     for x in nums:
         running += x
-        count += seen[running - k]
-        seen[running] += 1
-    return count
+        total += count_of_prefix[running - k]   # look up BEFORE inserting
+        count_of_prefix[running] += 1
+    return total
 ```
 
 ### Complexity
-Time O(n), Space O(n). One pass with O(1) map lookups.
+Time O(n), Space O(n). A sliding window will **not** work here — negatives mean the running sum isn't monotonic, so shrinking from the left is not a valid move. Prefix + map handles negatives fine.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Pivot Index (LeetCode 724)
-A representative **Prefix Sum** problem. The signal: precompute cumulative sums so any range query is o(1).
+### Problem — Find Pivot Index (LeetCode 724)
+Return the leftmost index where the sum of everything to its left equals the sum of everything to its right, or `−1`.
 
 ### Thought Process
-1. The pivot is where the left-side sum equals the right-side sum.
-2. With `total = sum(nums)`, the right side at index `i` is `total - left - nums[i]`.
-3. Sweep once keeping `left`; the first index where `left == total - left - nums[i]` is the pivot.
+1. We need left sum and right sum at every index — sounds like two prefix arrays.
+2. But the right side is not independent: `right = total − left − nums[i]`.
+3. So one number, `total`, plus a running `left`, is all the state we need — no array at all.
+4. Sweep left to right; the first index where `left == total − left − nums[i]` is the answer.
+5. Add `nums[i]` to `left` **after** the check, since `left` must exclude the current element.
 
 ### Dry Run
-`nums=[1,7,3,6,5,6]`, total=28
-- i=0 left=0: right=28-0-1=27 ≠ 0
-- i=1 left=1: right=28-1-7=20 ≠ 1
-- i=2 left=8: right=28-8-3=17 ≠ 8
-- i=3 left=11: right=28-11-6=11 == 11 → pivot **3**
+
+Input: `nums = [1, 7, 3, 6, 5, 6]`, `total = 28`
+
+| i | nums[i] | left (before i) | right = 28 − left − nums[i] | equal? |
+|---|---------|-----------------|-----------------------------|--------|
+| 0 | 1       | 0               | 28 − 0 − 1 = 27             | no     |
+| 1 | 7       | 1               | 28 − 1 − 7 = 20             | no     |
+| 2 | 3       | 8               | 28 − 8 − 3 = 17             | no     |
+| 3 | 6       | 11              | 28 − 11 − 6 = 11            | **yes** |
+
+Output: **3**
+
+Verify: left of index 3 is `1+7+3 = 11`; right is `5+6 = 11`. ✓
 
 ### Visualization
-```
-left=11 | nums[3]=6 | right = 28-11-6 = 11  ✓ balanced at index 3
+
+```text
+        left sum = 11        pivot        right sum = 11
+      ┌─────────────────┐     ┌─┐     ┌─────────┐
+nums = [ 1  ,  7  ,  3  ] [ 6 ] [ 5  ,  6 ]
+                            ↑
+                        index 3   →  11 == 11  ✓
 ```
 
 ### Code
+
+```go
+func pivotIndex(nums []int) int {
+    total := 0
+    for _, x := range nums {
+        total += x
+    }
+
+    left := 0
+    for i, x := range nums {
+        // right side = everything except the left part and nums[i] itself
+        if left == total-left-x {
+            return i
+        }
+        left += x // only now does nums[i] join the left side
+    }
+    return -1
+}
+```
+
 ```python
 def pivotIndex(nums):
     total = sum(nums)
     left = 0
     for i, x in enumerate(nums):
-        if left == total - left - x:
+        if left == total - left - x:   # right = total - left - nums[i]
             return i
-        left += x
+        left += x                      # add AFTER the check
     return -1
 ```
 
 ### Complexity
-Time O(n), Space O(1). Two linear sweeps, no extra array.
+Time O(n) — two linear passes. Space **O(1)** — no prefix array is stored, just two integers.
 
+---
 
 ## 12. LeetCode Practice Set
 

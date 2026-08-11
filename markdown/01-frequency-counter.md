@@ -51,35 +51,89 @@ Train your eye to fire on these:
 
 ## 3. Brute Force Approach
 
-**Problem framing:** Are two strings `s` and `t` anagrams?
+**The question this pattern keeps answering:** *"How many times does each thing appear?"* — and then something about those counts.
+
+Running example: are `s` and `t` anagrams (same letters, same counts, order ignored)?
 
 ### Intuition
-Sort both and compare, or for each character in `s` scan `t` to find and remove a match.
+Without any bookkeeping, the only way to know whether `t` has "the right number of each letter" is to go looking for each letter, one at a time. For every character of `s`, scan all of `t` for an unused match and cross it off.
 
 ### Algorithm
-1. For each char in `s`, linearly search `t` for it.
-2. Mark matched positions so they aren't reused.
-3. If every char matches and lengths are equal → anagram.
+1. If `len(s) != len(t)` → not anagrams.
+2. Take the first character of `s`. Scan `t` from the start looking for it.
+3. If found, mark that position of `t` as used so it can't match twice.
+4. If not found, return false.
+5. Repeat for every character of `s`. If all matched → anagram.
 
 ### Complexity
-- Time: **O(n²)** (search-and-mark) or **O(n log n)** (sort-and-compare).
-- Space: O(1) or O(n) depending on sort.
+- Time: **O(n²)** — every one of the `n` characters may scan all `n` positions.
+- Space: O(n) for the "used" marks.
+- (Sorting both strings and comparing is the other obvious route: O(n log n).)
 
 ### Drawbacks
-- The nested search is quadratic and dies on large inputs.
-- Sorting throws away the linear-time opportunity and mutates/copies data.
+- We rescan `t` from scratch for every single character — the same work over and over.
+- Sorting is better, but it does more than we asked for: we don't need the letters *in order*, we only need *how many of each*. Paying O(n log n) to learn an ordering we then throw away is wasted work.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Build **one** frequency map for `s` (increment), then **decrement** while scanning `t`. If any count goes negative or a key is missing, they differ. Equal lengths + all-zero counts ⇒ anagram.
 
-### Optimization journey
-1. *Sort both* → O(n log n).
-2. *Count s, count t, compare maps* → O(n) time, O(k) space (k = alphabet).
-3. *Single map, +1 for s and −1 for t* → still O(n), but one map and an early exit.
+Here is the whole idea in one sentence:
+
+> **Stop searching for characters. Count them once, then just read the counts.**
+
+The brute force is slow because *lookup* is slow — finding "is there another `a` left in `t`?" costs a scan. But if we build a small table `letter → how many times it appears`, that same question becomes a single array read.
+
+### The thought process
+
+```text
+We need    : to know if s and t have identical letter counts.
+Obvious way: for each letter of s, search t for it.
+Too slow   : each search is O(n), so O(n²) total.
+Notice     : we never care WHERE a letter is, only HOW MANY there are.
+Therefore  : store the counts in a table indexed by the letter itself.
+Now        : "how many a's are left?" is one array read instead of a scan.
+```
+
+### Why we need a counting table (and not something else)
+
+A frequency table is just a **direct-address array**: the character *is* the index. `count['a'-'a']` is slot 0, `count['b'-'a']` is slot 1, and so on. No searching, no hashing, no comparison — the data tells you where to look. That is why lookups are O(1).
+
+Use a fixed array when the key domain is small and known (26 lowercase letters, ASCII 128, digits 0–9). Use a hash map when the keys are arbitrary (words, large integers, structs).
+
+### Steps
+
+```text
+Step 1 → If lengths differ, return false immediately.
+Step 2 → Walk both strings together with one index i.
+Step 3 → For s[i], add 1 to its slot. For t[i], subtract 1 from its slot.
+Step 4 → After the walk, every slot must be 0.
+Step 5 → Any non-zero slot means one string has a surplus → not anagrams.
+```
+
+Why can we fuse both strings into **one** table? Because `+1` for `s` and `−1` for `t` cancel exactly when the counts match. We are really computing `count(s) − count(t)` and asking whether it is all zeros. Two tables would work too — one is just cheaper.
+
+### Why the equal-length check matters
+
+With equal lengths, "no slot is negative" and "no slot is positive" mean the same thing — the total of all slots is forced to 0. That is what lets a single scan settle it. Without the length check, `s="a"`, `t="aa"` would leave slot `a` at `−1` and you would still need to reason about it separately.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "anagram", "permutation of", "same characters"
+  "count / how many times", "appears exactly k times"
+  "first non-repeating", "majority element", "duplicate"
+        ↓
+Think about...
+  "I don't need positions — I need tallies."
+        ↓
+Use...
+  fixed array  → small known alphabet (a-z, ASCII, digits)
+  hash map     → arbitrary keys (words, ints, tuples)
+```
 
 ### Visual explanation
 
@@ -111,33 +165,37 @@ Build **one** frequency map for `s` (increment), then **decrement** while scanni
 </svg>
 ```
 
-```
+```text
 s = "anagram"        t = "nagaram"
-count(s): a:3 n:1 g:1 r:1 m:1
-scan t:   n-- a-- g-- a-- r-- a-- m--
-final:    a:0 n:0 g:0 r:0 m:0   → all zero → ANAGRAM ✅
+
+count after adding s : a:3  n:1  g:1  r:1  m:1
+count after minus t  : a:0  n:0  g:0  r:0  m:0
+
+all zero  →  ANAGRAM ✅
 ```
 
 ### Interview explanation
-"I'll tally `s` into a frequency array of size 26 since it's lowercase English. Then I walk `t`, decrementing. If a count drops below zero, `t` has a character `s` doesn't have enough of — return false immediately. Equal lengths guarantee the converse, so an all-zero array means they're anagrams. Two linear passes, O(n) time, O(1) space."
+"I'll tally into a fixed 26-slot array since the input is lowercase English. I walk both strings in one loop: `+1` for `s[i]`, `−1` for `t[i]`. Because the lengths are equal, an all-zero array at the end is exactly the anagram condition. That's one pass, O(n) time and O(1) space — the array size doesn't grow with the input."
 
 ---
 
 ## 5. Generic Templates
 
-> The four implementations below share one skeleton — switch language tabs to compare. Each is production-quality with detailed comments.
+> The four implementations below share one skeleton: **build the table, then read the table.**
 
 ```go
-// CountFrequencies returns a map of element -> occurrences. O(n) time, O(k) space.
+// CountFrequencies tallies any comparable values. O(n) time, O(k) space
+// where k is the number of distinct values.
 func CountFrequencies[T comparable](xs []T) map[T]int {
     freq := make(map[T]int, len(xs))
     for _, x := range xs {
-        freq[x]++ // zero value is 0, so this is safe
+        freq[x]++ // missing keys read as 0, so this is safe
     }
     return freq
 }
 
-// IsAnagram uses a fixed 26-slot array (lowercase English) for O(1) space.
+// IsAnagram fuses both strings into one 26-slot table.
+// +1 for s, -1 for t; all zeros means the counts matched.
 func IsAnagram(s, t string) bool {
     if len(s) != len(t) {
         return false
@@ -145,7 +203,7 @@ func IsAnagram(s, t string) bool {
     var count [26]int
     for i := 0; i < len(s); i++ {
         count[s[i]-'a']++
-        count[t[i]-'a']-- // process both strings in one loop
+        count[t[i]-'a']--
     }
     for _, c := range count {
         if c != 0 {
@@ -160,37 +218,32 @@ func IsAnagram(s, t string) bool {
 from collections import Counter
 
 def count_frequencies(xs):
-    """Return a Counter mapping element -> occurrences. O(n)."""
+    """Tally any hashable values. O(n) time."""
     return Counter(xs)
 
 def is_anagram(s: str, t: str) -> bool:
-    """Two strings are anagrams iff their multisets of chars match."""
+    """One table, +1 for s and -1 for t. All zeros means anagram."""
     if len(s) != len(t):
         return False
-    count = {}
-    for ch in s:
-        count[ch] = count.get(ch, 0) + 1
-    for ch in t:
-        if ch not in count:        # char in t not present in s
-            return False
-        count[ch] -= 1
-        if count[ch] == 0:
-            del count[ch]          # keep the map clean
-    return len(count) == 0
+    count = [0] * 26
+    for a, b in zip(s, t):
+        count[ord(a) - 97] += 1
+        count[ord(b) - 97] -= 1
+    return all(c == 0 for c in count)
 ```
 
 ```java
 import java.util.*;
 
 public class FrequencyCounter {
-    // Generic counter for any object type.
+    // Tally any object type.
     public static <T> Map<T, Integer> countFrequencies(List<T> xs) {
         Map<T, Integer> freq = new HashMap<>();
         for (T x : xs) freq.merge(x, 1, Integer::sum);
         return freq;
     }
 
-    // Fixed-array anagram check, O(n) time, O(1) space.
+    // One table, +1 for s and -1 for t.
     public static boolean isAnagram(String s, String t) {
         if (s.length() != t.length()) return false;
         int[] count = new int[26];
@@ -210,7 +263,7 @@ public class FrequencyCounter {
 #include <vector>
 using namespace std;
 
-// Generic frequency map.
+// Tally any hashable values.
 template <typename T>
 unordered_map<T, int> countFrequencies(const vector<T>& xs) {
     unordered_map<T, int> freq;
@@ -219,7 +272,7 @@ unordered_map<T, int> countFrequencies(const vector<T>& xs) {
     return freq;
 }
 
-// Fixed-array anagram check.
+// One table, +1 for s and -1 for t.
 bool isAnagram(const string& s, const string& t) {
     if (s.size() != t.size()) return false;
     int count[26] = {0};
@@ -317,36 +370,74 @@ bool isAnagram(const string& s, const string& t) {
 ## 9. Solved Example 1
 
 ### Problem — Valid Anagram (LeetCode 242)
-Given `s` and `t`, return true if `t` is an anagram of `s`.
+Given `s` and `t`, return `true` if `t` is an anagram of `s`.
 
 ### Thought Process
-Lengths must match. A fixed 26-array fused over both strings gives O(n)/O(1).
+1. Anagram means *same multiset of letters*, so only counts matter.
+2. Unequal lengths can never be anagrams — reject in O(1).
+3. Walk both strings with one index: `+1` for `s[i]`, `−1` for `t[i]`.
+4. Equal lengths + all-zero table ⇔ anagram.
 
 ### Dry Run
-`s="rat", t="car"` → count: r:1−? Let's tally: from s `r+,a+,t+`; from t `c+? no` … fused: index r:+1 then c:−1 → array has +1 at r/a/t and −1 at c/a/r ⇒ r:0, a:0, t:+1, c:−1 → not all zero → **false**.
+
+Input: `s = "rat"`, `t = "car"`
+
+Lengths match (3 == 3), so we walk the pair `(s[i], t[i])`.
+
+| i | s[i] | t[i] | change            | table after (only non-zero) |
+|---|------|------|-------------------|-----------------------------|
+| 0 | r    | c    | r +1, c −1        | r:+1, c:−1                  |
+| 1 | a    | a    | a +1, a −1        | r:+1, c:−1                  |
+| 2 | t    | r    | t +1, r −1        | c:−1, t:+1                  |
+
+Final scan finds `c = −1` (a letter `t` has that `s` doesn't) → return **false**.
 
 ### Visualization
 
-| char | a | c | r | t |
-|------|---|---|---|---|
-| net  | 0 | -1| 0 | +1|
+```text
+letter :  a    c    r    t
+net    :  0   -1    0   +1
+                ↑         ↑
+        t has a 'c'   s has a 't'
+        s lacks       t lacks
+```
 
-Non-zero entries ⇒ not an anagram.
+Any non-zero entry ⇒ not an anagram.
 
 ### Code
 
+```go
+func isAnagram(s string, t string) bool {
+    if len(s) != len(t) {
+        return false
+    }
+    var count [26]int
+    for i := 0; i < len(s); i++ {
+        count[s[i]-'a']++ // surplus from s
+        count[t[i]-'a']-- // consumed by t
+    }
+    for _, c := range count {
+        if c != 0 {
+            return false
+        }
+    }
+    return true
+}
+```
+
 ```python
 def isAnagram(s, t):
-    if len(s) != len(t): return False
-    cnt = [0]*26
+    if len(s) != len(t):
+        return False
+    count = [0] * 26
     for a, b in zip(s, t):
-        cnt[ord(a)-97] += 1
-        cnt[ord(b)-97] -= 1
-    return all(c == 0 for c in cnt)
+        count[ord(a) - 97] += 1
+        count[ord(b) - 97] -= 1
+    return all(c == 0 for c in count)
 ```
 
 ### Complexity
-O(n) time, O(1) space.
+Time O(n) — one pass plus a fixed 26-slot scan. Space O(1) — the table size never grows with the input.
 
 ---
 
@@ -356,70 +447,147 @@ O(n) time, O(1) space.
 Group words that are anagrams of each other.
 
 ### Thought Process
-Anagrams share the same frequency signature. Use a 26-length count tuple as the map key — cheaper than sorting for long words.
+1. Comparing every pair of words is O(N²) — too slow.
+2. Instead, give each word a **signature** that is identical for anagrams and different otherwise.
+3. The frequency table *is* that signature: `"eat"` and `"tea"` both tally to `a:1, e:1, t:1`.
+4. Use the signature as a map key and append the word to its bucket.
 
 ### Dry Run
-`["eat","tea","tan"]`
-- "eat" → key (a1,e1,t1) → bucket A
-- "tea" → same key → bucket A
-- "tan" → key (a1,n1,t1) → bucket B
-Result: `[["eat","tea"],["tan"]]`.
+
+Input: `["eat", "tea", "tan"]`
+
+We write the signature as the counts of `a,b,…,z`; only non-zero letters are shown.
+
+| word  | signature      | map after                          |
+|-------|----------------|------------------------------------|
+| "eat" | a:1, e:1, t:1  | `{aet: [eat]}`                     |
+| "tea" | a:1, e:1, t:1  | `{aet: [eat, tea]}`  ← same bucket |
+| "tan" | a:1, n:1, t:1  | `{aet: [eat, tea], ant: [tan]}`    |
+
+Output: `[["eat","tea"], ["tan"]]`
 
 ### Visualization
-```
-key (1,0,...,1,...,1)  -> [eat, tea]
-key (1,...,n,...,t)    -> [tan]
+
+```text
+"eat" ─┐
+       ├─▶ signature a1 e1 t1 ─▶ bucket #1  [eat, tea]
+"tea" ─┘
+
+"tan" ───▶ signature a1 n1 t1 ─▶ bucket #2  [tan]
 ```
 
 ### Code
 
+```go
+func groupAnagrams(strs []string) [][]string {
+    // key: the 26-slot count array, usable directly as a Go map key.
+    groups := make(map[[26]int][]string)
+    for _, w := range strs {
+        var key [26]int
+        for i := 0; i < len(w); i++ {
+            key[w[i]-'a']++
+        }
+        groups[key] = append(groups[key], w)
+    }
+
+    result := make([][]string, 0, len(groups))
+    for _, bucket := range groups {
+        result = append(result, bucket)
+    }
+    return result
+}
+```
+
 ```python
 from collections import defaultdict
-def groupAnagrams(words):
+
+def groupAnagrams(strs):
     groups = defaultdict(list)
-    for w in words:
-        key = [0]*26
-        for ch in w: key[ord(ch)-97] += 1
-        groups[tuple(key)].append(w)
+    for w in strs:
+        key = [0] * 26
+        for ch in w:
+            key[ord(ch) - 97] += 1
+        groups[tuple(key)].append(w)   # tuple is hashable, list is not
     return list(groups.values())
 ```
 
 ### Complexity
-O(N·L) time (N words, L max length), O(N·L) space.
+Time O(N·L) for N words of max length L — each word is tallied once. Space O(N·L) for the buckets.
+
+> Sorting each word to build the key also works, but costs O(N·L log L). Counting is strictly cheaper.
 
 ---
 
 ## 11. Solved Example 3
 
 ### Problem — First Unique Character (LeetCode 387)
-Return the index of the first non-repeating character, or −1.
+Return the index of the first non-repeating character in `s`, or `−1` if there is none.
 
 ### Thought Process
-Count all chars, then scan left-to-right for the first with count 1. Two passes.
+1. "Non-repeating" is a statement about a count, so we need counts.
+2. But we can't answer while counting — the character at index 0 might repeat at the very end.
+3. So: **pass 1** counts every character, **pass 2** walks left to right and returns the first index whose count is 1.
+4. Two passes are still O(n) total.
 
 ### Dry Run
-`"leetcode"` → counts: l1 e3 t1 c1 o1 d1 → scan: l has count 1 → index **0**.
+
+Input: `s = "leetcode"`
+
+**Pass 1 — build the table:**
+
+| char  | l | e | t | c | o | d |
+|-------|---|---|---|---|---|---|
+| count | 1 | 3 | 1 | 1 | 1 | 1 |
+
+**Pass 2 — scan left to right:**
+
+| i | s[i] | count | unique? |
+|---|------|-------|---------|
+| 0 | l    | 1     | yes → return **0** |
+
+Output: **0**
+
+A second case, `s = "loveleetcode"` → counts `l:2, o:2, v:1, e:4, …`; index 0 (`l`) has count 2, index 1 (`o`) has count 2, index 2 (`v`) has count 1 → answer **2**.
 
 ### Visualization
 
-| char | l | e | t | c | o | d |
-|------|---|---|---|---|---|---|
-| cnt  | 1 | 3 | 1 | 1 | 1 | 1 |
+```text
+s :  l  e  e  t  c  o  d  e
+cnt: 1  3  3  1  1  1  1  3
+     ↑
+   first count == 1  →  index 0
+```
 
 ### Code
 
+```go
+func firstUniqChar(s string) int {
+    var count [26]int
+    for i := 0; i < len(s); i++ { // pass 1: tally
+        count[s[i]-'a']++
+    }
+    for i := 0; i < len(s); i++ { // pass 2: first with count 1
+        if count[s[i]-'a'] == 1 {
+            return i
+        }
+    }
+    return -1
+}
+```
+
 ```python
 from collections import Counter
+
 def firstUniqChar(s):
-    cnt = Counter(s)
-    for i, ch in enumerate(s):
-        if cnt[ch] == 1:
+    count = Counter(s)                 # pass 1: tally
+    for i, ch in enumerate(s):         # pass 2: first with count 1
+        if count[ch] == 1:
             return i
     return -1
 ```
 
 ### Complexity
-O(n) time, O(1) space (fixed alphabet).
+Time O(n) — two linear passes. Space O(1) — 26 fixed slots.
 
 ---
 

@@ -41,32 +41,113 @@ difference, range update, increment range, imos, interval add.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Add `v` to every element between `l` and `r`"* — asked many times, before anyone reads the array.
+
 ### Intuition
-Nested loops re-examine pairs/ranges, giving O(n^2) or worse.
+Do exactly what was asked. For each update, walk the range and add.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Read the update `(l, r, v)`.
+2. For `i` from `l` to `r`: `arr[i] += v`.
+3. Repeat for every update.
+4. Return `arr`.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n) per update**, so **O(m·n)** for `m` updates.
+- Space: O(n).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Difference Array pattern is built to use.
+- An update covering the whole array touches all `n` cells even though it says one simple thing: *"everyone here goes up by `v`"*.
+- With `m = 10⁴` bookings over `n = 10⁴` seats, that's 10⁸ writes — and nobody has read a single value yet.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Difference Array invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Don't record the value at every position. Record only where the value *changes* — the start and the end.**
+
+Imagine marking a stretch of road as "+10 speed limit". You don't repaint every metre. You put up one sign at the start saying **+10**, and one sign at the end saying **−10**. A driver keeping a running tally of signs always knows the current limit.
+
+That running tally is a prefix sum. So:
+
+> **Difference array is the inverse of prefix sum. Prefix sum turns many range *queries* into O(1); difference array turns many range *updates* into O(1).**
+
+### The thought process
+
+```text
+We need    : many range updates, then read the final array once.
+Obvious way: loop over each range and add.
+Too slow   : O(m·n), and the same cells get written again and again.
+Notice     : inside a range, every element changes by the SAME amount.
+             The only interesting places are the two edges.
+Therefore  : store the CHANGE between neighbours instead of the values.
+             +v where the range starts, -v just after it ends.
+Now        : each update is 2 writes, and one prefix sum at the end
+             rebuilds the whole array.
+```
+
+### Steps
+
+```text
+Step 1 → Make diff of size n+1, all zeros.
+Step 2 → For each update (l, r, v):
+             diff[l]   += v      "from here on, add v"
+             diff[r+1] -= v      "stop adding v from here on"
+Step 3 → Sweep once with a running total:
+             running += diff[i];  arr[i] = running
+Step 4 → arr is the final array.
+```
+
+### Why `diff[r+1] -= v` and not `diff[r] -= v`
+
+Because `r` is **inclusive** — element `r` must still receive the `+v`. The cancellation has to happen at the *first index that should not get it*, which is `r+1`.
+
+This is exactly why `diff` needs `n+1` slots: when `r = n−1`, the write goes to `diff[n]`, one past the last real element. That slot is never read during reconstruction, it just gives the "−v" somewhere legal to land — the same "one extra slot removes a special case" trick as the prefix array's leading zero.
+
+### Why the prefix sum rebuilds the array
+
+If `diff[i]` holds `arr[i] − arr[i−1]`, then adding up `diff[0..i]` telescopes back to `arr[i]`:
+
+```text
+diff[0] + diff[1] + diff[2] + ... + diff[i]
+= arr[0] + (arr[1]-arr[0]) + (arr[2]-arr[1]) + ... + (arr[i]-arr[i-1])
+= arr[i]                    ← everything in between cancels
+```
+
+Each update writes two deltas; the sweep integrates them all at once.
+
+### A tiny worked check
+
+```text
+n = 5, update (1, 3, +2)
+
+diff : [ 0, +2,  0,  0, -2,  0 ]
+         0   1   2   3   4   5     ← index 5 exists only to hold the -2
+running: 0   2   2   2   0
+arr    : [0,  2,  2,  2,  0]       ← exactly indices 1..3 got +2  ✓
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "add v to all elements in range [l, r]", many times
+  bookings / reservations / flights / passengers over a range
+  "how many intervals cover each point"
+  all updates come FIRST, reads come after
+        ↓
+Think about...
+  "Inside a range nothing varies — only the two edges matter."
+        ↓
+Use...
+  difference array   → offline: all updates, then one read
+  Fenwick / segment  → online: updates and reads interleaved
+  sweep line         → the same idea when the coordinates are sparse
+```
 
 ### Visual explanation
 
@@ -98,59 +179,124 @@ Trade O(n) extra space for O(1) lookups, collapsing nested work into independent
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Difference Array  : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+update (1,3,+2)          ┌──── +2 applies here ────┐
+index :   0      1      2      3      4
+diff  :   0     +2      0      0     -2
+                ↑                     ↑
+            turn it on           turn it off
+                                 (r+1 = 4)
+running:  0      2      2      2      0
 ```
 
 ### Interview explanation
-"This is a Difference Array problem. I'll trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes. That brings the complexity down to O(n) time and O(n) space — here's the template."
+"All the updates arrive before any read, so I don't need the real array while updating. I'll keep a difference array where `diff[i]` is the change from `arr[i-1]` to `arr[i]`. Each range update `(l, r, v)` becomes two writes: `diff[l] += v` and `diff[r+1] -= v` — `r+1` because `r` is inclusive. After all updates, one prefix-sum sweep reconstructs the array. That's O(1) per update and O(n) once at the end, instead of O(m·n)."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Foundations** family template. Adapt the comparison/condition to the specific problem.
+> Two writes per update, one sweep at the end. Size the array `n+1` so `r+1` is always a legal index.
 
 ```go
-// Prefix-sum style precompute: range sum in O(1) after O(n) build.
-func prefix(nums []int) []int {
-    pre := make([]int, len(nums)+1)
-    for i, v := range nums {
-        pre[i+1] = pre[i] + v
-    }
-    return pre
+// DiffArray applies range updates in O(1) each and materialises in O(n).
+type DiffArray struct {
+    diff []int
 }
-func rangeSum(pre []int, l, r int) int { return pre[r+1] - pre[l] }
+
+func NewDiffArray(n int) *DiffArray {
+    return &DiffArray{diff: make([]int, n+1)} // one extra slot for r+1
+}
+
+// Add adds v to every element in the inclusive range [l, r].
+func (d *DiffArray) Add(l, r, v int) {
+    d.diff[l] += v   // from l onwards, add v
+    d.diff[r+1] -= v // from r+1 onwards, stop adding v
+}
+
+// Build reconstructs the final array with one prefix-sum sweep.
+func (d *DiffArray) Build() []int {
+    out := make([]int, len(d.diff)-1)
+    running := 0
+    for i := range out {
+        running += d.diff[i]
+        out[i] = running
+    }
+    return out
+}
 ```
 
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
+class DiffArray:
+    """Range updates in O(1) each, materialise in O(n)."""
 
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+    def __init__(self, n):
+        self.diff = [0] * (n + 1)      # one extra slot for r+1
+
+    def add(self, l, r, v):            # inclusive [l, r]
+        self.diff[l] += v              # from l onwards, add v
+        self.diff[r + 1] -= v          # from r+1 onwards, stop
+
+    def build(self):
+        out, running = [], 0
+        for i in range(len(self.diff) - 1):
+            running += self.diff[i]
+            out.append(running)
+        return out
 ```
 
 ```java
-int[] prefix(int[] nums) {
-    int[] pre = new int[nums.length + 1];
-    for (int i = 0; i < nums.length; i++) pre[i+1] = pre[i] + nums[i];
-    return pre;
+public class DiffArray {
+    private final long[] diff;
+
+    public DiffArray(int n) {
+        diff = new long[n + 1];        // one extra slot for r+1
+    }
+
+    // Adds v to every element in the inclusive range [l, r].
+    public void add(int l, int r, long v) {
+        diff[l] += v;
+        diff[r + 1] -= v;
+    }
+
+    public long[] build() {
+        long[] out = new long[diff.length - 1];
+        long running = 0;
+        for (int i = 0; i < out.length; i++) {
+            running += diff[i];
+            out[i] = running;
+        }
+        return out;
+    }
 }
-int rangeSum(int[] pre, int l, int r) { return pre[r+1] - pre[l]; }
 ```
 
 ```cpp
-vector<long long> prefix(vector<int>& nums) {
-    vector<long long> pre(nums.size()+1, 0);
-    for (size_t i = 0; i < nums.size(); ++i) pre[i+1] = pre[i] + nums[i];
-    return pre;
-}
-long long rangeSum(vector<long long>& pre, int l, int r) { return pre[r+1] - pre[l]; }
+#include <vector>
+using namespace std;
+
+class DiffArray {
+    vector<long long> diff;
+
+public:
+    explicit DiffArray(int n) : diff(n + 1, 0) {}   // one extra slot for r+1
+
+    // Adds v to every element in the inclusive range [l, r].
+    void add(int l, int r, long long v) {
+        diff[l] += v;
+        diff[r + 1] -= v;
+    }
+
+    vector<long long> build() const {
+        vector<long long> out(diff.size() - 1);
+        long long running = 0;
+        for (size_t i = 0; i < out.size(); ++i) {
+            running += diff[i];
+            out[i] = running;
+        }
+        return out;
+    }
+};
 ```
 
 ---
@@ -234,122 +380,254 @@ long long rangeSum(vector<long long>& pre, int l, int r) { return pre[r+1] - pre
 
 ## 9. Solved Example 1
 
-### Problem — Corporate Flight (LeetCode 1109)
-A representative **Difference Array** problem. The signal: apply many range updates in o(1) each, then reconstruct with one pass.
+### Problem — Corporate Flight Bookings (LeetCode 1109)
+There are `n` flights labelled `1..n`. Each booking `[first, last, seats]` reserves `seats` on every flight from `first` to `last` inclusive. Return the total seats booked per flight.
 
 ### Thought Process
-1. Each booking `[first, last, seats]` adds `seats` to a 1-indexed range — a classic range update.
-2. Use a diff array: `diff[first-1] += seats` and `diff[last] -= seats` (marks start and one-past-end).
-3. A running prefix sum over `diff` reconstructs the per-flight totals.
+1. Every booking is a range update, and all bookings arrive before we report anything — the ideal difference-array setup.
+2. Flights are **1-indexed** but our array is 0-indexed, so flight `f` lives at index `f−1`.
+3. Booking `[first, last, seats]` therefore becomes `diff[first-1] += seats` and `diff[last] -= seats`.
+   - The stop index is `(last−1)+1 = last`. The two `−1`s cancel, which is why this one looks asymmetric.
+4. One prefix-sum sweep gives the per-flight totals.
 
 ### Dry Run
-`bookings=[[1,2,10],[2,3,20]], n=3`
-- booking1: diff[0]+=10, diff[2]-=10
-- booking2: diff[1]+=20, diff[3]-=20 → diff=[10,20,-10,-20]
-- prefix: 10, 30, 20 → answer `[10,30,20]`
+
+Input: `bookings = [[1,2,10], [2,3,20]]`, `n = 3` → `diff` has `n+1 = 4` slots, all zero.
+
+| booking     | writes                              | diff after            |
+|-------------|-------------------------------------|-----------------------|
+| `[1,2,10]`  | `diff[0] += 10`, `diff[2] -= 10`    | `[10, 0, −10, 0]`     |
+| `[2,3,20]`  | `diff[1] += 20`, `diff[3] -= 20`    | `[10, 20, −10, −20]`  |
+
+**Sweep to rebuild:**
+
+| flight | index | diff | running | answer |
+|--------|-------|------|---------|--------|
+| 1      | 0     | 10   | 10      | 10     |
+| 2      | 1     | 20   | 30      | 30     |
+| 3      | 2     | −10  | 20      | 20     |
+
+Output: **`[10, 30, 20]`**
+
+Sanity check: flight 2 is covered by both bookings → `10 + 20 = 30` ✓
 
 ### Visualization
-```
-diff  = [ +10, +20, -10, -20 ]
-prefix= [  10,  30,  20 ]      ← seats per flight
+
+```text
+flight :    1      2      3
+b1     : [-- 10 --]
+b2     :        [-- 20 --]
+         ────────────────────
+total  :   10     30     20
 ```
 
 ### Code
+
+```go
+func corpFlightBookings(bookings [][]int, n int) []int {
+    diff := make([]int, n+1)
+    for _, b := range bookings {
+        first, last, seats := b[0], b[1], b[2]
+        diff[first-1] += seats // flight `first` is index first-1
+        diff[last] -= seats    // stop after flight `last` (index last-1)
+    }
+
+    answer := make([]int, n)
+    running := 0
+    for i := 0; i < n; i++ {
+        running += diff[i]
+        answer[i] = running
+    }
+    return answer
+}
+```
+
 ```python
 def corpFlightBookings(bookings, n):
-    diff = [0]*(n+1)
+    diff = [0] * (n + 1)
     for first, last, seats in bookings:
-        diff[first-1] += seats
-        diff[last]    -= seats
-    res, running = [], 0
+        diff[first - 1] += seats     # flight `first` is index first-1
+        diff[last] -= seats          # stop after flight `last`
+    answer, running = [], 0
     for i in range(n):
         running += diff[i]
-        res.append(running)
-    return res
+        answer.append(running)
+    return answer
 ```
 
 ### Complexity
-Time O(n + m) for m bookings, Space O(n).
+Time O(n + m) for `m` bookings — O(1) per booking plus one sweep. Space O(n).
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Range Addition (LeetCode 370)
-A representative **Difference Array** problem. The signal: apply many range updates in o(1) each, then reconstruct with one pass.
+Start with an array of `length` zeros. Apply updates `[start, end, inc]`, each adding `inc` to the inclusive range. Return the final array.
 
 ### Thought Process
-1. Each update `[start, end, inc]` adds `inc` to the inclusive range `[start, end]`.
-2. Record only the boundaries in a diff array: `diff[start] += inc`, `diff[end+1] -= inc`.
-3. After all updates, a single prefix sum materializes the final array.
+1. This is the difference array in its purest form — no index translation to worry about.
+2. `diff[start] += inc` turns the increment on; `diff[end+1] -= inc` turns it off.
+3. `end+1` can be `length`, which is why `diff` has `length+1` slots.
+4. Sweep once at the end.
 
 ### Dry Run
-`length=5, updates=[[1,3,2],[2,4,3]]`
-- upd1: diff[1]+=2, diff[4]-=2
-- upd2: diff[2]+=3, diff[5]-=3 → diff=[0,2,3,0,-2,-3]
-- prefix: 0,2,5,5,3 → answer `[0,2,5,5,3]`
+
+Input: `length = 5`, `updates = [[1,3,2], [2,4,3]]` → `diff` has 6 slots.
+
+| update    | writes                          | diff after                |
+|-----------|---------------------------------|---------------------------|
+| `[1,3,2]` | `diff[1] += 2`, `diff[4] -= 2`  | `[0, 2, 0, 0, −2, 0]`     |
+| `[2,4,3]` | `diff[2] += 3`, `diff[5] -= 3`  | `[0, 2, 3, 0, −2, −3]`    |
+
+**Sweep to rebuild** (only indices 0..4 are read):
+
+| i       | 0 | 1 | 2 | 3 | 4 |
+|---------|---|---|---|---|---|
+| diff[i] | 0 | 2 | 3 | 0 | −2|
+| running | 0 | 2 | 5 | 5 | 3 |
+
+Output: **`[0, 2, 5, 5, 3]`**
+
+Sanity check: index 2 and 3 are inside both ranges → `2 + 3 = 5` ✓. Index 4 is only in the second → `3` ✓. The `−3` in slot 5 is never read; it exists only so `end+1 = 5` is a legal write.
 
 ### Visualization
-```
-diff  = [0, +2, +3, 0, -2, (-3)]
-prefix= [0,  2,  5, 5,  3]
+
+```text
+index  :   0     1     2     3     4
+u1     :        [--- +2 ---]
+u2     :              [------ +3 ------]
+         ──────────────────────────────
+result :   0     2     5     5     3
 ```
 
 ### Code
-```python
-def getModifiedArray(length, updates):
-    diff = [0]*(length+1)
-    for start, end, inc in updates:
+
+```go
+func getModifiedArray(length int, updates [][]int) []int {
+    diff := make([]int, length+1) // slot `length` absorbs end+1 writes
+    for _, u := range updates {
+        start, end, inc := u[0], u[1], u[2]
         diff[start] += inc
         diff[end+1] -= inc
-    res, running = [], 0
+    }
+
+    answer := make([]int, length)
+    running := 0
+    for i := 0; i < length; i++ {
+        running += diff[i]
+        answer[i] = running
+    }
+    return answer
+}
+```
+
+```python
+def getModifiedArray(length, updates):
+    diff = [0] * (length + 1)        # slot `length` absorbs end+1 writes
+    for start, end, inc in updates:
+        diff[start] += inc
+        diff[end + 1] -= inc
+    answer, running = [], 0
     for i in range(length):
         running += diff[i]
-        res.append(running)
-    return res
+        answer.append(running)
+    return answer
 ```
 
 ### Complexity
-Time O(n + m) for m updates, Space O(n).
+Time O(length + m), Space O(length).
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Car Pooling (LeetCode 1094)
-A representative **Difference Array** problem. The signal: apply many range updates in o(1) each, then reconstruct with one pass.
+A car has `capacity` seats and only drives forward. Each trip `[numPassengers, from, to]` means those passengers board at `from` and get off at `to`. Return `true` if every trip fits.
 
 ### Thought Process
-1. Each trip `[num, start, end]` occupies `num` seats over the location range `[start, end)`.
-2. On a diff array indexed by location: `diff[start] += num`, `diff[end] -= num` (passengers leave at `end`).
-3. Sweep the running occupancy; if it ever exceeds `capacity`, return `False`.
+1. Occupancy over a location range is a range update — difference array again.
+2. **Key difference from the previous two problems:** passengers get off *at* `to`, so the range is **half-open** `[from, to)`. Location `to` is already free.
+3. That means the stop write is `diff[to] -= num`, with **no `+1`**. Getting this right is the whole problem.
+4. Sweep locations in increasing order tracking occupancy; if it ever exceeds `capacity`, return `false`.
+5. Constraints cap locations at 1000, so a fixed 1001-slot array is enough.
 
 ### Dry Run
-`trips=[[2,1,5],[3,3,7]], capacity=4`
-- trip1: diff[1]+=2, diff[5]-=2
-- trip2: diff[3]+=3, diff[7]-=3
-- running by location: loc1→2, loc3→5 > 4 → return **False**
+
+Input: `trips = [[2,1,5], [3,3,7]]`, `capacity = 4`
+
+| trip      | writes                        |
+|-----------|-------------------------------|
+| `[2,1,5]` | `diff[1] += 2`, `diff[5] -= 2` |
+| `[3,3,7]` | `diff[3] += 3`, `diff[7] -= 3` |
+
+**Sweep by location:**
+
+| location | diff | occupancy | ≤ capacity 4? |
+|----------|------|-----------|---------------|
+| 0        | 0    | 0         | yes           |
+| 1        | +2   | 2         | yes           |
+| 2        | 0    | 2         | yes           |
+| 3        | +3   | **5**     | **no → false**|
+
+Output: **`false`**
+
+Now raise the capacity to 5: the sweep continues — location 5 drops to `5−2 = 3`, location 7 drops to `0`, never exceeding 5 → **`true`**. Note that at location 5 the first group leaves *before* anyone would board there; that is exactly what the half-open range encodes.
 
 ### Visualization
-```
-loc:   1   2   3   4   5 ...
-occ:   2   2   5   5   3      5 > capacity(4) -> False
+
+```text
+location:  1   2   3   4   5   6   7
+trip1   : [--- 2 passengers ---)          (off at 5)
+trip2   :         [--- 3 passengers ---)  (off at 7)
+          ─────────────────────────────
+occupied:  2   2   5   5   3   3   0
+                   ↑
+              5 > capacity 4  →  false
 ```
 
 ### Code
+
+```go
+func carPooling(trips [][]int, capacity int) bool {
+    const maxLocation = 1001
+    diff := make([]int, maxLocation+1)
+
+    for _, t := range trips {
+        num, from, to := t[0], t[1], t[2]
+        diff[from] += num // board here
+        diff[to] -= num   // get off here: the range is half-open [from, to)
+    }
+
+    occupancy := 0
+    for _, d := range diff {
+        occupancy += d
+        if occupancy > capacity {
+            return false
+        }
+    }
+    return true
+}
+```
+
 ```python
 def carPooling(trips, capacity):
-    diff = [0]*1001                 # locations 0..1000
+    diff = [0] * 1002                # locations 0..1000, plus slack
     for num, start, end in trips:
-        diff[start] += num
-        diff[end]   -= num
-    running = 0
+        diff[start] += num           # board here
+        diff[end] -= num             # get off here: range is half-open
+    occupancy = 0
     for d in diff:
-        running += d
-        if running > capacity:
+        occupancy += d
+        if occupancy > capacity:
             return False
     return True
 ```
 
 ### Complexity
-Time O(n + maxLoc), Space O(maxLoc).
+Time O(m + maxLocation), Space O(maxLocation). If locations were unbounded you'd sort the boarding/alighting events instead — that is the Sweep Line pattern.
 
+---
 
 ## 12. LeetCode Practice Set
 

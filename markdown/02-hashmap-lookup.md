@@ -41,32 +41,105 @@ hashmap, lookup, complement, seen, cache, O(1), dictionary.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Have I already seen the thing I need?"*
+
+Running example: given `nums` and a `target`, find two indices whose values add up to `target`.
+
 ### Intuition
-Nested loops re-examine pairs/ranges, giving O(n^2) or worse.
+With no memory of what we've already looked at, the only option is to try every pair: fix one element, then walk the rest of the array hoping to find its partner.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each index `i` from `0` to `n−1`:
+2. &nbsp;&nbsp;For each index `j` from `i+1` to `n−1`:
+3. &nbsp;&nbsp;&nbsp;&nbsp;If `nums[i] + nums[j] == target`, return `[i, j]`.
+4. If the loops finish, no pair exists.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n²)** — roughly `n²/2` pairs are tested.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Hash Map Lookup pattern is built to use.
+- The inner loop re-walks the same suffix over and over. For `n = 10⁵` that's ~5·10⁹ comparisons — far too slow.
+- Notice what the inner loop actually *does*: it asks a yes/no question — *"is the value `target − nums[i]` somewhere in this array?"* Scanning is a very expensive way to ask that.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Hash Map Lookup invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Remember what you've seen in a hash map, so "have I seen X?" costs O(1) instead of a scan.**
+
+The brute force never had a memory. Every time it needed to know whether some value existed, it went and looked. A hash map *is* that memory: you pay O(n) space once, and every "does this exist / where was it / how many times" question becomes a single lookup.
+
+### The thought process
+
+```text
+We need    : two numbers that add to target.
+Obvious way: test every pair.
+Too slow   : O(n²), because finding the partner means scanning.
+Notice     : once we fix nums[i], the partner is not a mystery —
+             it is exactly target - nums[i]. One specific value.
+Therefore  : we don't need to search. We need to LOOK UP.
+Now        : keep a map value → index of everything seen so far,
+             and check for the partner before moving on. One pass.
+```
+
+That shift — from *"search for something that fits"* to *"compute exactly what I need, then look it up"* — is the whole pattern.
+
+### Why we need a hash map
+
+A hash map turns a value into a storage location by hashing it. It doesn't compare against the other keys, so lookup time doesn't grow with the number of entries: O(1) average for insert, lookup, and delete.
+
+Pick the right flavour:
+
+| You need to know… | Use |
+|---|---|
+| "have I seen this value?" | `set` |
+| "where did I see it?" | `map[value]index` |
+| "how many times?" | `map[value]count` |
+| "which things belong together?" | `map[signature][]item` |
+
+### Steps (Two Sum)
+
+```text
+Step 1 → Create an empty map: value → index.
+Step 2 → Walk the array once with index i.
+Step 3 → Compute need = target - nums[i].
+Step 4 → If need is already in the map, we're done: return [map[need], i].
+Step 5 → Otherwise record map[nums[i]] = i and move on.
+```
+
+### Why we check *before* we insert
+
+This is the subtle part, and it is what makes one pass correct.
+
+Checking first guarantees the partner we find is at a **strictly earlier index**, so we never pair an element with itself. Consider `nums = [3, 2, 4]`, `target = 6`:
+
+- If we inserted first, then at `i = 0` the map would already hold `{3: 0}`, `need = 3` would be found, and we'd wrongly return `[0, 0]`.
+- Checking first, `i = 0` finds nothing, stores `{3: 0}`; the real answer `[1, 2]` is found later.
+
+The same "check the past, then join the past" order is why one pass suffices: every pair `(i, j)` with `i < j` gets considered exactly once — at the moment we reach `j`.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "find two/three things that satisfy a relation"
+  "does X exist", "contains duplicate", "seen before"
+  "group these by something", "count occurrences of"
+  and your first instinct is a nested loop
+        ↓
+Think about...
+  "For a fixed element, is the thing I'm hunting for
+   actually a single computable value?"
+        ↓
+Use...
+  a hash map / set holding what you've already processed,
+  and query it in O(1) instead of scanning.
+```
 
 ### Visual explanation
 
@@ -91,59 +164,160 @@ Trade O(n) extra space for O(1) lookups, collapsing nested work into independent
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Hash Map Lookup   : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [2, 7, 11, 15]   target = 9
+
+i=0  x=2   need 9-2=7   map {}          → 7 not there   → store {2:0}
+i=1  x=7   need 9-7=2   map {2:0}       → 2 FOUND at 0  → answer [0, 1]
 ```
 
 ### Interview explanation
-"This is a Hash Map Lookup problem. I'll trade O(n) extra space for O(1) lookups, collapsing nested work into independent linear passes. That brings the complexity down to O(n) time and O(n) space — here's the template."
+"The brute force is O(n²) because finding the partner requires a scan. But the partner isn't unknown — for element `x` it's exactly `target − x`. So I'll keep a hash map of `value → index` for everything I've already passed, and at each element check whether its complement is in the map before inserting it. Checking before inserting guarantees the match is at an earlier index. One pass, O(n) time, O(n) space."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Foundations** family template. Adapt the comparison/condition to the specific problem.
+> Three shapes cover almost every hash-map problem: **seen-set**, **complement lookup**, and **group-by-signature**.
 
 ```go
-// Prefix-sum style precompute: range sum in O(1) after O(n) build.
-func prefix(nums []int) []int {
-    pre := make([]int, len(nums)+1)
-    for i, v := range nums {
-        pre[i+1] = pre[i] + v
+// 1. Seen-set: "have I encountered this before?"
+func hasDuplicate(nums []int) bool {
+    seen := make(map[int]struct{}, len(nums)) // struct{} costs no memory
+    for _, x := range nums {
+        if _, ok := seen[x]; ok {
+            return true
+        }
+        seen[x] = struct{}{}
     }
-    return pre
+    return false
 }
-func rangeSum(pre []int, l, r int) int { return pre[r+1] - pre[l] }
+
+// 2. Complement lookup: check the map BEFORE inserting.
+func twoSum(nums []int, target int) []int {
+    seen := make(map[int]int, len(nums)) // value -> index
+    for i, x := range nums {
+        if j, ok := seen[target-x]; ok {
+            return []int{j, i}
+        }
+        seen[x] = i
+    }
+    return nil
+}
+
+// 3. Group-by-signature: bucket items under a key they share.
+func groupBy(words []string, signature func(string) string) [][]string {
+    groups := make(map[string][]string)
+    for _, w := range words {
+        key := signature(w)
+        groups[key] = append(groups[key], w)
+    }
+    out := make([][]string, 0, len(groups))
+    for _, bucket := range groups {
+        out = append(out, bucket)
+    }
+    return out
+}
 ```
 
 ```python
-def prefix(nums):
-    pre = [0]*(len(nums)+1)
-    for i, v in enumerate(nums):
-        pre[i+1] = pre[i] + v
-    return pre
+from collections import defaultdict
 
-def range_sum(pre, l, r):       # inclusive [l, r]
-    return pre[r+1] - pre[l]
+# 1. Seen-set
+def has_duplicate(nums):
+    seen = set()
+    for x in nums:
+        if x in seen:
+            return True
+        seen.add(x)
+    return False
+
+# 2. Complement lookup: check before insert
+def two_sum(nums, target):
+    seen = {}                        # value -> index
+    for i, x in enumerate(nums):
+        if target - x in seen:
+            return [seen[target - x], i]
+        seen[x] = i
+    return []
+
+# 3. Group-by-signature
+def group_by(items, signature):
+    groups = defaultdict(list)
+    for it in items:
+        groups[signature(it)].append(it)
+    return list(groups.values())
 ```
 
 ```java
-int[] prefix(int[] nums) {
-    int[] pre = new int[nums.length + 1];
-    for (int i = 0; i < nums.length; i++) pre[i+1] = pre[i] + nums[i];
-    return pre;
+import java.util.*;
+
+public class HashMapLookup {
+    // 1. Seen-set
+    public static boolean hasDuplicate(int[] nums) {
+        Set<Integer> seen = new HashSet<>();
+        for (int x : nums) if (!seen.add(x)) return true;  // add returns false if present
+        return false;
+    }
+
+    // 2. Complement lookup: check before insert
+    public static int[] twoSum(int[] nums, int target) {
+        Map<Integer, Integer> seen = new HashMap<>();      // value -> index
+        for (int i = 0; i < nums.length; i++) {
+            Integer j = seen.get(target - nums[i]);
+            if (j != null) return new int[]{j, i};
+            seen.put(nums[i], i);
+        }
+        return new int[]{};
+    }
+
+    // 3. Group-by-signature
+    public static List<List<String>> groupBy(String[] words,
+                                             java.util.function.Function<String, String> signature) {
+        Map<String, List<String>> groups = new HashMap<>();
+        for (String w : words) groups.computeIfAbsent(signature.apply(w), k -> new ArrayList<>()).add(w);
+        return new ArrayList<>(groups.values());
+    }
 }
-int rangeSum(int[] pre, int l, int r) { return pre[r+1] - pre[l]; }
 ```
 
 ```cpp
-vector<long long> prefix(vector<int>& nums) {
-    vector<long long> pre(nums.size()+1, 0);
-    for (size_t i = 0; i < nums.size(); ++i) pre[i+1] = pre[i] + nums[i];
-    return pre;
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include <string>
+#include <functional>
+using namespace std;
+
+// 1. Seen-set
+bool hasDuplicate(const vector<int>& nums) {
+    unordered_set<int> seen;
+    seen.reserve(nums.size());
+    for (int x : nums) if (!seen.insert(x).second) return true;
+    return false;
 }
-long long rangeSum(vector<long long>& pre, int l, int r) { return pre[r+1] - pre[l]; }
+
+// 2. Complement lookup: check before insert
+vector<int> twoSum(const vector<int>& nums, int target) {
+    unordered_map<int, int> seen;                 // value -> index
+    for (int i = 0; i < (int)nums.size(); ++i) {
+        auto it = seen.find(target - nums[i]);
+        if (it != seen.end()) return {it->second, i};
+        seen[nums[i]] = i;
+    }
+    return {};
+}
+
+// 3. Group-by-signature
+vector<vector<string>> groupBy(const vector<string>& words,
+                               function<string(const string&)> signature) {
+    unordered_map<string, vector<string>> groups;
+    for (const auto& w : words) groups[signature(w)].push_back(w);
+    vector<vector<string>> out;
+    out.reserve(groups.size());
+    for (auto& kv : groups) out.push_back(move(kv.second));
+    return out;
+}
 ```
 
 ---
@@ -228,60 +402,116 @@ long long rangeSum(vector<long long>& pre, int l, int r) { return pre[r+1] - pre
 ## 9. Solved Example 1
 
 ### Problem — Two Sum (LeetCode 1)
-A representative **Hash Map Lookup** problem. The signal: trade space for time: store seen values for o(1) existence/complement checks.
+Return the indices of the two numbers that add up to `target`. Exactly one solution exists, and you may not use the same element twice.
 
 ### Thought Process
-1. For each `x`, the partner we need is its complement `target - x`.
-2. Keep a map of `value → index` for everything seen so far.
-3. Before storing `x`, check if its complement is already in the map — if so, we found the pair in a single pass.
+1. For a fixed `nums[i]`, the partner is not vague — it is exactly `target − nums[i]`.
+2. So the real question is "does that specific value already exist?", which a map answers in O(1).
+3. Walk once, keeping `value → index` of everything already passed.
+4. Check for the complement **before** inserting the current value — that keeps the match strictly earlier and stops an element pairing with itself.
 
 ### Dry Run
-`nums=[2,7,11,15], target=9`
-- x=2: need 7, not seen → store {2:0}
-- x=7: need 2, seen at index 0 → return `[0, 1]`
+
+Input: `nums = [2, 7, 11, 15]`, `target = 9`
+
+| i | nums[i] | need = 9 − nums[i] | need in map? | map before this step | action |
+|---|---------|--------------------|--------------|----------------------|--------|
+| 0 | 2       | 7                  | no           | `{}`                 | store `2 → 0` |
+| 1 | 7       | 2                  | **yes → 0**  | `{2:0}`              | return `[0, 1]` |
+
+Output: **`[0, 1]`** (since `nums[0] + nums[1] = 2 + 7 = 9`)
 
 ### Visualization
-```
-seen={2:0}   x=7  need 9-7=2  ── found at 0 ─▶ answer [0,1]
+
+```text
+nums:  [ 2 ,  7 , 11 , 15 ]
+         ↑
+       i=0  need 7 → map {} → miss, remember 2
+
+nums:  [ 2 ,  7 , 11 , 15 ]
+              ↑
+       i=1  need 2 → map {2:0} → HIT at index 0  ⇒  [0, 1]
 ```
 
 ### Code
+
+```go
+func twoSum(nums []int, target int) []int {
+    seen := make(map[int]int, len(nums)) // value -> index seen so far
+    for i, x := range nums {
+        if j, ok := seen[target-x]; ok { // check BEFORE inserting
+            return []int{j, i}
+        }
+        seen[x] = i
+    }
+    return nil
+}
+```
+
 ```python
 def twoSum(nums, target):
-    seen = {}                       # value -> index
+    seen = {}                            # value -> index
     for i, x in enumerate(nums):
-        if target - x in seen:
+        if target - x in seen:           # check BEFORE inserting
             return [seen[target - x], i]
         seen[x] = i
     return []
 ```
 
 ### Complexity
-Time O(n), Space O(n). Single pass with O(1) complement lookups.
+Time O(n) — one pass, O(1) lookups. Space O(n) — the map holds at most `n` entries.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Contains Duplicate (LeetCode 217)
-A representative **Hash Map Lookup** problem. The signal: trade space for time: store seen values for o(1) existence/complement checks.
+Return `true` if any value appears at least twice in `nums`.
 
 ### Thought Process
-1. A duplicate exists iff some value appears a second time as we scan.
-2. Maintain a `set` of values already seen.
-3. On each element, if it is already in the set return `True`; otherwise add it.
+1. A duplicate exists exactly when some value shows up a second time as we scan.
+2. We don't need positions or counts — only membership. That's a `set`.
+3. For each element: if it's already in the set, we've found the repeat; otherwise add it.
+4. Reaching the end with no hit means every value was distinct.
 
 ### Dry Run
-`nums=[1,2,3,1]`
-- 1 → not seen, add {1}
-- 2 → add {1,2}
-- 3 → add {1,2,3}
-- 1 → already in set → return `True`
+
+Input: `nums = [1, 2, 3, 1]`
+
+| step | x | already in set? | set after |
+|------|---|-----------------|-----------|
+| 1    | 1 | no              | `{1}`     |
+| 2    | 2 | no              | `{1,2}`   |
+| 3    | 3 | no              | `{1,2,3}` |
+| 4    | 1 | **yes**         | → return `true` |
+
+Output: **`true`**
+
+For `nums = [1, 2, 3, 4]` the scan finishes with `{1,2,3,4}` and no hit → **`false`**.
 
 ### Visualization
-```
-seen={1,2,3}   x=1  ── already present ─▶ True
+
+```text
+seen = { 1, 2, 3 }        x = 1
+                            ↑
+                    already present ⇒ true
 ```
 
 ### Code
+
+```go
+func containsDuplicate(nums []int) bool {
+    seen := make(map[int]struct{}, len(nums))
+    for _, x := range nums {
+        if _, ok := seen[x]; ok {
+            return true
+        }
+        seen[x] = struct{}{}
+    }
+    return false
+}
+```
+
 ```python
 def containsDuplicate(nums):
     seen = set()
@@ -293,46 +523,80 @@ def containsDuplicate(nums):
 ```
 
 ### Complexity
-Time O(n), Space O(n). Each element checked/inserted in O(1).
+Time O(n), Space O(n). Sorting first would also work in O(n log n) time and O(1) extra space — that's the trade-off to mention if the interviewer restricts memory.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Group Anagrams (LeetCode 49)
-A representative **Hash Map Lookup** problem. The signal: trade space for time: store seen values for o(1) existence/complement checks.
+Group the words that are anagrams of each other.
 
 ### Thought Process
-1. Two words are anagrams iff their sorted letters are identical.
-2. Use that sorted string as a hash-map key that groups all its anagrams.
-3. Bucket each word under its key; the map's values are the answer groups.
+1. Comparing every pair of words is O(N²).
+2. Instead, reduce each word to a **signature** that is identical for anagrams and different otherwise.
+3. Sorting a word's letters is the simplest such signature: `"eat"` and `"tea"` both become `"aet"`.
+4. Use the signature as a map key; each bucket is one answer group.
 
 ### Dry Run
-`["eat","tea","tan"]`
-- "eat" → key "aet" → {aet:[eat]}
-- "tea" → key "aet" → {aet:[eat,tea]}
-- "tan" → key "ant" → {aet:[eat,tea], ant:[tan]}
-Result: `[["eat","tea"],["tan"]]`
+
+Input: `["eat", "tea", "tan"]`
+
+| word  | sorted key | map after                          |
+|-------|-----------|------------------------------------|
+| "eat" | `"aet"`   | `{aet: [eat]}`                     |
+| "tea" | `"aet"`   | `{aet: [eat, tea]}` ← joins bucket |
+| "tan" | `"ant"`   | `{aet: [eat, tea], ant: [tan]}`    |
+
+Output: `[["eat","tea"], ["tan"]]` (group order is not required to be stable)
 
 ### Visualization
-```
-key "aet" -> [eat, tea]
-key "ant" -> [tan]
+
+```text
+"eat" ──sort──▶ "aet" ─┐
+                       ├─▶ bucket "aet" = [eat, tea]
+"tea" ──sort──▶ "aet" ─┘
+
+"tan" ──sort──▶ "ant" ───▶ bucket "ant" = [tan]
 ```
 
 ### Code
+
+```go
+func groupAnagramsSorted(strs []string) [][]string {
+    groups := make(map[string][]string)
+    for _, w := range strs {
+        b := []byte(w)
+        sort.Slice(b, func(i, j int) bool { return b[i] < b[j] })
+        key := string(b) // anagrams share this key
+        groups[key] = append(groups[key], w)
+    }
+
+    out := make([][]string, 0, len(groups))
+    for _, bucket := range groups {
+        out = append(out, bucket)
+    }
+    return out
+}
+```
+
 ```python
 from collections import defaultdict
 
 def groupAnagrams(strs):
     groups = defaultdict(list)
-    for s in strs:
-        key = "".join(sorted(s))    # anagrams share the sorted key
-        groups[key].append(s)
+    for w in strs:
+        key = "".join(sorted(w))   # anagrams share the sorted key
+        groups[key].append(w)
     return list(groups.values())
 ```
 
 ### Complexity
-Time O(N·L log L), Space O(N·L) for N words of max length L.
+Time O(N·L log L) for N words of max length L (the sort dominates). Space O(N·L).
 
+> Counting letters into a 26-slot key instead of sorting drops this to O(N·L) — see the Frequency Counter chapter.
+
+---
 
 ## 12. LeetCode Practice Set
 
