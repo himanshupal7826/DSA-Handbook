@@ -41,32 +41,133 @@ lcs, common subsequence, dp, grid, edit distance.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"How similar are these two sequences?"* — the longest shared subsequence, the fewest edits, the smallest deletion cost.
+
 ### Intuition
-Naive recursion recomputes overlapping subproblems — exponential time.
+Generate every subsequence of the first string and check which ones also appear in the second.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Enumerate all `2ᵐ` subsequences of `text1`.
+2. For each, scan `text2` to test whether it appears as a subsequence there.
+3. Track the longest that does.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(2ᵐ · n)**.
+- Space: O(m).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Longest Common Subsequence pattern is built to use.
+- At `m = 30` this is a billion checks; the constraints go to 1,000.
+- The recursive framing is no better on its own: `lcs(i, j)` branches into `lcs(i−1, j)` and `lcs(i, j−1)`, which both reach `lcs(i−1, j−1)`. The same pair of positions is recomputed along exponentially many routes — while there are only `m × n` distinct pairs in total.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Longest Common Subsequence invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Walk both strings from the end. At each step either the two current characters match — in which case they pair up — or one of them must be discarded.**
+
+There are only `m × n` positions to consider, so fill a table instead of recursing blindly.
+
+### The four DP questions
+
+**1. What does `dp[i][j]` mean?**
+
+```text
+dp[i][j] = the length of the longest common subsequence of
+           the FIRST i characters of text1 and the FIRST j of text2
+```
+
+Note "first `i` characters", not "index `i`". That off-by-one convention is deliberate — see below.
+
+**2. How do we compute it?**
+
+Compare `text1[i−1]` and `text2[j−1]` (the last characters of those prefixes):
+
+```text
+MATCH     → the pair contributes 1, and we shrink BOTH prefixes:
+            dp[i][j] = dp[i-1][j-1] + 1
+
+MISMATCH  → they cannot both be the last character of the answer, so
+            discard one and take whichever is better:
+            dp[i][j] = max( dp[i-1][j], dp[i][j-1] )
+```
+
+**3. What is the base case?**
+
+```text
+dp[0][j] = 0   an empty first string shares nothing
+dp[i][0] = 0   an empty second string shares nothing
+```
+
+**4. Why iterate forward, row by row?**
+
+`dp[i][j]` reads only `dp[i−1][j−1]`, `dp[i−1][j]` and `dp[i][j−1]` — all above or to the left. Filling top-to-bottom, left-to-right means every dependency is already final.
+
+### Why the table is `(m+1) × (n+1)` and not `m × n`
+
+The extra row and column hold the **empty prefix**. Without them, `dp[0][0]` would have to mean "first character of each", and every formula would need a guard for `i = 0` or `j = 0`.
+
+With the padding, the base cases are just a row and a column of zeros, and the recurrence applies uniformly to every real cell. The cost is one extra row and column; the benefit is no special cases anywhere.
+
+The price is the shift: **`dp[i][j]` talks about `text1[i-1]` and `text2[j-1]`.** Write that down before coding — mixing up the shift is the single most common bug in this family.
+
+### The same table, three problems
+
+Change only the recurrence:
+
+| Problem | Match | Mismatch |
+|---|---|---|
+| **LCS** (1143) | `dp[i-1][j-1] + 1` | `max(dp[i-1][j], dp[i][j-1])` |
+| **Edit Distance** (72) | `dp[i-1][j-1]` (free) | `1 + min(` replace, delete, insert `)` |
+| **Delete Operations** (583) | `dp[i-1][j-1]` | `1 + min(dp[i-1][j], dp[i][j-1])` |
+| Longest Common **Substring** | `dp[i-1][j-1] + 1` | **`0`** — substrings must be contiguous |
+
+That last row is worth pausing on. A subsequence may skip characters, so a mismatch keeps the best result so far. A *substring* cannot, so a mismatch resets to zero — and the answer becomes the max over the whole table rather than the bottom-right corner.
+
+### The three edit-distance moves, and which cell each one reads
+
+For Edit Distance the mismatch branch takes the cheapest of three operations. Each corresponds to a neighbouring cell:
+
+```text
+dp[i-1][j-1]  →  REPLACE text1[i-1] with text2[j-1]   (both consumed)
+dp[i-1][j]    →  DELETE  text1[i-1]                   (only text1 consumed)
+dp[i][j-1]    →  INSERT  text2[j-1]                   (only text2 consumed)
+```
+
+Reading "which string got consumed" off the indices is the reliable way to remember which is which.
+
+Base cases differ too: `dp[i][0] = i` (delete every character) and `dp[0][j] = j` (insert every character) — not zeros.
+
+### Space optimisation
+
+Each row depends only on the row above, so two rows suffice — or one row plus a saved diagonal value:
+
+```text
+O(m × n) space  →  O(min(m, n)) space
+```
+
+Do this only when asked. The full table is what lets you **reconstruct** the actual subsequence or edit script by walking backwards from the corner, and that is usually the more valuable follow-up.
+
+### How should I recognize this?
+
+```text
+If you see...
+  TWO strings or arrays compared
+  "longest common ...", "edit distance", "minimum operations to make equal"
+  "delete/insert/replace to transform A into B"
+  "is one a subsequence of the other"
+        ↓
+Think about...
+  "At the last character of each prefix: do they match?
+   If not, which one do I discard?"
+        ↓
+Use...
+  a (m+1) x (n+1) table, dp[i][j] over the FIRST i and FIRST j characters
+  match → take the diagonal;  mismatch → best of the neighbours
+```
 
 ### Visual explanation
 
@@ -105,61 +206,255 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Longest Common Sub: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+text1 = "abcde", text2 = "ace"
+
+        ""   a   c   e
+   ""    0   0   0   0
+   a     0   1   1   1
+   b     0   1   1   1
+   c     0   1   2   2
+   d     0   1   2   2
+   e     0   1   2   3
+                     ↑
+              answer = 3   ("ace")
+
+MATCH (e.g. row c, col c): take the DIAGONAL and add 1
+MISMATCH (e.g. row b, col c): take max(above, left) — carry the best forward
 ```
 
 ### Interview explanation
-"This is a Longest Common Subsequence problem. I'll optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it. That brings the complexity down to O(states × transitions) time and O(states) space — here's the template."
+"I'll build a 2D table where `dp[i][j]` is the LCS length of the first `i` characters of one string and the first `j` of the other. The extra row and column for empty prefixes are what remove all the boundary special cases — the cost is remembering that `dp[i][j]` refers to `text1[i-1]` and `text2[j-1]`. The recurrence follows from one question: do the last characters of the two prefixes match? If they do, they can be paired, so I take the diagonal and add one. If not, they can't both end the answer, so I discard one and take the better of the two neighbours. Base cases are zeros. I fill row by row, since every cell reads only above and to the left. That's O(m·n) time and space, and the space drops to one row if I don't need to reconstruct the actual subsequence. Edit Distance is the same table with a different recurrence — the three mismatch options map exactly to the diagonal, above and left cells, which is how I remember which is replace, delete and insert."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Dynamic Programming** family template. Adapt the comparison/condition to the specific problem.
+> `(m+1) × (n+1)` table. `dp[i][j]` covers the FIRST `i` and FIRST `j` characters.
 
 ```go
-// 0/1 Knapsack, space-optimized to 1D. dp[w] = best value at capacity w.
-func knapsack(weights, values []int, cap int) int {
-    dp := make([]int, cap+1)
-    for i := range weights {
-        for w := cap; w >= weights[i]; w-- {  // reverse: each item once
-            if dp[w-weights[i]]+values[i] > dp[w] {
-                dp[w] = dp[w-weights[i]] + values[i]
+// LCSLength returns the length of the longest common subsequence.
+// dp[i][j] = LCS of the first i chars of a and the first j chars of b.
+func LCSLength(a, b string) int {
+    m, n := len(a), len(b)
+
+    // (m+1) x (n+1): the extra row/column hold the EMPTY prefix, which
+    // makes the base cases a row and column of zeros with no special cases.
+    dp := make([][]int, m+1)
+    for i := range dp {
+        dp[i] = make([]int, n+1)
+    }
+
+    for i := 1; i <= m; i++ {
+        for j := 1; j <= n; j++ {
+            // dp[i][j] concerns a[i-1] and b[j-1] — mind the shift.
+            if a[i-1] == b[j-1] {
+                dp[i][j] = dp[i-1][j-1] + 1 // pair them up
+            } else if dp[i-1][j] >= dp[i][j-1] {
+                dp[i][j] = dp[i-1][j] // discard a[i-1]
+            } else {
+                dp[i][j] = dp[i][j-1] // discard b[j-1]
             }
         }
     }
-    return dp[cap]
+    return dp[m][n]
+}
+
+// LCSString reconstructs one actual longest common subsequence by walking
+// the finished table backwards from the corner.
+func LCSString(a, b string) string {
+    m, n := len(a), len(b)
+    dp := make([][]int, m+1)
+    for i := range dp {
+        dp[i] = make([]int, n+1)
+    }
+    for i := 1; i <= m; i++ {
+        for j := 1; j <= n; j++ {
+            if a[i-1] == b[j-1] {
+                dp[i][j] = dp[i-1][j-1] + 1
+            } else if dp[i-1][j] >= dp[i][j-1] {
+                dp[i][j] = dp[i-1][j]
+            } else {
+                dp[i][j] = dp[i][j-1]
+            }
+        }
+    }
+
+    // Walk back: a diagonal step means those characters were paired.
+    out := []byte{}
+    i, j := m, n
+    for i > 0 && j > 0 {
+        switch {
+        case a[i-1] == b[j-1]:
+            out = append(out, a[i-1])
+            i--
+            j--
+        case dp[i-1][j] >= dp[i][j-1]:
+            i--
+        default:
+            j--
+        }
+    }
+    for l, r := 0, len(out)-1; l < r; l, r = l+1, r-1 {
+        out[l], out[r] = out[r], out[l]
+    }
+    return string(out)
+}
+
+// LCSLengthCompact uses two rows instead of the full table.
+// It cannot reconstruct the subsequence — only the length.
+func LCSLengthCompact(a, b string) int {
+    if len(b) > len(a) {
+        a, b = b, a // keep the inner dimension small
+    }
+    previous := make([]int, len(b)+1)
+    current := make([]int, len(b)+1)
+
+    for i := 1; i <= len(a); i++ {
+        for j := 1; j <= len(b); j++ {
+            if a[i-1] == b[j-1] {
+                current[j] = previous[j-1] + 1
+            } else if previous[j] >= current[j-1] {
+                current[j] = previous[j]
+            } else {
+                current[j] = current[j-1]
+            }
+        }
+        previous, current = current, previous
+    }
+    return previous[len(b)]
 }
 ```
 
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def lcs_length(a, b):
+    """dp[i][j] = LCS of the first i chars of a and the first j chars of b."""
+    m, n = len(a), len(b)
+    # (m+1) x (n+1): the padding row/column hold the EMPTY prefix.
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            # dp[i][j] concerns a[i-1] and b[j-1] — mind the shift.
+            if a[i - 1] == b[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1     # pair them up
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])   # discard one
+    return dp[m][n]
+
+def lcs_string(a, b):
+    """Reconstruct one actual LCS by walking the table backwards."""
+    m, n = len(a), len(b)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if a[i - 1] == b[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+
+    out, i, j = [], m, n
+    while i > 0 and j > 0:
+        if a[i - 1] == b[j - 1]:
+            out.append(a[i - 1])        # a diagonal step = a paired character
+            i -= 1
+            j -= 1
+        elif dp[i - 1][j] >= dp[i][j - 1]:
+            i -= 1
+        else:
+            j -= 1
+    return "".join(reversed(out))
+
+def lcs_length_compact(a, b):
+    """Two rows instead of the full table. Length only, no reconstruction."""
+    if len(b) > len(a):
+        a, b = b, a
+    previous = [0] * (len(b) + 1)
+    for i in range(1, len(a) + 1):
+        current = [0] * (len(b) + 1)
+        for j in range(1, len(b) + 1):
+            if a[i - 1] == b[j - 1]:
+                current[j] = previous[j - 1] + 1
+            else:
+                current[j] = max(previous[j], current[j - 1])
+        previous = current
+    return previous[len(b)]
 ```
 
 ```java
-int knapsack(int[] weights, int[] values, int cap) {
-    int[] dp = new int[cap + 1];
-    for (int i = 0; i < weights.length; i++)
-        for (int w = cap; w >= weights[i]; w--)
-            dp[w] = Math.max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+public class LCS {
+    // dp[i][j] = LCS of the first i chars of a and the first j chars of b.
+    public static int lcsLength(String a, String b) {
+        int m = a.length(), n = b.length();
+        int[][] dp = new int[m + 1][n + 1];         // padding row/column = empty prefix
+
+        for (int i = 1; i <= m; i++)
+            for (int j = 1; j <= n; j++)
+                if (a.charAt(i - 1) == b.charAt(j - 1))
+                    dp[i][j] = dp[i - 1][j - 1] + 1;            // pair them
+                else
+                    dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);   // discard one
+
+        return dp[m][n];
+    }
+
+    // Edit Distance: same table, different recurrence and base cases.
+    public static int editDistance(String a, String b) {
+        int m = a.length(), n = b.length();
+        int[][] dp = new int[m + 1][n + 1];
+
+        for (int i = 0; i <= m; i++) dp[i][0] = i;  // delete everything
+        for (int j = 0; j <= n; j++) dp[0][j] = j;  // insert everything
+
+        for (int i = 1; i <= m; i++)
+            for (int j = 1; j <= n; j++)
+                if (a.charAt(i - 1) == b.charAt(j - 1))
+                    dp[i][j] = dp[i - 1][j - 1];                // free
+                else
+                    dp[i][j] = 1 + Math.min(dp[i - 1][j - 1],   // replace
+                               Math.min(dp[i - 1][j],           // delete
+                                        dp[i][j - 1]));         // insert
+
+        return dp[m][n];
+    }
 }
 ```
 
 ```cpp
-int knapsack(vector<int>& weights, vector<int>& values, int cap) {
-    vector<int> dp(cap + 1, 0);
-    for (size_t i = 0; i < weights.size(); ++i)
-        for (int w = cap; w >= weights[i]; --w)
-            dp[w] = max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+#include <algorithm>
+#include <string>
+#include <vector>
+using namespace std;
+
+// dp[i][j] = LCS of the first i chars of a and the first j chars of b.
+int lcsLength(const string& a, const string& b) {
+    int m = (int)a.size(), n = (int)b.size();
+    vector<vector<int>> dp(m + 1, vector<int>(n + 1, 0));   // padding = empty prefix
+
+    for (int i = 1; i <= m; ++i)
+        for (int j = 1; j <= n; ++j)
+            if (a[i - 1] == b[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+            else dp[i][j] = max(dp[i - 1][j], dp[i][j - 1]);
+
+    return dp[m][n];
+}
+
+// Edit Distance: same table, different recurrence and base cases.
+int editDistance(const string& a, const string& b) {
+    int m = (int)a.size(), n = (int)b.size();
+    vector<vector<int>> dp(m + 1, vector<int>(n + 1, 0));
+
+    for (int i = 0; i <= m; ++i) dp[i][0] = i;       // delete everything
+    for (int j = 0; j <= n; ++j) dp[0][j] = j;       // insert everything
+
+    for (int i = 1; i <= m; ++i)
+        for (int j = 1; j <= n; ++j)
+            if (a[i - 1] == b[j - 1]) dp[i][j] = dp[i - 1][j - 1];
+            else dp[i][j] = 1 + min({dp[i - 1][j - 1],   // replace
+                                     dp[i - 1][j],       // delete
+                                     dp[i][j - 1]});     // insert
+
+    return dp[m][n];
 }
 ```
 
@@ -244,136 +539,414 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 
 ## 9. Solved Example 1
 
-### Problem — LCS (LeetCode 1143)
-Given two strings `text1` and `text2`, return the length of their **longest common subsequence** (characters in the same relative order, not necessarily contiguous).
+### Problem — Longest Common Subsequence (LeetCode 1143)
+Return the length of the longest subsequence common to both strings. A subsequence keeps relative order but need not be contiguous.
 
 ### Thought Process
-1. Let `dp[i][j]` = LCS length of the first `i` chars of `text1` and first `j` chars of `text2`.
-2. If `text1[i-1] == text2[j-1]`, the pair extends the LCS: `dp[i][j] = dp[i-1][j-1] + 1`.
-3. Otherwise skip one character from either string: `dp[i][j] = max(dp[i-1][j], dp[i][j-1])`.
-4. Answer is `dp[m][n]`; row 0 and column 0 are 0 (empty string matches nothing).
+
+**What does `dp[i][j]` mean?** The LCS length of the **first `i`** characters of `text1` and the **first `j`** of `text2`.
+
+**How do we compute it?** Compare the last characters of those prefixes, `text1[i-1]` and `text2[j-1]`:
+- **match** → they can be paired, so `dp[i][j] = dp[i-1][j-1] + 1`
+- **mismatch** → they cannot both end the answer, so discard one: `max(dp[i-1][j], dp[i][j-1])`
+
+**What is the base case?** `dp[0][j] = dp[i][0] = 0` — an empty prefix shares nothing.
+
+**Why fill row by row?** Every cell reads only the diagonal, above, and left neighbours, all of which are already final in that order.
 
 ### Dry Run
-`text1 = "abcde"`, `text2 = "ace"`.
-- `a`==`a` → dp lifts to 1 along that diagonal.
-- `c`==`c` builds on the `a` match → 2.
-- `e`==`e` builds on the `ac` match → 3.
-- Non-matching cells inherit the best neighbor; final `dp[5][3] = 3` ("ace").
+
+Input: `text1 = "abcde"`, `text2 = "ace"`
+
+|       | **""** | **a** | **c** | **e** |
+|-------|--------|-------|-------|-------|
+| **""**| 0 | 0 | 0 | 0 |
+| **a** | 0 | **1** | 1 | 1 |
+| **b** | 0 | 1 | 1 | 1 |
+| **c** | 0 | 1 | **2** | 2 |
+| **d** | 0 | 1 | 2 | 2 |
+| **e** | 0 | 1 | 2 | **3** |
+
+Output: **`dp[5][3] = 3`** ✓ — the subsequence is `"ace"`.
+
+**Three cells worth reading closely:**
+
+- **Row `a`, column `a`**: `text1[0] = 'a'` equals `text2[0] = 'a'` → diagonal `dp[0][0] = 0`, plus 1 → **1**.
+- **Row `b`, column `c`**: `'b' ≠ 'c'` → `max(dp[1][2], dp[2][1]) = max(1, 1)` → **1**. The mismatch carries the best result forward rather than resetting.
+- **Row `c`, column `c`**: `'c' = 'c'` → diagonal `dp[2][1] = 1`, plus 1 → **2**.
+
+That middle case is the difference between subsequence and **substring**. For a longest common *substring* the mismatch would write `0`, because contiguity is required — and the answer would be the maximum anywhere in the table rather than the corner.
 
 ### Visualization
-```
-input  ──▶ [ fill dp grid comparing text1[i] vs text2[j] ]
-state  ──▶ match: diagonal+1, else max(up, left)
-output ──▶ dp[m][n]
+
+```text
+        ""   a   c   e
+   ""    0   0   0   0
+   a     0  [1]  1   1        match 'a' → diagonal + 1
+   b     0   1   1   1        mismatch  → carry the best forward
+   c     0   1  [2]  2        match 'c' → diagonal + 1
+   d     0   1   2   2
+   e     0   1   2  [3]       match 'e' → diagonal + 1
+                        ↑
+                   answer 3 = "ace"
 ```
 
 ### Code
+
+```go
+func longestCommonSubsequence(text1 string, text2 string) int {
+    m, n := len(text1), len(text2)
+
+    // (m+1) x (n+1): the extra row and column represent the EMPTY prefix,
+    // which turns every base case into a plain zero.
+    dp := make([][]int, m+1)
+    for i := range dp {
+        dp[i] = make([]int, n+1)
+    }
+
+    for i := 1; i <= m; i++ {
+        for j := 1; j <= n; j++ {
+            // dp[i][j] is about text1[i-1] and text2[j-1] — mind the shift.
+            if text1[i-1] == text2[j-1] {
+                dp[i][j] = dp[i-1][j-1] + 1 // pair the two characters
+            } else if dp[i-1][j] >= dp[i][j-1] {
+                dp[i][j] = dp[i-1][j] // discard text1[i-1]
+            } else {
+                dp[i][j] = dp[i][j-1] // discard text2[j-1]
+            }
+        }
+    }
+
+    return dp[m][n]
+}
+```
+
 ```python
 def longestCommonSubsequence(text1, text2):
     m, n = len(text1), len(text2)
+    # The padding row/column represent the EMPTY prefix → base cases are zeros.
     dp = [[0] * (n + 1) for _ in range(m + 1)]
+
     for i in range(1, m + 1):
         for j in range(1, n + 1):
+            # dp[i][j] is about text1[i-1] and text2[j-1] — mind the shift.
             if text1[i - 1] == text2[j - 1]:
-                dp[i][j] = dp[i - 1][j - 1] + 1
+                dp[i][j] = dp[i - 1][j - 1] + 1          # pair them
             else:
-                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])   # discard one
+
     return dp[m][n]
 ```
 
 ### Complexity
-Time O(m × n), Space O(m × n) (reducible to O(n) with a rolling row).
+Time **O(m · n)**, Space **O(m · n)** — reducible to O(min(m, n)) with two rows if reconstruction is not needed.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Edit Distance (LeetCode 72)
-Given `word1` and `word2`, return the minimum number of insert, delete, or replace operations to convert `word1` into `word2`.
+Return the minimum number of operations to convert `word1` into `word2`. The allowed operations are insert, delete, and replace a character.
 
 ### Thought Process
-1. Let `dp[i][j]` = min operations to turn the first `i` chars of `word1` into the first `j` chars of `word2`.
-2. Base cases: `dp[i][0] = i` (delete all), `dp[0][j] = j` (insert all).
-3. If the last chars match, no cost: `dp[i][j] = dp[i-1][j-1]`.
-4. Else take 1 + min of replace `dp[i-1][j-1]`, delete `dp[i-1][j]`, insert `dp[i][j-1]`.
+
+**What does `dp[i][j]` mean?** The minimum operations to turn the first `i` characters of `word1` into the first `j` of `word2`.
+
+**What is the base case?** Not zeros this time:
+- `dp[i][0] = i` — turning `i` characters into nothing means `i` deletions.
+- `dp[0][j] = j` — turning nothing into `j` characters means `j` insertions.
+
+**How do we compute it?**
+- **match** → the characters already agree, so nothing is spent: `dp[i][j] = dp[i-1][j-1]`
+- **mismatch** → pay 1 and take the cheapest of three moves, each reading a different neighbour:
+
+```text
+dp[i-1][j-1]  →  REPLACE word1[i-1] with word2[j-1]   (both consumed)
+dp[i-1][j]    →  DELETE  word1[i-1]                   (only word1 consumed)
+dp[i][j-1]    →  INSERT  word2[j-1]                   (only word2 consumed)
+```
+
+Reading *which string got consumed* off the indices is the reliable way to keep the three straight.
 
 ### Dry Run
-`word1 = "horse"`, `word2 = "ros"`.
-- Base row/col seed the deletes/inserts (`dp[i][0]=i`, `dp[0][j]=j`).
-- `h`≠`r` → replace path; mismatches take `1+min(neighbors)`.
-- `o`==`o` and `s`==`s` copy the diagonal, keeping cost flat.
-- Final `dp[5][3] = 3` (replace h→r, delete r, delete e).
+
+Input: `word1 = "horse"`, `word2 = "ros"`
+
+|       | **""** | **r** | **o** | **s** |
+|-------|--------|-------|-------|-------|
+| **""**| 0 | 1 | 2 | 3 |
+| **h** | 1 | **1** | 2 | 3 |
+| **o** | 2 | 2 | **1** | 2 |
+| **r** | 3 | **2** | 2 | 2 |
+| **s** | 4 | 3 | 3 | **2** |
+| **e** | 5 | 4 | 4 | **3** |
+
+Output: **`dp[5][3] = 3`** ✓
+
+**Reading the table back as an edit script:**
+
+```text
+horse → rorse    replace 'h' with 'r'
+rorse → rose     delete 'r'
+rose  → ros      delete 'e'
+```
+
+Three operations. ✓
+
+**Two cells worth checking by hand:**
+
+- **Row `h`, column `r`**: `'h' ≠ 'r'` → `1 + min(dp[0][0]=0, dp[0][1]=1, dp[1][0]=1) = 1 + 0 = 1`. The winning move is the diagonal — a **replace**.
+- **Row `o`, column `o`**: `'o' = 'o'` → free, so `dp[2][2] = dp[1][1] = 1`. A match costs nothing and simply inherits the diagonal.
 
 ### Visualization
-```
-input  ──▶ [ fill dp grid over word1[i] vs word2[j] ]
-state  ──▶ match: diagonal, else 1 + min(replace, delete, insert)
-output ──▶ dp[m][n]
+
+```text
+        ""   r   o   s
+   ""    0   1   2   3       base: insert j characters
+   h     1  [1]  2   3       mismatch → 1 + min(diag, up, left)
+   o     2   2  [1]  2       match    → inherit the diagonal, free
+   r     3  [2]  2   2
+   s     4   3   3  [2]
+   e     5   4   4  [3]
+                       ↑
+                 answer = 3
+
+  diagonal = replace   up = delete   left = insert
 ```
 
 ### Code
+
+```go
+func minDistance(word1 string, word2 string) int {
+    m, n := len(word1), len(word2)
+
+    dp := make([][]int, m+1)
+    for i := range dp {
+        dp[i] = make([]int, n+1)
+    }
+
+    // Base cases are NOT zeros here.
+    for i := 0; i <= m; i++ {
+        dp[i][0] = i // delete every character of word1
+    }
+    for j := 0; j <= n; j++ {
+        dp[0][j] = j // insert every character of word2
+    }
+
+    for i := 1; i <= m; i++ {
+        for j := 1; j <= n; j++ {
+            if word1[i-1] == word2[j-1] {
+                dp[i][j] = dp[i-1][j-1] // already equal: costs nothing
+                continue
+            }
+
+            // Each neighbour corresponds to one operation:
+            //   diagonal = replace, above = delete, left = insert.
+            best := dp[i-1][j-1] // replace
+            if dp[i-1][j] < best {
+                best = dp[i-1][j] // delete
+            }
+            if dp[i][j-1] < best {
+                best = dp[i][j-1] // insert
+            }
+            dp[i][j] = best + 1
+        }
+    }
+
+    return dp[m][n]
+}
+```
+
 ```python
 def minDistance(word1, word2):
     m, n = len(word1), len(word2)
     dp = [[0] * (n + 1) for _ in range(m + 1)]
+
     for i in range(m + 1):
-        dp[i][0] = i
+        dp[i][0] = i                    # delete every character of word1
     for j in range(n + 1):
-        dp[0][j] = j
+        dp[0][j] = j                    # insert every character of word2
+
     for i in range(1, m + 1):
         for j in range(1, n + 1):
             if word1[i - 1] == word2[j - 1]:
-                dp[i][j] = dp[i - 1][j - 1]
+                dp[i][j] = dp[i - 1][j - 1]     # already equal: free
             else:
-                dp[i][j] = 1 + min(dp[i - 1][j - 1],  # replace
-                                   dp[i - 1][j],       # delete
-                                   dp[i][j - 1])       # insert
+                dp[i][j] = 1 + min(
+                    dp[i - 1][j - 1],   # replace
+                    dp[i - 1][j],       # delete from word1
+                    dp[i][j - 1],       # insert from word2
+                )
+
     return dp[m][n]
 ```
 
 ### Complexity
-Time O(m × n), Space O(m × n) (reducible to O(n) with a rolling row).
+Time **O(m · n)**, Space **O(m · n)**, reducible to O(min(m, n)).
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Delete Ops (LeetCode 583)
-Given `word1` and `word2`, return the minimum number of character deletions (from either string) needed to make the two strings equal.
+### Problem — Delete Operation for Two Strings (LeetCode 583)
+Return the minimum number of **deletions** (from either string) needed to make the two strings equal.
 
 ### Thought Process
-1. Whatever survives the deletions must be a common subsequence, so the largest string we can keep is the LCS.
-2. Compute `L = LCS(word1, word2)` with the standard 2D DP.
-3. Delete every non-LCS character from each: `m - L` from `word1`, `n - L` from `word2`.
-4. Answer = `m + n - 2*L`.
+1. Only deletions are allowed — no replace, no insert. So the two strings must be whittled down to something they **both** contain.
+2. The largest such common remainder is exactly the **LCS**. Anything larger cannot exist in both; anything smaller wastes deletions.
+3. So the answer follows directly:
+
+```text
+deletions = (m - LCS) + (n - LCS) = m + n - 2 * LCS
+```
+
+4. That means one call to Example 1 answers this problem.
+5. Alternatively, solve it directly with a `dp[i][j] = minimum deletions to equalise the two prefixes` table — useful to know, because it shows how the recurrence shifts when only two of the three operations are allowed.
 
 ### Dry Run
-`word1 = "sea"`, `word2 = "eat"`.
-- LCS DP finds "ea" → `L = 2`.
-- `m = 3`, `n = 3`.
-- Answer = `3 + 3 - 2*2 = 2` (delete `s` from "sea", `t` from "eat").
+
+Input: `word1 = "sea"`, `word2 = "eat"`
+
+**Via the LCS shortcut:**
+
+The LCS of `"sea"` and `"eat"` is `"ea"`, of length 2.
+
+```text
+deletions = 3 + 3 - 2 * 2 = 6 - 4 = 2
+```
+
+Output: **2** ✓ — delete `'s'` from `"sea"` to get `"ea"`, and delete `'t'` from `"eat"` to get `"ea"`. ✓
+
+**Via the direct table** — `dp[i][j]` = deletions to make the two prefixes equal:
+
+|       | **""** | **e** | **a** | **t** |
+|-------|--------|-------|-------|-------|
+| **""**| 0 | 1 | 2 | 3 |
+| **s** | 1 | 2 | 3 | 4 |
+| **e** | 2 | **1** | 2 | 3 |
+| **a** | 3 | 2 | **1** | **2** |
+
+Output: **`dp[3][3] = 2`** ✓ — the two methods agree.
+
+**Reading the table.** Base cases are `dp[i][0] = i` and `dp[0][j] = j`: emptying a prefix costs one deletion per character. Row `e`, column `e` is a match, so it inherits the diagonal `dp[1][0] = 1` for free. Row `a`, column `t` is a mismatch, so we delete from one side: `1 + min(dp[2][3]=3, dp[3][2]=1) = 2`.
+
+Note the mismatch branch has only **two** options here, not three — there is no replace, because replacement is not an allowed operation.
 
 ### Visualization
-```
-input  ──▶ [ fill LCS grid over word1 vs word2 ]
-state  ──▶ match: diagonal+1, else max(up, left)
-output ──▶ m + n - 2*dp[m][n]
+
+```text
+"sea"  and  "eat"
+
+     LCS = "ea"  (length 2)
+
+   sea  →  delete 's'  →  ea      1 deletion
+   eat  →  delete 't'  →  ea      1 deletion
+                                  ─────────────
+                                  2 total
+
+   formula: m + n - 2*LCS = 3 + 3 - 4 = 2
 ```
 
 ### Code
+
+```go
+func minDistanceDelete(word1 string, word2 string) int {
+    // Only deletions are allowed, so both strings must be reduced to a
+    // common subsequence — and the largest one is the LCS.
+    lcs := lcsLengthFor583(word1, word2)
+    return len(word1) + len(word2) - 2*lcs
+}
+
+// lcsLengthFor583 is Example 1's routine, repeated here so this snippet
+// stands alone.
+func lcsLengthFor583(a, b string) int {
+    dp := make([][]int, len(a)+1)
+    for i := range dp {
+        dp[i] = make([]int, len(b)+1)
+    }
+    for i := 1; i <= len(a); i++ {
+        for j := 1; j <= len(b); j++ {
+            if a[i-1] == b[j-1] {
+                dp[i][j] = dp[i-1][j-1] + 1
+            } else if dp[i-1][j] >= dp[i][j-1] {
+                dp[i][j] = dp[i-1][j]
+            } else {
+                dp[i][j] = dp[i][j-1]
+            }
+        }
+    }
+    return dp[len(a)][len(b)]
+}
+
+// minDistanceDeleteDirect solves it without going through the LCS.
+// dp[i][j] = deletions needed to make the two prefixes equal.
+func minDistanceDeleteDirect(word1 string, word2 string) int {
+    m, n := len(word1), len(word2)
+
+    dp := make([][]int, m+1)
+    for i := range dp {
+        dp[i] = make([]int, n+1)
+    }
+
+    for i := 0; i <= m; i++ {
+        dp[i][0] = i // empty the prefix, one deletion per character
+    }
+    for j := 0; j <= n; j++ {
+        dp[0][j] = j
+    }
+
+    for i := 1; i <= m; i++ {
+        for j := 1; j <= n; j++ {
+            if word1[i-1] == word2[j-1] {
+                dp[i][j] = dp[i-1][j-1] // keep both: free
+                continue
+            }
+            // Only TWO options — there is no replace operation here.
+            if dp[i-1][j] < dp[i][j-1] {
+                dp[i][j] = dp[i-1][j] + 1 // delete from word1
+            } else {
+                dp[i][j] = dp[i][j-1] + 1 // delete from word2
+            }
+        }
+    }
+
+    return dp[m][n]
+}
+```
+
 ```python
 def minDistance(word1, word2):
+    """Only deletions allowed → reduce both to their LCS."""
+    lcs = longestCommonSubsequence(word1, word2)
+    return len(word1) + len(word2) - 2 * lcs
+
+def minDistance_direct(word1, word2):
+    """dp[i][j] = deletions needed to make the two prefixes equal."""
     m, n = len(word1), len(word2)
     dp = [[0] * (n + 1) for _ in range(m + 1)]
+
+    for i in range(m + 1):
+        dp[i][0] = i                    # empty the prefix
+    for j in range(n + 1):
+        dp[0][j] = j
+
     for i in range(1, m + 1):
         for j in range(1, n + 1):
             if word1[i - 1] == word2[j - 1]:
-                dp[i][j] = dp[i - 1][j - 1] + 1
+                dp[i][j] = dp[i - 1][j - 1]         # keep both: free
             else:
-                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
-    lcs = dp[m][n]
-    return m + n - 2 * lcs
+                # Only TWO options — no replace operation exists here.
+                dp[i][j] = 1 + min(dp[i - 1][j], dp[i][j - 1])
+
+    return dp[m][n]
 ```
 
 ### Complexity
-Time O(m × n), Space O(m × n) (reducible to O(n) with a rolling row).
+Time **O(m · n)**, Space **O(m · n)**.
 
+> All three examples are one table with one question at each cell — *do the last characters match?* — and a different answer for what to do when they don't. Once that is internalised, the whole two-sequence DP family reduces to picking the right mismatch branch.
+
+---
 
 ## 12. LeetCode Practice Set
 

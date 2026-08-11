@@ -41,32 +41,133 @@ coin change, min coins, ways, dp, unbounded.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Using these denominations, how do I make this amount?"* — fewest coins, or how many ways.
+
 ### Intuition
-Naive recursion recomputes overlapping subproblems — exponential time.
+At every step, try every coin.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. `fewest(amount)`: if `amount == 0`, zero coins are needed.
+2. Otherwise, for each coin `c ≤ amount`, recursively compute `fewest(amount − c)`.
+3. Take the minimum and add 1.
+4. If no coin leads to a solution, the amount is unreachable.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(cᵃ)** for `c` coins and amount `a` — exponential.
+- Space: O(a) recursion depth.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Coin Change pattern is built to use.
+- The same subproblem is solved over and over. With coins `{1,2,5}` and amount 11, `fewest(9)` is reached via `11→10→9`, via `11→9` directly, and countless other routes — each time recomputed from scratch.
+- The recursion tree has exponentially many nodes but only `a + 1` **distinct** values inside it. That gap is the entire opportunity.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Coin Change invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **There are only `amount + 1` distinct subproblems, so compute each one once and store it.**
+
+### The four DP questions
+
+Every DP solution is these four answers. For "fewest coins":
+
+**1. What does `dp[i]` mean?**
+
+```text
+dp[i] = the fewest coins needed to make exactly amount i
+```
+
+Say it as a full sentence, out loud, before writing any code. Almost every DP bug is a vague or shifting definition.
+
+**2. How do we compute `dp[i]`?**
+
+Any solution for `i` must end with *some* coin `c`. Remove that coin and what remains is an optimal solution for `i − c`:
+
+```text
+dp[i] = min over all coins c <= i of ( dp[i - c] + 1 )
+```
+
+**3. What is the base case?**
+
+```text
+dp[0] = 0        making zero requires zero coins
+dp[i] = infinity for i > 0, meaning "not yet known to be reachable"
+```
+
+The infinity sentinel matters: it lets `min` ignore unreachable states without a special case. Use a value like `amount + 1` — larger than any real answer, and safe from overflow when you add 1.
+
+**4. Why iterate forward?**
+
+`dp[i]` depends on `dp[i − c]`, which is a **smaller** index. Computing `i` in increasing order guarantees every dependency is already final.
+
+### The part that actually trips people: loop order changes the meaning
+
+For *counting* problems the two nested loops can be written either way round, and **they compute different things**. This is the most important idea in the chapter.
+
+```text
+COMBINATIONS  (order does NOT matter: 1+2 and 2+1 are the same)
+    for each coin:                ← coins OUTER
+        for amount = coin..target:
+            dp[amount] += dp[amount - coin]
+
+PERMUTATIONS  (order DOES matter: 1+2 and 2+1 are different)
+    for amount = 1..target:       ← amount OUTER
+        for each coin <= amount:
+            dp[amount] += dp[amount - coin]
+```
+
+**Why coins-outer counts combinations.** Fixing a coin and sweeping every amount before moving to the next coin means each coin is considered *once, in a fixed order*. A count can therefore only ever use coins in that order — `1` then `2`, never `2` then `1` — so `1+2` is counted and `2+1` is not.
+
+**Why amount-outer counts permutations.** Here every coin is reconsidered at every amount, with no fixed order between them, so `1+2` and `2+1` are both reached and both counted.
+
+Check it on `coins = {1,2}`, `target = 3`:
+
+```text
+coins outer:  ways(3) = 2      →  {1,1,1} and {1,2}
+amount outer: ways(3) = 3      →  1+1+1, 1+2, 2+1
+```
+
+Same code, one swap, different answers. Read the problem statement to decide which it wants.
+
+> LeetCode 377 is called "Combination Sum IV" but actually counts **permutations** — the name is misleading, the examples are not. Always check the examples.
+
+### Why the minimisation version doesn't care about loop order
+
+For `min`, order is irrelevant: taking a minimum is commutative and associative, so `dp[i]` ends up the same either way. Only **counting** distinguishes the two loop orders — which is exactly why the distinction is easy to forget until it bites.
+
+### Greedy does not work here
+
+The natural instinct — "always take the largest coin that fits" — is wrong for general denominations:
+
+```text
+coins = {1, 3, 4},  amount = 6
+
+greedy: 4 + 1 + 1        = 3 coins
+optimal: 3 + 3           = 2 coins
+```
+
+Greedy happens to be correct for real-world currency systems, which are designed to make it so. It is not correct in general, and DP is.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "fewest coins / minimum number of items to reach a total"
+  "how many ways to make change", "how many ways to reach a target"
+  unlimited reuse of each item
+        ↓
+Think about...
+  "What does dp[i] mean, in one sentence?"
+  "Does order matter?  →  it decides the loop order"
+        ↓
+Use...
+  minimise → dp[i] = min(dp[i-c] + 1),  loop order irrelevant
+  count combinations → coins OUTER
+  count permutations → amount OUTER
+```
 
 ### Visual explanation
 
@@ -95,61 +196,199 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Coin Change       : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+coins = [1, 2, 5], amount = 11, minimising
+
+  i  :  0  1  2  3  4  5  6  7  8  9 10 11
+ dp  :  0  1  1  2  2  1  2  2  3  3  2  3
+                          ↑              ↑
+              dp[5]=1 (one 5)      dp[11] = dp[6]+1 = 3
+                                   → 5 + 5 + 1
+
+each dp[i] looks back to dp[i-1], dp[i-2], dp[i-5] — all already final
+because we sweep i upward
 ```
 
 ### Interview explanation
-"This is a Coin Change problem. I'll optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it. That brings the complexity down to O(states × transitions) time and O(states) space — here's the template."
+"I'll define `dp[i]` as the fewest coins needed to make exactly amount `i`. Any solution for `i` ends with some coin `c`, and removing it leaves an optimal solution for `i − c`, so `dp[i] = min over c of dp[i−c] + 1`. The base case is `dp[0] = 0`, and I initialise the rest to `amount + 1` as an infinity sentinel so `min` ignores unreachable states. I sweep `i` upward because every dependency is at a smaller index. That's O(amount × coins) time and O(amount) space. For the counting variants the loop order carries the meaning: coins on the outside counts **combinations**, because each coin is only ever considered in one fixed position, while amount on the outside counts **permutations**, because every coin is reconsidered at every amount. And I'd note that greedy fails here — with coins {1,3,4} and amount 6, greedy gives 3 coins but the optimum is 2."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Dynamic Programming** family template. Adapt the comparison/condition to the specific problem.
+> Define `dp[i]` in words first. For counting, the loop order *is* the specification.
 
 ```go
-// 0/1 Knapsack, space-optimized to 1D. dp[w] = best value at capacity w.
-func knapsack(weights, values []int, cap int) int {
-    dp := make([]int, cap+1)
-    for i := range weights {
-        for w := cap; w >= weights[i]; w-- {  // reverse: each item once
-            if dp[w-weights[i]]+values[i] > dp[w] {
-                dp[w] = dp[w-weights[i]] + values[i]
+// MinCoins returns the fewest coins summing to amount, or -1 if impossible.
+// dp[i] = the fewest coins needed to make exactly amount i.
+func MinCoins(coins []int, amount int) int {
+    // amount+1 acts as infinity: larger than any real answer, no overflow.
+    const unreachableMarker = 1
+    dp := make([]int, amount+1)
+    for i := 1; i <= amount; i++ {
+        dp[i] = amount + unreachableMarker
+    }
+    dp[0] = 0 // making zero needs zero coins
+
+    // Forward sweep: dp[i] depends only on smaller indices.
+    for i := 1; i <= amount; i++ {
+        for _, coin := range coins {
+            if coin > i {
+                continue
+            }
+            if dp[i-coin]+1 < dp[i] {
+                dp[i] = dp[i-coin] + 1
             }
         }
     }
-    return dp[cap]
+
+    if dp[amount] > amount {
+        return -1 // never improved from the sentinel
+    }
+    return dp[amount]
+}
+
+// CountCombinations counts unordered ways to reach amount.
+// COINS OUTER: each coin is considered once, in a fixed order, so
+// 1+2 is counted and 2+1 is not.
+func CountCombinations(coins []int, amount int) int {
+    dp := make([]int, amount+1)
+    dp[0] = 1 // one way to make zero: take nothing
+
+    for _, coin := range coins { // outer
+        for i := coin; i <= amount; i++ {
+            dp[i] += dp[i-coin]
+        }
+    }
+    return dp[amount]
+}
+
+// CountPermutations counts ORDERED ways to reach amount.
+// AMOUNT OUTER: every coin is reconsidered at every amount, so both
+// 1+2 and 2+1 are counted.
+func CountPermutations(coins []int, amount int) int {
+    dp := make([]int, amount+1)
+    dp[0] = 1
+
+    for i := 1; i <= amount; i++ { // outer
+        for _, coin := range coins {
+            if coin <= i {
+                dp[i] += dp[i-coin]
+            }
+        }
+    }
+    return dp[amount]
 }
 ```
 
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def min_coins(coins, amount):
+    """dp[i] = fewest coins needed to make exactly amount i."""
+    INF = amount + 1                    # larger than any real answer
+    dp = [INF] * (amount + 1)
+    dp[0] = 0                           # zero needs zero coins
+
+    for i in range(1, amount + 1):      # forward: dependencies are smaller
+        for coin in coins:
+            if coin <= i:
+                dp[i] = min(dp[i], dp[i - coin] + 1)
+
+    return -1 if dp[amount] > amount else dp[amount]
+
+def count_combinations(coins, amount):
+    """Unordered ways. COINS OUTER: each coin considered once, in order."""
+    dp = [0] * (amount + 1)
+    dp[0] = 1                           # one way to make zero
+
+    for coin in coins:                  # outer
+        for i in range(coin, amount + 1):
+            dp[i] += dp[i - coin]
+    return dp[amount]
+
+def count_permutations(coins, amount):
+    """Ordered ways. AMOUNT OUTER: every coin reconsidered at every amount."""
+    dp = [0] * (amount + 1)
+    dp[0] = 1
+
+    for i in range(1, amount + 1):      # outer
+        for coin in coins:
+            if coin <= i:
+                dp[i] += dp[i - coin]
+    return dp[amount]
 ```
 
 ```java
-int knapsack(int[] weights, int[] values, int cap) {
-    int[] dp = new int[cap + 1];
-    for (int i = 0; i < weights.length; i++)
-        for (int w = cap; w >= weights[i]; w--)
-            dp[w] = Math.max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+import java.util.*;
+
+public class CoinChange {
+    // dp[i] = fewest coins needed to make exactly amount i.
+    public static int minCoins(int[] coins, int amount) {
+        int[] dp = new int[amount + 1];
+        Arrays.fill(dp, amount + 1);        // infinity sentinel
+        dp[0] = 0;
+
+        for (int i = 1; i <= amount; i++)   // forward sweep
+            for (int coin : coins)
+                if (coin <= i) dp[i] = Math.min(dp[i], dp[i - coin] + 1);
+
+        return dp[amount] > amount ? -1 : dp[amount];
+    }
+
+    // COINS OUTER → combinations (order does not matter).
+    public static int countCombinations(int[] coins, int amount) {
+        long[] dp = new long[amount + 1];
+        dp[0] = 1;
+        for (int coin : coins)
+            for (int i = coin; i <= amount; i++) dp[i] += dp[i - coin];
+        return (int) dp[amount];
+    }
+
+    // AMOUNT OUTER → permutations (order matters).
+    public static int countPermutations(int[] coins, int amount) {
+        long[] dp = new long[amount + 1];
+        dp[0] = 1;
+        for (int i = 1; i <= amount; i++)
+            for (int coin : coins)
+                if (coin <= i) dp[i] += dp[i - coin];
+        return (int) dp[amount];
+    }
 }
 ```
 
 ```cpp
-int knapsack(vector<int>& weights, vector<int>& values, int cap) {
-    vector<int> dp(cap + 1, 0);
-    for (size_t i = 0; i < weights.size(); ++i)
-        for (int w = cap; w >= weights[i]; --w)
-            dp[w] = max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+#include <algorithm>
+#include <vector>
+using namespace std;
+
+// dp[i] = fewest coins needed to make exactly amount i.
+int minCoins(const vector<int>& coins, int amount) {
+    vector<int> dp(amount + 1, amount + 1);     // infinity sentinel
+    dp[0] = 0;
+
+    for (int i = 1; i <= amount; ++i)           // forward sweep
+        for (int coin : coins)
+            if (coin <= i) dp[i] = min(dp[i], dp[i - coin] + 1);
+
+    return dp[amount] > amount ? -1 : dp[amount];
+}
+
+// COINS OUTER → combinations.
+long long countCombinations(const vector<int>& coins, int amount) {
+    vector<long long> dp(amount + 1, 0);
+    dp[0] = 1;
+    for (int coin : coins)
+        for (int i = coin; i <= amount; ++i) dp[i] += dp[i - coin];
+    return dp[amount];
+}
+
+// AMOUNT OUTER → permutations.
+long long countPermutations(const vector<int>& coins, int amount) {
+    vector<long long> dp(amount + 1, 0);
+    dp[0] = 1;
+    for (int i = 1; i <= amount; ++i)
+        for (int coin : coins)
+            if (coin <= i) dp[i] += dp[i - coin];
+    return dp[amount];
 }
 ```
 
@@ -235,113 +474,319 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — Coin Change (LeetCode 322)
-Given coins of distinct denominations and a target `amount`, return the **fewest coins** needed to make up that amount, or `-1` if it is impossible. Coins may be reused (unbounded).
+Given coin denominations and an `amount`, return the fewest coins summing to it, or `−1` if it cannot be made. You have unlimited coins of each denomination.
 
 ### Thought Process
-1. Let `dp[a]` = minimum coins to make amount `a`. Base case `dp[0] = 0`; initialize all others to infinity (unreachable).
-2. For each amount `a` from 1 to `amount`, try every coin `c ≤ a`: taking coin `c` costs `dp[a - c] + 1`, so `dp[a] = min(dp[a], dp[a - c] + 1)`.
-3. The answer is `dp[amount]` if it stayed finite, else `-1`.
+
+**What does `dp[i]` mean?** The fewest coins needed to make exactly amount `i`.
+
+**How do we compute it?** Any solution for `i` ends with some coin `c`. Remove that coin and the rest is an optimal solution for `i − c`. So `dp[i] = min over c of dp[i−c] + 1`.
+
+**What is the base case?** `dp[0] = 0` — zero coins make zero. Everything else starts at `amount + 1`, a value larger than any real answer, so `min` ignores unreachable states without a special case.
+
+**Why iterate forward?** `dp[i]` reads only `dp[i − c]` for positive `c`, which are smaller indices. Sweeping upward means every dependency is already final when we need it.
 
 ### Dry Run
-coins = [1, 2, 5], amount = 6.
-- dp[1]=1, dp[2]=min(dp[1]+1, dp[0]+1)=1, dp[3]=dp[2]+1=2, dp[4]=dp[2]+1=2.
-- dp[5]=min(dp[4]+1, dp[3]+1, dp[0]+1)=1 (one 5-coin).
-- dp[6]=min(dp[5]+1, dp[4]+1, dp[1]+1)=2 (5+1). Answer = **2**.
+
+Input: `coins = [1, 2, 5]`, `amount = 11`
+
+Start: `dp[0] = 0`, everything else `12` (the sentinel).
+
+| i | from `dp[i−1]+1` | from `dp[i−2]+1` | from `dp[i−5]+1` | `dp[i]` |
+|---|-------------------|-------------------|-------------------|---------|
+| 1 | `0+1 = 1` | — | — | **1** |
+| 2 | `1+1 = 2` | `0+1 = 1` | — | **1** |
+| 3 | `1+1 = 2` | `1+1 = 2` | — | **2** |
+| 4 | `2+1 = 3` | `1+1 = 2` | — | **2** |
+| 5 | `2+1 = 3` | `2+1 = 3` | `0+1 = 1` | **1** |
+| 6 | `1+1 = 2` | `2+1 = 3` | `1+1 = 2` | **2** |
+| 7 | `2+1 = 3` | `1+1 = 2` | `1+1 = 2` | **2** |
+| 8 | `2+1 = 3` | `2+1 = 3` | `2+1 = 3` | **3** |
+| 9 | `3+1 = 4` | `2+1 = 3` | `2+1 = 3` | **3** |
+| 10 | `3+1 = 4` | `3+1 = 4` | `1+1 = 2` | **2** |
+| 11 | `2+1 = 3` | `3+1 = 4` | `2+1 = 3` | **3** |
+
+Output: **3** ✓
+
+Check by hand: `5 + 5 + 1 = 11` uses three coins, and no two coins reach 11. ✓
+
+Trace `dp[11] = 3` back: it came from `dp[6] + 1`, and `dp[6] = 2` came from `dp[5] + 1`, and `dp[5] = 1` came from `dp[0] + 1`. That chain is `1, 5, 5` — exactly the coins.
+
+**The unreachable case:** `coins = [2]`, `amount = 3`. `dp[1]` never improves from the sentinel `4`, so `dp[3]` cannot either, and we return `−1`. ✓
 
 ### Visualization
-```
-amount ──▶ [ build dp[0..amount], min over each coin ]
-state  ──▶ dp[a] = fewest coins for a, filled bottom-up
-output ──▶ dp[amount], or -1 if still infinity
+
+```text
+coins = [1, 2, 5]
+
+  i  :  0  1  2  3  4  5  6  7  8  9 10 11
+ dp  :  0  1  1  2  2  1  2  2  3  3  2  3
+        └──────────────┘        ↑        ↑
+        all already final    dp[6]=2   dp[11] = dp[6]+1 = 3
+
+  backtrack the choices:  11 ─5─▶ 6 ─5─▶ 1 ─1─▶ 0
 ```
 
 ### Code
+
+```go
+func coinChange(coins []int, amount int) int {
+    // dp[i] = fewest coins to make exactly amount i.
+    dp := make([]int, amount+1)
+
+    // amount+1 is an infinity sentinel: bigger than any real answer
+    // (which is at most `amount` using all 1s), and safe to add 1 to.
+    for i := 1; i <= amount; i++ {
+        dp[i] = amount + 1
+    }
+    dp[0] = 0 // zero coins make zero
+
+    // Forward: every dp[i-coin] is a smaller index, hence already final.
+    for i := 1; i <= amount; i++ {
+        for _, coin := range coins {
+            if coin > i {
+                continue
+            }
+            if candidate := dp[i-coin] + 1; candidate < dp[i] {
+                dp[i] = candidate
+            }
+        }
+    }
+
+    if dp[amount] > amount {
+        return -1 // never improved: the amount is unreachable
+    }
+    return dp[amount]
+}
+```
+
 ```python
 def coinChange(coins, amount):
-    INF = float('inf')
-    dp = [0] + [INF] * amount          # dp[a] = fewest coins to make a
-    for a in range(1, amount + 1):
-        for c in coins:
-            if c <= a and dp[a - c] + 1 < dp[a]:
-                dp[a] = dp[a - c] + 1
-    return dp[amount] if dp[amount] != INF else -1
+    INF = amount + 1                    # bigger than any real answer
+    dp = [INF] * (amount + 1)
+    dp[0] = 0                           # zero coins make zero
+
+    for i in range(1, amount + 1):      # forward: dependencies are smaller
+        for coin in coins:
+            if coin <= i:
+                dp[i] = min(dp[i], dp[i - coin] + 1)
+
+    return -1 if dp[amount] > amount else dp[amount]
 ```
 
 ### Complexity
-Time O(amount × len(coins)), Space O(amount).
+Time **O(amount × len(coins))**, Space **O(amount)**.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Coin Change II (LeetCode 518)
-Given coins of distinct denominations and a target `amount`, return the **number of combinations** that make up that amount. Order does not matter (2+1 and 1+2 count once); coins may be reused.
+Count the number of **combinations** that make up `amount`. Two combinations differing only in order are the **same**.
 
 ### Thought Process
-1. Let `dp[a]` = number of combinations making amount `a`, with `dp[0] = 1` (the empty combination).
-2. To avoid counting the same multiset in different orders, loop coins on the **outside** and amounts on the inside. Each coin is fully considered before moving on, so combinations stay order-independent.
-3. For each coin `c`, add `dp[a - c]` into `dp[a]` for `a` from `c` to `amount`. Return `dp[amount]`.
+
+**What does `dp[i]` mean?** The number of distinct combinations summing to exactly `i`.
+
+**How do we compute it?** Processing coin `c`, every combination for `i − c` extends to one for `i` by adding a `c`. So `dp[i] += dp[i − c]`.
+
+**What is the base case?** `dp[0] = 1` — exactly one way to make zero: take nothing. Starting at `0` instead would make every count zero forever.
+
+**Why coins on the outside?** Because order must *not* matter. Fixing one coin and sweeping all amounts before moving on means coins can only ever be used in the outer loop's order — so `1+2` is counted and `2+1` is never reachable.
 
 ### Dry Run
-coins = [1, 2, 5], amount = 5.
-- After coin 1: dp = [1,1,1,1,1,1] (all-ones combinations).
-- After coin 2: dp[2]+=dp[0]→2, dp[3]+=dp[1]→2, dp[4]+=dp[2]→3, dp[5]+=dp[3]→3.
-- After coin 5: dp[5]+=dp[0]→4. Answer = **4** ({1x5},{1,2,2},{1,1,1,2},{1x5 ones},{5}).
+
+Input: `amount = 5`, `coins = [1, 2, 5]` — coins outer.
+
+Start: `dp = [1, 0, 0, 0, 0, 0]`
+
+**After coin 1** (each `dp[i] += dp[i−1]`, sweeping `i = 1..5`):
+
+| i | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| dp| 1 | 1 | 1 | 1 | 1 | 1 |
+
+Only one way per amount so far — all 1s.
+
+**After coin 2** (`dp[i] += dp[i−2]`, sweeping `i = 2..5`):
+
+| i | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| dp| 1 | 1 | **2** | **2** | **3** | **3** |
+
+`dp[4] = 1 + dp[2] = 1 + 2 = 3` → `{1,1,1,1}`, `{1,1,2}`, `{2,2}`.
+
+**After coin 5** (`dp[i] += dp[i−5]`, only `i = 5`):
+
+| i | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| dp| 1 | 1 | 2 | 2 | 3 | **4** |
+
+Output: **4** ✓
+
+The four combinations are `{5}`, `{2,2,1}`, `{2,1,1,1}`, `{1,1,1,1,1}`. ✓
+
+**Why `2+1+1+1` and `1+2+1+1` were not counted separately.** By the time coin 2 is processed, coin 1's sweep is complete and never revisited. So a combination is always built as "some 1s, then some 2s, then some 5s" — one canonical order per multiset.
 
 ### Visualization
-```
-coins  ──▶ [ for each coin, sweep amounts upward ]
-state  ──▶ dp[a] = # combinations, coin-outer keeps order out
-output ──▶ dp[amount]
+
+```text
+coins outer, one full sweep per coin:
+
+  after coin 1:  [1, 1, 1, 1, 1, 1]
+  after coin 2:  [1, 1, 2, 2, 3, 3]
+  after coin 5:  [1, 1, 2, 2, 3, 4]
+                                  ↑
+                            answer = 4
+
+  each coin is finished before the next begins
+     ⇒ combinations are built in a fixed coin order
+     ⇒ {2,1,1,1} counted once, not four times
 ```
 
 ### Code
+
+```go
+func change(amount int, coins []int) int {
+    // dp[i] = number of distinct combinations summing to exactly i.
+    dp := make([]int, amount+1)
+    dp[0] = 1 // exactly one way to make zero: take nothing
+
+    // COINS OUTER. Each coin is fully processed before the next begins,
+    // so combinations are only ever built in this fixed coin order —
+    // which is what makes 1+2 and 2+1 the same single count.
+    for _, coin := range coins {
+        for i := coin; i <= amount; i++ {
+            dp[i] += dp[i-coin]
+        }
+    }
+
+    return dp[amount]
+}
+```
+
 ```python
 def change(amount, coins):
-    dp = [1] + [0] * amount            # dp[a] = # combinations making a
-    for c in coins:                    # coin outer -> combinations, not permutations
-        for a in range(c, amount + 1):
-            dp[a] += dp[a - c]
+    dp = [0] * (amount + 1)
+    dp[0] = 1                           # one way to make zero: take nothing
+
+    # COINS OUTER: each coin finished before the next starts, so a
+    # combination is always built in this fixed order → 1+2 == 2+1.
+    for coin in coins:
+        for i in range(coin, amount + 1):
+            dp[i] += dp[i - coin]
+
     return dp[amount]
 ```
 
 ### Complexity
-Time O(amount × len(coins)), Space O(amount).
+Time **O(amount × len(coins))**, Space **O(amount)**.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Comb Sum IV (LeetCode 377)
-Given an array of distinct positive integers `nums` and a `target`, return the **number of ordered permutations** (sequences) that sum to `target`. Here order matters: (1,2) and (2,1) are counted separately; numbers may be reused.
+### Problem — Combination Sum IV (LeetCode 377)
+Given distinct positive integers and a `target`, count the number of **ordered** combinations summing to the target. Sequences in different orders count separately.
 
 ### Thought Process
-1. Let `dp[t]` = number of ordered sequences summing to `t`, with `dp[0] = 1` (the empty sequence).
-2. Because order matters, loop the **target on the outside** and the numbers on the inside — this lets any number be the last element of a sequence, counting each ordering.
-3. For each `t` from 1 to `target`, add `dp[t - n]` for every `n ≤ t`. Return `dp[target]`.
+
+**Read the examples, not the title.** Despite the name, LeetCode 377 counts **permutations** — `(1,2,1)` and `(2,1,1)` are two different answers. That single fact decides the loop order.
+
+**What does `dp[i]` mean?** The number of ordered sequences summing to exactly `i`.
+
+**How do we compute it?** Every such sequence has a *last* element `x`. Removing it leaves an ordered sequence summing to `i − x`. So `dp[i] = sum over x of dp[i − x]`.
+
+**What is the base case?** `dp[0] = 1` — the empty sequence.
+
+**Why amount on the outside?** Because at each amount we reconsider *every* number as the last element, with no fixed ordering between them. That is exactly what makes `1+2` and `2+1` two separate counts.
 
 ### Dry Run
-nums = [1, 2, 3], target = 4.
-- dp[0]=1, dp[1]=dp[0]=1, dp[2]=dp[1]+dp[0]=2, dp[3]=dp[2]+dp[1]+dp[0]=4.
-- dp[4]=dp[3]+dp[2]+dp[1]=4+2+1=7. Answer = **7** ordered sequences summing to 4.
+
+Input: `nums = [1, 2, 3]`, `target = 4` — amount outer.
+
+Start: `dp[0] = 1`.
+
+| i | from `dp[i−1]` | from `dp[i−2]` | from `dp[i−3]` | `dp[i]` |
+|---|-----------------|-----------------|-----------------|---------|
+| 1 | `dp[0] = 1` | — | — | **1** |
+| 2 | `dp[1] = 1` | `dp[0] = 1` | — | **2** |
+| 3 | `dp[2] = 2` | `dp[1] = 1` | `dp[0] = 1` | **4** |
+| 4 | `dp[3] = 4` | `dp[2] = 2` | `dp[1] = 1` | **7** |
+
+Output: **7** ✓
+
+The seven ordered sequences are:
+
+```text
+(1,1,1,1)   (1,1,2)   (1,2,1)   (2,1,1)
+(2,2)       (1,3)     (3,1)
+```
+
+Note `(1,2,1)` and `(2,1,1)` are counted separately — that is the permutation semantics. ✓
+
+**The same input with the loops swapped.** Putting `nums` on the outside would count only unordered combinations: `{1,1,1,1}`, `{1,1,2}`, `{2,2}`, `{1,3}` — just **4**. Same code, one swap, and a wrong answer for this problem.
 
 ### Visualization
-```
-target ──▶ [ for each t, sum dp[t-n] over all n ]
-state  ──▶ dp[t] = # ordered sequences, target-outer counts order
-output ──▶ dp[target]
+
+```text
+dp[4] = dp[3] + dp[2] + dp[1]
+      =   4   +   2   +   1   = 7
+        ↑        ↑        ↑
+   last elem   last elem  last elem
+      is 1       is 2       is 3
+
+amount OUTER ⇒ every number is reconsidered at every amount
+             ⇒ (1,2,1) and (2,1,1) both counted
+
+    compare:   coins outer → 4   (combinations)
+               amount outer → 7  (permutations)   ← what 377 wants
 ```
 
 ### Code
+
+```go
+func combinationSum4(nums []int, target int) int {
+    // dp[i] = number of ORDERED sequences summing to exactly i.
+    dp := make([]int, target+1)
+    dp[0] = 1 // the empty sequence
+
+    // AMOUNT OUTER. Every number is reconsidered as the last element at
+    // every amount, with no fixed order between them — so (1,2) and (2,1)
+    // are counted separately.
+    for i := 1; i <= target; i++ {
+        for _, num := range nums {
+            if num <= i {
+                dp[i] += dp[i-num]
+            }
+        }
+    }
+
+    return dp[target]
+}
+```
+
 ```python
 def combinationSum4(nums, target):
-    dp = [1] + [0] * target            # dp[t] = # ordered sequences summing to t
-    for t in range(1, target + 1):     # target outer -> permutations, order counts
-        for n in nums:
-            if n <= t:
-                dp[t] += dp[t - n]
+    dp = [0] * (target + 1)
+    dp[0] = 1                           # the empty sequence
+
+    # AMOUNT OUTER: every number reconsidered at every amount, so
+    # (1,2) and (2,1) are counted separately.
+    for i in range(1, target + 1):
+        for num in nums:
+            if num <= i:
+                dp[i] += dp[i - num]
+
     return dp[target]
 ```
 
 ### Complexity
-Time O(target × len(nums)), Space O(target).
+Time **O(target × len(nums))**, Space **O(target)**.
 
+> Put Examples 2 and 3 side by side: identical recurrence, identical base case, identical complexity — and different answers, because the loop order *is* the specification. When a counting problem involves reusable items, decide "does order matter?" first, and let that choose which loop goes outside.
+
+---
 
 ## 12. LeetCode Practice Set
 

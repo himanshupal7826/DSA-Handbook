@@ -41,32 +41,135 @@ lis, longest increasing, dp, patience, binary search.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"What is the longest subsequence I can pull out that keeps increasing?"* — elements need not be adjacent, but must stay in their original order.
+
 ### Intuition
-Naive recursion recomputes overlapping subproblems — exponential time.
+Every element is either in the subsequence or not. Try all `2ⁿ` choices and keep the longest increasing one.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Enumerate every subsequence (all `2ⁿ` subsets of positions, in order).
+2. Check whether it is strictly increasing.
+3. Track the longest that passes.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n · 2ⁿ)**.
+- Space: O(n).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Longest Increasing Subsequence pattern is built to use.
+- At `n = 30` that is a billion subsequences. The constraints go to 2,500.
+- And it re-derives the same facts endlessly. The best increasing run ending at position 5 is a fixed number, but the brute force recomputes it inside every subsequence that happens to pass through position 5.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Longest Increasing Subsequence invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **For each position, work out the longest increasing run that *ends there* — then the answer is the largest of those.**
+
+Anchoring on "ends at `i`" is what makes the subproblems finite and reusable. There are only `n` of them.
+
+### The four DP questions
+
+**1. What does `dp[i]` mean?**
+
+```text
+dp[i] = the length of the longest strictly increasing subsequence
+        that ENDS at index i (and therefore includes nums[i])
+```
+
+The "ends at `i`" part is essential. Defining it as "the LIS within the first `i` elements" sounds similar but does not compose — you would not know whether `nums[i]` could be appended to it.
+
+**2. How do we compute `dp[i]`?**
+
+Look at every earlier index `j`. If `nums[j] < nums[i]`, then any run ending at `j` can be extended by `nums[i]`:
+
+```text
+dp[i] = 1 + max( dp[j] )  over all j < i with nums[j] < nums[i]
+      = 1                 if no such j exists
+```
+
+**3. What is the base case?**
+
+```text
+dp[i] = 1 for every i    — the single element nums[i] is itself a run of length 1
+```
+
+**4. Why iterate forward?**
+
+`dp[i]` reads only `dp[j]` for `j < i`, so sweeping left to right guarantees every dependency is final.
+
+**The answer is `max(dp)`, not `dp[n−1]`.** The longest run need not end at the last element — a classic slip.
+
+That gives **O(n²)**, which is often enough and is always the right first answer.
+
+### The O(n log n) version: patience sorting
+
+Keep an array `tails`, where:
+
+```text
+tails[k] = the smallest possible tail value among all increasing
+           subsequences of length k+1
+```
+
+`tails` is automatically sorted — a longer run must end at a larger value — so it can be binary searched.
+
+For each `x`, find the first tail `>= x` (a **lower bound**):
+
+- **past the end** → `x` exceeds every tail, so it extends the longest run. Append it.
+- **inside** → replace that tail with `x`. Same length, smaller tail, which can only make future extensions easier.
+
+The answer is `len(tails)`.
+
+> **`tails` is not itself a valid subsequence.** Only its *length* is the answer. Claiming otherwise is a common interview slip — the array is a bookkeeping device, not a witness.
+
+**Why lower bound and not upper bound?** Lower bound finds the first tail `>= x`, so an *equal* tail is replaced rather than appended — which enforces **strictly** increasing. Switching to upper bound solves the non-decreasing variant instead.
+
+### Which version to write
+
+| | O(n²) DP | O(n log n) patience |
+|---|---|---|
+| Length only | works | **faster** |
+| Reconstruct the actual subsequence | **natural** (follow the `dp` values back) | needs extra parent tracking |
+| **Count** how many LIS exist | **necessary** | does not extend cleanly |
+| Explain under pressure | easy | needs the `tails` invariant stated precisely |
+
+Lead with the O(n²) definition, then offer the O(n log n) refinement. If the question asks for a *count* of optimal solutions, you need the O(n²) form anyway.
+
+### The reduction that keeps appearing
+
+Many problems are LIS wearing a disguise:
+
+```text
+Russian Doll Envelopes  →  sort by width, LIS on heights
+Max chain of pairs      →  sort by first, LIS on second
+Longest Bitonic         →  LIS forward + LIS backward, combined
+Minimum deletions to
+  make it increasing    →  n - LIS(n)
+```
+
+The tell is *"pick a subset that stays ordered by two criteria at once"* — sort by one, LIS the other.
+
+### How should I recognize this?
+
+```text
+If you see...
+  "longest increasing subsequence", "longest chain"
+  "maximum number of items that can be nested / stacked"
+  "minimum deletions to make it sorted"
+  order must be preserved, elements need not be adjacent
+        ↓
+Think about...
+  "What is the best run ENDING at each position?"
+        ↓
+Use...
+  length only        → patience sorting, O(n log n)
+  count of LIS, or
+  reconstruction     → O(n²) DP with dp[i] = LIS ending at i
+  two criteria       → sort by one, LIS on the other
+```
 
 ### Visual explanation
 
@@ -92,61 +195,256 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Longest Increasing: maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [10, 9, 2, 5, 3, 7, 101, 18]
+
+index :   0   1   2   3   4   5    6    7
+value :  10   9   2   5   3   7  101   18
+dp    :   1   1   1   2   2   3    4    4
+                      ↑       ↑    ↑
+              dp[3]=2 (2,5)   |    dp[6] = dp[5]+1 = 4
+                        dp[5]=3 (2,3,7)
+
+answer = max(dp) = 4        e.g. 2 → 3 → 7 → 101
+NOT dp[last] — the best run does not have to end at the last element
 ```
 
 ### Interview explanation
-"This is a Longest Increasing Subsequence problem. I'll optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it. That brings the complexity down to O(states × transitions) time and O(states) space — here's the template."
+"I'll define `dp[i]` as the length of the longest strictly increasing subsequence that *ends at* index `i`. Anchoring on 'ends at i' is what makes the subproblems compose — I can then ask whether `nums[i]` extends any earlier run. So `dp[i] = 1 + max(dp[j])` over all `j < i` with `nums[j] < nums[i]`, and 1 if there is none. Every `dp[i]` starts at 1 because a single element is a run. The answer is the max over the whole array, not the last entry, since the best run need not end at the last element. That's O(n²). There's an O(n log n) refinement using patience sorting: keep an array where `tails[k]` is the smallest tail among runs of length `k+1`, which stays sorted, and binary search each new value with a lower bound so equal values are replaced rather than appended — that's what keeps it strictly increasing. I'd note `tails` isn't itself a valid subsequence, only its length is the answer. If the problem asked me to *count* the optimal subsequences, I'd stay with the O(n²) form, since the counting doesn't extend cleanly to patience sorting."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Dynamic Programming** family template. Adapt the comparison/condition to the specific problem.
+> `dp[i]` = best run ending at `i`. Answer is the max, not the last entry.
 
 ```go
-// 0/1 Knapsack, space-optimized to 1D. dp[w] = best value at capacity w.
-func knapsack(weights, values []int, cap int) int {
-    dp := make([]int, cap+1)
-    for i := range weights {
-        for w := cap; w >= weights[i]; w-- {  // reverse: each item once
-            if dp[w-weights[i]]+values[i] > dp[w] {
-                dp[w] = dp[w-weights[i]] + values[i]
+// LISLength returns the length of the longest strictly increasing
+// subsequence, using the O(n^2) DP.
+// dp[i] = length of the LIS ENDING at index i.
+func LISLength(nums []int) int {
+    if len(nums) == 0 {
+        return 0
+    }
+
+    dp := make([]int, len(nums))
+    for i := range dp {
+        dp[i] = 1 // a single element is a run of length 1
+    }
+
+    best := 1
+    for i := 1; i < len(nums); i++ {
+        for j := 0; j < i; j++ {
+            // nums[i] can extend any run ending at a smaller value.
+            if nums[j] < nums[i] && dp[j]+1 > dp[i] {
+                dp[i] = dp[j] + 1
             }
         }
+        if dp[i] > best {
+            best = dp[i] // the answer is the MAX, not dp[n-1]
+        }
     }
-    return dp[cap]
+    return best
+}
+
+// LISLengthFast is the O(n log n) patience-sorting version.
+// tails[k] = the smallest tail among increasing runs of length k+1.
+// NOTE: tails is NOT itself a valid subsequence — only its length is.
+func LISLengthFast(nums []int) int {
+    tails := []int{}
+
+    for _, x := range nums {
+        // Lower bound: first tail >= x. Using >= (not >) replaces an equal
+        // tail, which is what enforces STRICT increase.
+        position := lowerBound(tails, x)
+
+        if position == len(tails) {
+            tails = append(tails, x) // x beats every tail: extend
+        } else {
+            tails[position] = x // same length, smaller tail is strictly better
+        }
+    }
+    return len(tails)
+}
+
+func lowerBound(sorted []int, target int) int {
+    lo, hi := 0, len(sorted)
+    for lo < hi {
+        mid := lo + (hi-lo)/2
+        if sorted[mid] < target {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    return lo
+}
+
+// LISSequence reconstructs one actual longest subsequence, which the
+// patience version cannot do without extra bookkeeping.
+func LISSequence(nums []int) []int {
+    if len(nums) == 0 {
+        return nil
+    }
+
+    dp := make([]int, len(nums))
+    parent := make([]int, len(nums))
+    for i := range dp {
+        dp[i] = 1
+        parent[i] = -1 // no predecessor
+    }
+
+    bestIndex := 0
+    for i := 1; i < len(nums); i++ {
+        for j := 0; j < i; j++ {
+            if nums[j] < nums[i] && dp[j]+1 > dp[i] {
+                dp[i] = dp[j] + 1
+                parent[i] = j
+            }
+        }
+        if dp[i] > dp[bestIndex] {
+            bestIndex = i
+        }
+    }
+
+    // Walk the parent chain backwards, then reverse.
+    sequence := []int{}
+    for at := bestIndex; at != -1; at = parent[at] {
+        sequence = append(sequence, nums[at])
+    }
+    for l, r := 0, len(sequence)-1; l < r; l, r = l+1, r-1 {
+        sequence[l], sequence[r] = sequence[r], sequence[l]
+    }
+    return sequence
 }
 ```
 
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+from bisect import bisect_left
+
+def lis_length(nums):
+    """O(n^2). dp[i] = length of the LIS ENDING at index i."""
+    if not nums:
+        return 0
+
+    dp = [1] * len(nums)                # a single element is a run of 1
+    for i in range(1, len(nums)):
+        for j in range(i):
+            if nums[j] < nums[i]:
+                dp[i] = max(dp[i], dp[j] + 1)
+
+    return max(dp)                      # the MAX, not dp[-1]
+
+def lis_length_fast(nums):
+    """O(n log n) patience sorting.
+    tails[k] = smallest tail among runs of length k+1.
+    tails is NOT a valid subsequence — only its length is the answer."""
+    tails = []
+    for x in nums:
+        # bisect_left is a lower bound: an equal tail is REPLACED,
+        # which enforces strict increase.
+        position = bisect_left(tails, x)
+        if position == len(tails):
+            tails.append(x)             # x extends the longest run
+        else:
+            tails[position] = x         # smaller tail, same length
+    return len(tails)
+
+def lis_sequence(nums):
+    """Reconstruct one actual longest subsequence."""
+    if not nums:
+        return []
+
+    dp = [1] * len(nums)
+    parent = [-1] * len(nums)
+    best_index = 0
+
+    for i in range(1, len(nums)):
+        for j in range(i):
+            if nums[j] < nums[i] and dp[j] + 1 > dp[i]:
+                dp[i] = dp[j] + 1
+                parent[i] = j
+        if dp[i] > dp[best_index]:
+            best_index = i
+
+    sequence = []
+    at = best_index
+    while at != -1:
+        sequence.append(nums[at])
+        at = parent[at]
+    return sequence[::-1]
 ```
 
 ```java
-int knapsack(int[] weights, int[] values, int cap) {
-    int[] dp = new int[cap + 1];
-    for (int i = 0; i < weights.length; i++)
-        for (int w = cap; w >= weights[i]; w--)
-            dp[w] = Math.max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+import java.util.*;
+
+public class LIS {
+    // O(n^2). dp[i] = length of the LIS ending at index i.
+    public static int lisLength(int[] nums) {
+        if (nums.length == 0) return 0;
+        int[] dp = new int[nums.length];
+        Arrays.fill(dp, 1);
+
+        int best = 1;
+        for (int i = 1; i < nums.length; i++) {
+            for (int j = 0; j < i; j++)
+                if (nums[j] < nums[i]) dp[i] = Math.max(dp[i], dp[j] + 1);
+            best = Math.max(best, dp[i]);      // the MAX, not dp[n-1]
+        }
+        return best;
+    }
+
+    // O(n log n). tails[k] = smallest tail among runs of length k+1.
+    public static int lisLengthFast(int[] nums) {
+        List<Integer> tails = new ArrayList<>();
+        for (int x : nums) {
+            int position = lowerBound(tails, x);   // >= keeps it STRICT
+            if (position == tails.size()) tails.add(x);
+            else tails.set(position, x);
+        }
+        return tails.size();
+    }
+
+    private static int lowerBound(List<Integer> sorted, int target) {
+        int lo = 0, hi = sorted.size();
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;
+            if (sorted.get(mid) < target) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
+    }
 }
 ```
 
 ```cpp
-int knapsack(vector<int>& weights, vector<int>& values, int cap) {
-    vector<int> dp(cap + 1, 0);
-    for (size_t i = 0; i < weights.size(); ++i)
-        for (int w = cap; w >= weights[i]; --w)
-            dp[w] = max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+#include <algorithm>
+#include <vector>
+using namespace std;
+
+// O(n^2). dp[i] = length of the LIS ending at index i.
+int lisLength(const vector<int>& nums) {
+    if (nums.empty()) return 0;
+    vector<int> dp(nums.size(), 1);
+
+    int best = 1;
+    for (size_t i = 1; i < nums.size(); ++i) {
+        for (size_t j = 0; j < i; ++j)
+            if (nums[j] < nums[i]) dp[i] = max(dp[i], dp[j] + 1);
+        best = max(best, dp[i]);               // the MAX, not dp.back()
+    }
+    return best;
+}
+
+// O(n log n). lower_bound replaces an equal tail → STRICT increase.
+int lisLengthFast(const vector<int>& nums) {
+    vector<int> tails;
+    for (int x : nums) {
+        auto it = lower_bound(tails.begin(), tails.end(), x);
+        if (it == tails.end()) tails.push_back(x);
+        else *it = x;
+    }
+    return (int)tails.size();
 }
 ```
 
@@ -231,131 +529,392 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 
 ## 9. Solved Example 1
 
-### Problem — LIS (LeetCode 300)
-Given an integer array `nums`, return the **length** of the longest strictly increasing subsequence.
+### Problem — Longest Increasing Subsequence (LeetCode 300)
+Return the length of the longest **strictly increasing** subsequence.
 
 ### Thought Process
-1. Maintain `tails`, where `tails[k]` is the smallest possible tail value of an increasing subsequence of length `k+1`.
-2. For each `x`, binary-search the leftmost `tails[i] >= x`; replacing it keeps tails minimal, extending only when `x` is larger than every tail.
-3. If no such position exists, `x` extends the sequence (append); the final answer is `len(tails)`.
+
+**What does `dp[i]` mean?** The length of the longest strictly increasing subsequence that **ends at** index `i`.
+
+**How do we compute it?** For each earlier `j` with `nums[j] < nums[i]`, the run ending at `j` can be extended by `nums[i]`. Take the best such `j`, or 1 if none exists.
+
+**What is the base case?** `dp[i] = 1` for every `i` — a lone element is a run of length 1.
+
+**Why iterate forward?** `dp[i]` reads only `dp[j]` for `j < i`, so a left-to-right sweep has every dependency ready.
+
+**And the answer is `max(dp)`**, not `dp[n−1]` — the best run need not end at the last element.
 
 ### Dry Run
-`nums = [10,9,2,5,3,7]`
-- 10 → tails=[10]; 9 replaces → [9]; 2 replaces → [2]
-- 5 appends → [2,5]; 3 replaces 5 → [2,3]; 7 appends → [2,3,7]
-- `len(tails) = 3` ✓ (e.g. 2,3,7)
+
+Input: `nums = [10, 9, 2, 5, 3, 7, 101, 18]`
+
+| i | nums[i] | earlier `j` with `nums[j] < nums[i]` | best `dp[j]` | `dp[i]` |
+|---|---------|--------------------------------------|--------------|---------|
+| 0 | 10 | none | — | **1** |
+| 1 | 9 | none (10 is not < 9) | — | **1** |
+| 2 | 2 | none | — | **1** |
+| 3 | 5 | j=2 (`2`) | 1 | **2** |
+| 4 | 3 | j=2 (`2`) | 1 | **2** |
+| 5 | 7 | j=2 (`2`), j=3 (`5`), j=4 (`3`) | 2 (from j=3 or j=4) | **3** |
+| 6 | 101 | j=0..5 all smaller | 3 (from j=5) | **4** |
+| 7 | 18 | j=0..5 all smaller | 3 (from j=5) | **4** |
+
+`dp = [1, 1, 1, 2, 2, 3, 4, 4]` → answer **`max(dp) = 4`** ✓
+
+One witness: `2 → 3 → 7 → 101` (indices 2, 4, 5, 6). ✓
+
+**Note `dp[7] = 4` as well**, via `2 → 3 → 7 → 18`. Two different runs achieve the maximum — which is exactly what Example 3 will count.
+
+### The O(n log n) version on the same input
+
+| x | `tails` before | lower bound position | action | `tails` after |
+|---|----------------|----------------------|--------|---------------|
+| 10 | `[]` | 0 (past end) | append | `[10]` |
+| 9 | `[10]` | 0 | replace | `[9]` |
+| 2 | `[9]` | 0 | replace | `[2]` |
+| 5 | `[2]` | 1 (past end) | append | `[2, 5]` |
+| 3 | `[2,5]` | 1 | replace | `[2, 3]` |
+| 7 | `[2,3]` | 2 (past end) | append | `[2, 3, 7]` |
+| 101 | `[2,3,7]` | 3 (past end) | append | `[2, 3, 7, 101]` |
+| 18 | `[2,3,7,101]` | 3 | replace | `[2, 3, 7, 18]` |
+
+`len(tails) = 4` ✓ — the same answer.
+
+Note the final `tails = [2, 3, 7, 18]` *is* a valid subsequence here, but that is a coincidence. Feed it `[3, 4, 1, 2]` and `tails` ends as `[1, 2]` while a valid LIS is `[3, 4]` — same length, different elements. **Only the length is meaningful.**
 
 ### Visualization
-```
-input  ──▶ [ scan each x, binary-search into tails[] ]
-state  ──▶ tails[] holds minimal tail per length, updated in place
-output ──▶ len(tails) = LIS length
+
+```text
+index :   0   1   2   3   4   5    6    7
+value :  10   9   2   5   3   7  101   18
+dp    :   1   1   1   2   2   3    4    4
+                  └───┴───┴────┘
+                  2 → 3 → 7 → 101      length 4  ★
+
+answer = max(dp) = 4, achieved at BOTH index 6 and index 7
 ```
 
 ### Code
+
+```go
+func lengthOfLIS(nums []int) int {
+    if len(nums) == 0 {
+        return 0
+    }
+
+    // dp[i] = length of the longest increasing subsequence ENDING at i.
+    dp := make([]int, len(nums))
+    for i := range dp {
+        dp[i] = 1 // a lone element is a run of length 1
+    }
+
+    best := 1
+    for i := 1; i < len(nums); i++ {
+        for j := 0; j < i; j++ {
+            // nums[i] extends any run that ends at a smaller value.
+            if nums[j] < nums[i] && dp[j]+1 > dp[i] {
+                dp[i] = dp[j] + 1
+            }
+        }
+        if dp[i] > best {
+            best = dp[i] // the answer is the MAX, not dp[n-1]
+        }
+    }
+    return best
+}
+
+// lengthOfLISFast is the O(n log n) patience-sorting refinement.
+func lengthOfLISFast(nums []int) int {
+    // tails[k] = the smallest tail among increasing runs of length k+1.
+    // It is NOT a valid subsequence; only its length is the answer.
+    tails := []int{}
+
+    for _, x := range nums {
+        // sort.SearchInts is a lower bound: the first tail >= x. Using >=
+        // (not >) replaces an equal tail, enforcing STRICT increase.
+        position := sort.SearchInts(tails, x)
+
+        if position == len(tails) {
+            tails = append(tails, x) // x beats every tail: extend
+        } else {
+            tails[position] = x // same length, smaller tail is better
+        }
+    }
+    return len(tails)
+}
+```
+
 ```python
 from bisect import bisect_left
 
 def lengthOfLIS(nums):
-    tails = []                       # tails[k] = min tail of an LIS of length k+1
+    """O(n^2). dp[i] = LIS length ENDING at index i."""
+    if not nums:
+        return 0
+
+    dp = [1] * len(nums)                # a lone element is a run of 1
+    for i in range(1, len(nums)):
+        for j in range(i):
+            if nums[j] < nums[i]:
+                dp[i] = max(dp[i], dp[j] + 1)
+
+    return max(dp)                      # the MAX, not dp[-1]
+
+def lengthOfLIS_fast(nums):
+    """O(n log n). tails[k] = smallest tail among runs of length k+1."""
+    tails = []
     for x in nums:
-        i = bisect_left(tails, x)    # leftmost tail >= x (strictly increasing)
-        if i == len(tails):
-            tails.append(x)          # x extends the longest subsequence
+        position = bisect_left(tails, x)    # lower bound → STRICT increase
+        if position == len(tails):
+            tails.append(x)
         else:
-            tails[i] = x             # x becomes a smaller tail for that length
+            tails[position] = x
     return len(tails)
 ```
 
 ### Complexity
-Time O(n log n) — one binary search per element; Space O(n) for `tails`.
+O(n²) time and O(n) space for the DP; **O(n log n)** time and O(n) space for the patience version.
+
+---
 
 ## 10. Solved Example 2
 
-### Problem — Russian Dolls (LeetCode 354)
-Given envelopes `[w, h]`, one fits inside another only if both its width and height are strictly larger. Return the max number that can be nested.
+### Problem — Russian Doll Envelopes (LeetCode 354)
+Envelope `(w, h)` fits inside `(W, H)` only if `w < W` **and** `h < H`. Return the largest number that can be nested.
 
 ### Thought Process
-1. Sort by width ascending; for equal widths, sort height **descending** — this prevents two same-width envelopes from ever nesting via the height LIS.
-2. With widths handled by the sort, the answer reduces to the length of the strictly increasing subsequence of the **heights**.
-3. Run the O(n log n) patience/binary-search LIS on the height sequence.
+1. This is LIS in two dimensions. Sorting by width reduces it to one dimension — then it is an LIS on the heights.
+2. But there is a trap. If two envelopes share a width, sorting their heights **ascending** would let the LIS chain them — and they cannot nest, because nesting requires `w < W` strictly.
+3. **Fix: sort by width ascending, and by height *descending* when widths tie.** Equal-width envelopes then appear in decreasing height order, so a strictly increasing run can never take two of them.
+4. Run the O(n log n) LIS from Example 1 on the heights.
+5. Sorting is O(n log n) and the LIS is O(n log n), so the total is O(n log n).
 
 ### Dry Run
-`[[5,4],[6,4],[6,7],[2,3]]` → sort → `[[2,3],[5,4],[6,7],[6,4]]`
-- heights = `[3,4,7,4]`
-- LIS on heights: 3→[3], 4→[3,4], 7→[3,4,7], 4 replaces → [3,4,7]
-- answer = `3` ✓ ([2,3]→[5,4]→[6,7])
+
+Input: `envelopes = [[5,4], [6,4], [6,7], [2,3]]`
+
+**Step 1 — sort** (width ascending; height *descending* on ties):
+
+```text
+[2,3]   [5,4]   [6,7]   [6,4]
+                 └───────┘
+        width 6 appears twice → heights ordered 7 then 4
+```
+
+**Step 2 — LIS on the heights `[3, 4, 7, 4]`:**
+
+| h | `tails` before | lower bound | action | `tails` after |
+|---|----------------|-------------|--------|---------------|
+| 3 | `[]` | 0 (past end) | append | `[3]` |
+| 4 | `[3]` | 1 (past end) | append | `[3, 4]` |
+| 7 | `[3,4]` | 2 (past end) | append | `[3, 4, 7]` |
+| 4 | `[3,4,7]` | 1 | replace | `[3, 4, 7]` |
+
+`len(tails) = 3`
+
+Output: **3** ✓ — the chain `[2,3] → [5,4] → [6,7]`.
+
+**The tiebreak, demonstrated.** The two width-6 envelopes give heights `7` then `4`. Since `4 < 7`, the later one cannot extend a run containing the earlier one. Had we sorted heights ascending (`4` then `7`), the height sequence would be `[3, 4, 4, 7]` and the LIS would find `3 → 4 → 7` using **both** width-6 envelopes — claiming `[6,4]` nests inside `[6,7]`, which is false since their widths are equal.
 
 ### Visualization
-```
-input  ──▶ [ sort (w asc, h desc), then LIS on heights ]
-state  ──▶ tails[] over heights, same-width envelopes can't chain
-output ──▶ len(tails) = max nested envelopes
+
+```text
+sorted:   [2,3]   [5,4]   [6,7]   [6,4]
+heights:    3       4       7       4
+            └───────┴───────┘
+            strictly increasing 3 → 4 → 7   →  answer 3
+
+same width ⇒ heights DESCENDING (7 then 4)
+          ⇒ a strict LIS can never take both     ✓
 ```
 
 ### Code
+
+```go
+func maxEnvelopes(envelopes [][]int) int {
+    // Width ascending; on ties, height DESCENDING so two equal-width
+    // envelopes can never both appear in a strictly increasing run.
+    sort.Slice(envelopes, func(i, j int) bool {
+        if envelopes[i][0] == envelopes[j][0] {
+            return envelopes[i][1] > envelopes[j][1]
+        }
+        return envelopes[i][0] < envelopes[j][0]
+    })
+
+    // Now it is just an LIS over the heights.
+    tails := []int{}
+    for _, envelope := range envelopes {
+        height := envelope[1]
+        position := sort.SearchInts(tails, height) // lower bound
+        if position == len(tails) {
+            tails = append(tails, height)
+        } else {
+            tails[position] = height
+        }
+    }
+    return len(tails)
+}
+```
+
 ```python
 from bisect import bisect_left
 
 def maxEnvelopes(envelopes):
-    envelopes.sort(key=lambda e: (e[0], -e[1]))   # w asc, h desc on ties
-    tails = []                                     # LIS over heights
-    for _, h in envelopes:
-        i = bisect_left(tails, h)
-        if i == len(tails):
-            tails.append(h)
+    # Width ascending; on ties, height DESCENDING.
+    envelopes.sort(key=lambda e: (e[0], -e[1]))
+
+    tails = []                          # LIS over the heights
+    for _, height in envelopes:
+        position = bisect_left(tails, height)
+        if position == len(tails):
+            tails.append(height)
         else:
-            tails[i] = h
+            tails[position] = height
     return len(tails)
 ```
 
 ### Complexity
-Time O(n log n) — sort plus binary-search LIS; Space O(n) for `tails`.
+Time **O(n log n)** — the sort and the LIS are both O(n log n). Space O(n).
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — Number of LIS (LeetCode 673)
-Given `nums`, return **how many** longest strictly increasing subsequences exist.
+### Problem — Number of Longest Increasing Subsequences (LeetCode 673)
+Return **how many** longest increasing subsequences the array has.
 
 ### Thought Process
-1. Keep two arrays: `length[i]` = length of the LIS ending at `i`, and `count[i]` = number of such LIS ending at `i`.
-2. For each `j < i` with `nums[j] < nums[i]`: if it yields a longer chain (`length[j]+1 > length[i]`), reset `length[i]` and copy `count[j]`; if it ties (`length[j]+1 == length[i]`), add `count[j]`.
-3. Find the global max length, then sum `count[i]` over every `i` whose `length[i]` equals it.
+1. This is where the O(n log n) patience version stops helping — `tails` tracks lengths, not multiplicities. We need the O(n²) DP.
+2. Keep two arrays: `length[i]` (the LIS ending at `i`, as before) and `count[i]` (how many such subsequences there are).
+3. Scanning `j < i` with `nums[j] < nums[i]`, two cases:
+   - `length[j] + 1 > length[i]` → a **strictly better** run found. Overwrite: `length[i] = length[j]+1`, `count[i] = count[j]`.
+   - `length[j] + 1 == length[i]` → **another way** to achieve the same length. Accumulate: `count[i] += count[j]`.
+4. Base: `length[i] = 1`, `count[i] = 1`.
+5. The answer is the sum of `count[i]` over every `i` where `length[i]` equals the overall maximum.
+
+The overwrite-versus-accumulate distinction is the whole problem. Using `+=` in the first case would double-count runs that were already superseded.
 
 ### Dry Run
-`nums = [1,3,5,4,7]`
-- length=[1,2,3,3,4], count=[1,1,1,1,2] (index 4: from both 5 and 4)
-- max length = 4, achieved only at index 4
-- answer = `count[4] = 2` ✓ (1,3,5,7 and 1,3,4,7)
+
+Input: `nums = [1, 3, 5, 4, 7]`
+
+| i | nums[i] | j scanned | comparison | `length[i]` | `count[i]` |
+|---|---------|-----------|------------|-------------|------------|
+| 0 | 1 | — | — | **1** | **1** |
+| 1 | 3 | j=0 (`1<3`) | `1+1 = 2 > 1` → overwrite | **2** | **1** (= count[0]) |
+| 2 | 5 | j=0 (`1<5`) | `1+1 = 2 > 1` → overwrite | 2 | 1 |
+|   |   | j=1 (`3<5`) | `2+1 = 3 > 2` → overwrite | **3** | **1** (= count[1]) |
+| 3 | 4 | j=0 (`1<4`) | `2 > 1` → overwrite | 2 | 1 |
+|   |   | j=1 (`3<4`) | `3 > 2` → overwrite | **3** | **1** (= count[1]) |
+|   |   | j=2 (`5<4`? no) | skipped | 3 | 1 |
+| 4 | 7 | j=0 (`1<7`) | `2 > 1` → overwrite | 2 | 1 |
+|   |   | j=1 (`3<7`) | `3 > 2` → overwrite | 3 | 1 |
+|   |   | j=2 (`5<7`) | `3+1 = 4 > 3` → overwrite | **4** | **1** (= count[2]) |
+|   |   | j=3 (`4<7`) | `3+1 = 4 == 4` → **accumulate** | 4 | **2** (`1 + count[3]`) |
+
+Final: `length = [1, 2, 3, 3, 4]`, `count = [1, 1, 1, 1, 2]`
+
+Maximum length is **4**, achieved only at index 4, whose count is **2**.
+
+Output: **2** ✓ — the two subsequences are `1 → 3 → 5 → 7` and `1 → 3 → 4 → 7`. ✓
+
+The decisive row is the last one: `j = 2` found a strictly longer run and *overwrote*, then `j = 3` found an equally long one and *accumulated*. Getting either branch wrong changes the answer.
+
+**An edge case worth checking:** `nums = [2, 2, 2, 2, 2]`. No `j` has `nums[j] < nums[i]`, so every `length[i] = 1` and `count[i] = 1`. The maximum length is 1, achieved at all five indices, so the answer is **5** ✓ — five subsequences, each a single element.
 
 ### Visualization
-```
-input  ──▶ [ for each i, scan j<i, update length[i] & count[i] ]
-state  ──▶ length[] tracks LIS end-length, count[] tracks tallies
-output ──▶ sum count[i] where length[i] == max length
+
+```text
+nums   :  1   3   5   4   7
+length :  1   2   3   3   4
+count  :  1   1   1   1   2
+                  └───┴────┘
+        both length-3 runs (…5 and …4) extend into 7,
+        so count[4] = count[2] + count[3] = 1 + 1 = 2
+
+  1 → 3 → 5 → 7
+  1 → 3 → 4 → 7        two LIS of length 4
 ```
 
 ### Code
+
+```go
+func findNumberOfLIS(nums []int) int {
+    if len(nums) == 0 {
+        return 0
+    }
+
+    // length[i] = LIS length ending at i;  count[i] = how many such.
+    length := make([]int, len(nums))
+    count := make([]int, len(nums))
+    for i := range nums {
+        length[i] = 1
+        count[i] = 1
+    }
+
+    longest := 1
+    for i := 1; i < len(nums); i++ {
+        for j := 0; j < i; j++ {
+            if nums[j] >= nums[i] {
+                continue
+            }
+
+            switch {
+            case length[j]+1 > length[i]:
+                // A strictly better run: replace, and inherit its count.
+                length[i] = length[j] + 1
+                count[i] = count[j]
+            case length[j]+1 == length[i]:
+                // Another way to reach the same length: accumulate.
+                count[i] += count[j]
+            }
+        }
+        if length[i] > longest {
+            longest = length[i]
+        }
+    }
+
+    // Sum the counts of every index achieving the maximum length.
+    total := 0
+    for i := range nums {
+        if length[i] == longest {
+            total += count[i]
+        }
+    }
+    return total
+}
+```
+
 ```python
 def findNumberOfLIS(nums):
-    n = len(nums)
-    length = [1] * n                  # LIS length ending at i
-    count = [1] * n                   # number of such LIS ending at i
-    for i in range(n):
+    if not nums:
+        return 0
+
+    length = [1] * len(nums)            # LIS length ending at i
+    count = [1] * len(nums)             # how many such subsequences
+
+    for i in range(1, len(nums)):
         for j in range(i):
-            if nums[j] < nums[i]:
-                if length[j] + 1 > length[i]:
-                    length[i] = length[j] + 1
-                    count[i] = count[j]        # new longer chain: inherit
-                elif length[j] + 1 == length[i]:
-                    count[i] += count[j]        # tie: accumulate ways
-    best = max(length)
-    return sum(c for l, c in zip(length, count) if l == best)
+            if nums[j] >= nums[i]:
+                continue
+            if length[j] + 1 > length[i]:
+                # A strictly better run: replace and inherit its count.
+                length[i] = length[j] + 1
+                count[i] = count[j]
+            elif length[j] + 1 == length[i]:
+                # Another way to the same length: accumulate.
+                count[i] += count[j]
+
+    longest = max(length)
+    return sum(c for l, c in zip(length, count) if l == longest)
 ```
 
 ### Complexity
-Time O(n²) — nested scan over pairs; Space O(n) for `length` and `count`.
+Time **O(n²)** — every pair `(j, i)` is examined once. Space O(n) for the two arrays.
 
+> This is the case that justifies keeping the O(n²) formulation in your toolkit. Patience sorting is faster for the length alone, but it collapses the information the count needs — a good reminder that the "better" algorithm is only better for the question it was designed for.
+
+---
 
 ## 12. LeetCode Practice Set
 
