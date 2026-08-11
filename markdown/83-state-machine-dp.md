@@ -41,32 +41,156 @@ state machine, stock, transitions, dp, hold sell.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Each day I can do one of a few things; what sequence of decisions ends up best?"*
+
+Running example: prices `[1, 3, 2, 4]`, unlimited buy/sell, and you may hold at most one share.
+
 ### Intuition
-Naive recursion recomputes overlapping subproblems — exponential time.
+On every day you either act or you don't, and what you're allowed to do depends on whether you currently own a share. Branch on the decision, recurse into the next day, and keep the better outcome.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. `best(day, owning)` = best profit obtainable from `day` onward, given whether you own a share.
+2. If `day == n`, return 0 — no future decisions left.
+3. **Do nothing:** `best(day+1, owning)`.
+4. **Act:** if `owning`, sell → `prices[day] + best(day+1, false)`; if not, buy → `-prices[day] + best(day+1, true)`.
+5. Return the larger of the two.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(2^n)** — two branches every day.
+- Space: O(n) recursion stack.
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the State Machine DP pattern is built to use.
+- Only two things ever distinguish one call from another: the day, and whether you're holding. Yet the recursion re-derives them constantly:
+
+```text
+prices = [1, 3, 2, 4]
+
+buy@0, sell@1, buy@2  ──▶ best(3, owning=true)
+buy@0, sell@1, skip@2 ──▶ best(3, owning=false)
+skip@0, buy@1, skip@2 ──▶ best(3, owning=true)   ← identical to the first
+skip@0, skip@1, buy@2 ──▶ best(3, owning=true)   ← and again
+```
+
+  Three different histories, same future. The profit already banked differs, but the *decision problem* from day 3 onward is byte-for-byte the same.
+- What the brute force fails to exploit: **the future depends on the situation you are in, not on the story of how you got there.** Here there are only two situations per day, so `2n` states — not `2^n`.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the State Machine DP invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Name the handful of situations ("states") you can be in at the close of a day, draw one arrow per legal action, and carry a single running best for each state as you sweep the days forward.**
+
+It is a board game with two or three squares. Each day, every square asks "what's the best I can be worth, either by staying put or by receiving a token from a square that has an arrow pointing at me?" You only ever track one number per square, so the whole array of days collapses into two or three scalars.
+
+### The thought process
+
+```text
+We need    : the best outcome of a long sequence of daily decisions.
+Obvious way: branch on every decision.
+Too slow   : 2^n.
+Notice     : the only thing that carries forward is "do I hold a share?"
+             (plus a cooldown flag, or a transaction counter, if the
+              problem adds one).
+Notice too : that is a tiny finite set of situations — a state machine.
+Therefore  : one running best per state, updated once per day.
+Now        : O(n * states) time and O(states) space.
+```
+
+### The machine, drawn
+
+The base machine has two states. Everything else in this chapter is this picture with extra boxes.
+
+```text
+       stay (do nothing)                    stay (do nothing)
+            ┌───┐                                ┌───┐
+            v   │                                v   │
+        ┌────────────┐   buy:  hold = cash - p   ┌────────────┐
+        │    cash    │ ────────────────────────▶ │    hold    │
+        │ own 0 shrs │                           │ own 1 shr  │
+        └────────────┘ ◀──────────────────────── └────────────┘
+                         sell: cash = hold + p
+
+  cash = the best profit I can be sitting on today while owning nothing
+  hold = the best profit I can be sitting on today while owning one share
+         (a negative number early on — you have spent money and banked none)
+```
+
+Each day, at price `p`:
+
+```text
+cash = max(cash, hold + p)      stay in cash, or sell the share I hold
+hold = max(hold, cash - p)      keep holding,  or spend cash to buy today
+```
+
+Base case: `cash = 0` (you start owning nothing and having earned nothing) and `hold = -infinity` (owning a share before day 0 is impossible, and the sentinel must lose every `max`). Starting `hold` at `0` would be a bug: it would claim you can own a share for free.
+
+**Variants are new boxes and new arrows, nothing more:**
+
+| Variant | Change to the machine |
+|---|---|
+| At most one transaction (LC 121) | `hold = max(hold, -p)` — the buy comes from a fixed 0 baseline, not from `cash`, so previous profits can't fund a second purchase |
+| Transaction fee (LC 714) | charge it once per round trip: `cash = max(cash, hold + p - fee)` |
+| Cooldown (LC 309) | split `cash` into `sold` (sold *today*, frozen) and `rest` (idle, free to buy); `rest` receives from `sold` a day late |
+| At most `k` transactions (LC 188) | `k` stacked copies of the pair: `buy[j]`, `sell[j]` |
+
+### Why every update must read *yesterday's* numbers
+
+All the transitions describe "state at the end of day `d`, computed from states at the end of day `d-1`". If you overwrite a variable and then read it again in the same day, you have silently allowed two actions on one day.
+
+For the two-state machine that happens to be harmless (buying and selling on the same day nets zero). For **cooldown it is a real bug.** Correct: `rest` may only absorb `sold` from the *previous* day — that one-day gap *is* the cooldown. Watch it vanish if you feed `rest` the freshly-computed `sold`:
+
+```text
+prices = [1, 3, 2, 4]        correct answer with cooldown: 3  (buy@1, sell@4)
+
+  BROKEN (rest reads today's sold)       CORRECT (everything reads yesterday)
+  p=1: hold=-1 sold=0 rest=0             p=1: hold=-1  sold=-inf rest=0
+  p=3: hold=-1 sold=2 rest=2             p=3: hold=-1  sold=2    rest=0
+  p=2: hold=0  sold=2 rest=2  ← bought   p=2: hold=-1  sold=1    rest=2
+       on the same day it sold                (rest only NOW learns about the
+  p=4: hold=0  sold=4 rest=4               sale from p=3 — one day later)
+                                         p=4: hold=-1  sold=3    rest=2
+
+  answer 4  ✗  (that's the no-cooldown   answer 3  ✓
+                answer: 1->3 and 2->4)
+```
+
+The fix is one line: snapshot the three values into `prevHold, prevSold, prevRest` at the top of the loop and compute every new value from the snapshot.
+
+### Steps
+
+```text
+Step 1 → List the states. Ask: "what must I remember at the end of a day?"
+Step 2 → Give each state a variable and an English sentence.
+Step 3 → Draw one arrow per legal action, and label it with its price effect.
+Step 4 → Initialise: 0 for reachable start states, -infinity for the rest.
+Step 5 → For each day: snapshot, then apply every transition to the snapshot.
+Step 6 → Answer = the best terminal state (never one where you still hold).
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  a timeline of days/steps, a small set of modes you can be in,
+  and rules about what you may do in each mode:
+  "buy/sell", "at most k transactions", "cooldown", "fee",
+  "cannot do X twice in a row"
+        ↓
+Think about...
+  "What is the complete list of situations I can be in at the end of a step?"
+  Each situation is one variable.
+        ↓
+Use...
+  one running best per state, swept forward over the days
+  2 states  -> cash / hold
+  3 states  -> hold / sold / rest        (cooldown)
+  2k states -> buy[1..k] / sell[1..k]    (bounded transactions)
+  and ALWAYS compute the new values from a snapshot of the old ones
+```
 
 ### Visual explanation
 
@@ -91,61 +215,206 @@ Optimal substructure + overlapping subproblems ⇒ store each subproblem's answe
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-State Machine DP  : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+Cooldown machine (LeetCode 309) — three states, four arrows.
+
+                buy:  hold = max(hold, prevRest - p)
+        ┌────────────────────────────────────────────┐
+        │                                            v
+  ┌───────────┐                              ┌──────────────┐
+  │   rest    │                              │     hold     │
+  │ idle, may │                              │  own 1 share │
+  │ buy today │                              └──────────────┘
+  └───────────┘                                     │
+        ^                                           │ sell:
+        │                                           │ sold = prevHold + p
+        │  cooldown expires:                        v
+        │  rest = max(prevRest, prevSold)    ┌──────────────┐
+        └────────────────────────────────────│     sold     │
+                                             │ sold TODAY,  │
+                                             │ frozen       │
+                                             └──────────────┘
+
+  the missing arrow is the point: there is NO sold ──▶ hold arrow.
+  You must pass through `rest`, which costs exactly one day.
 ```
 
 ### Interview explanation
-"This is a State Machine DP problem. I'll optimal substructure + overlapping subproblems ⇒ store each subproblem's answer once and reuse it. That brings the complexity down to O(states × transitions) time and O(states) space — here's the template."
+"I'd model this as a small state machine. At the end of each day I'm in one of a few situations — holding a share or not, plus a cooldown or transaction-count dimension if the problem adds one — and I keep one running best profit per situation. Each legal action is an arrow: buying moves me from `cash` to `hold` and costs today's price, selling moves me back and pays it. So per day it's just `cash = max(cash, hold + price)` and `hold = max(hold, cash - price)`. I start `cash` at 0 and `hold` at negative infinity, since holding before day zero is impossible. The one thing to be careful about is computing every new value from yesterday's snapshot — with a cooldown, reading a value you just overwrote silently lets you buy and sell on the same day. It's O(n) time and O(1) space for the two- and three-state versions, O(n·k) time and O(k) space when there's a transaction cap."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Dynamic Programming** family template. Adapt the comparison/condition to the specific problem.
+> One running best per state; snapshot yesterday, then apply every arrow.
 
 ```go
-// 0/1 Knapsack, space-optimized to 1D. dp[w] = best value at capacity w.
-func knapsack(weights, values []int, cap int) int {
-    dp := make([]int, cap+1)
-    for i := range weights {
-        for w := cap; w >= weights[i]; w-- {  // reverse: each item once
-            if dp[w-weights[i]]+values[i] > dp[w] {
-                dp[w] = dp[w-weights[i]] + values[i]
+// MaxProfitUnlimited is the two-state machine with an optional per-round-trip
+// fee (pass fee = 0 for the plain unlimited-transactions problem).
+//   cash = best profit today while owning nothing
+//   hold = best profit today while owning one share
+func MaxProfitUnlimited(prices []int, fee int) int {
+    cash, hold := 0, -1<<62 // holding before day 0 is impossible
+
+    for _, p := range prices {
+        prevCash, prevHold := cash, hold // yesterday's snapshot
+
+        cash = max(prevCash, prevHold+p-fee) // stay in cash, or sell
+        hold = max(prevHold, prevCash-p)     // keep holding, or buy today
+    }
+    return cash // never end the sequence still holding
+}
+
+// MaxProfitAtMostK stacks k copies of the buy/sell pair.
+//   buy[j]  = best profit after the j-th purchase (currently holding)
+//   sell[j] = best profit after the j-th sale     (currently in cash)
+func MaxProfitAtMostK(prices []int, k int) int {
+    n := len(prices)
+    if n == 0 || k <= 0 {
+        return 0
+    }
+
+    // More than n/2 transactions can never be used: each needs two days.
+    // Fall back to grabbing every upward step.
+    if k >= n/2 {
+        profit := 0
+        for i := 1; i < n; i++ {
+            if prices[i] > prices[i-1] {
+                profit += prices[i] - prices[i-1]
             }
         }
+        return profit
     }
-    return dp[cap]
+
+    buy := make([]int, k+1)
+    sell := make([]int, k+1)
+    for j := 1; j <= k; j++ {
+        buy[j] = -1 << 62 // no purchase has happened yet
+    }
+
+    for _, p := range prices {
+        for j := 1; j <= k; j++ {
+            buy[j] = max(buy[j], sell[j-1]-p) // fund the j-th buy from j-1 sales
+            sell[j] = max(sell[j], buy[j]+p)  // close the j-th position
+        }
+    }
+    return sell[k]
 }
 ```
 
 ```python
-def knapsack(weights, values, cap):
-    dp = [0] * (cap + 1)               # dp[w] = best value for capacity w
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):   # reverse -> 0/1 (item used once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
+def max_profit_unlimited(prices, fee=0):
+    """Two-state machine; fee is charged once per completed round trip."""
+    cash, hold = 0, float('-inf')          # holding before day 0 is impossible
+
+    for p in prices:
+        prev_cash, prev_hold = cash, hold  # yesterday's snapshot
+        cash = max(prev_cash, prev_hold + p - fee)   # stay, or sell
+        hold = max(prev_hold, prev_cash - p)         # stay, or buy today
+    return cash                            # never end still holding
+
+
+def max_profit_at_most_k(prices, k):
+    """k stacked buy/sell layers.
+    buy[j]  = best profit after the j-th purchase (holding)
+    sell[j] = best profit after the j-th sale     (in cash)"""
+    n = len(prices)
+    if n == 0 or k <= 0:
+        return 0
+
+    if k >= n // 2:                        # cap is unreachable: take every rise
+        return sum(max(0, prices[i] - prices[i - 1]) for i in range(1, n))
+
+    buy = [float('-inf')] * (k + 1)
+    sell = [0] * (k + 1)
+
+    for p in prices:
+        for j in range(1, k + 1):
+            buy[j] = max(buy[j], sell[j - 1] - p)    # fund j-th buy from j-1 sales
+            sell[j] = max(sell[j], buy[j] + p)       # close the j-th position
+    return sell[k]
 ```
 
 ```java
-int knapsack(int[] weights, int[] values, int cap) {
-    int[] dp = new int[cap + 1];
-    for (int i = 0; i < weights.length; i++)
-        for (int w = cap; w >= weights[i]; w--)
-            dp[w] = Math.max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+public class StateMachineDP {
+    // Two-state machine; fee is charged once per completed round trip.
+    public static int maxProfitUnlimited(int[] prices, int fee) {
+        long cash = 0, hold = Long.MIN_VALUE / 4;   // cannot hold before day 0
+
+        for (int p : prices) {
+            long prevCash = cash, prevHold = hold;  // yesterday's snapshot
+            cash = Math.max(prevCash, prevHold + p - fee);  // stay, or sell
+            hold = Math.max(prevHold, prevCash - p);        // stay, or buy
+        }
+        return (int) cash;
+    }
+
+    // k stacked buy/sell layers.
+    public static int maxProfitAtMostK(int[] prices, int k) {
+        int n = prices.length;
+        if (n == 0 || k <= 0) return 0;
+
+        if (k >= n / 2) {                          // cap unreachable
+            int profit = 0;
+            for (int i = 1; i < n; i++)
+                if (prices[i] > prices[i - 1]) profit += prices[i] - prices[i - 1];
+            return profit;
+        }
+
+        long[] buy = new long[k + 1];
+        long[] sell = new long[k + 1];
+        for (int j = 1; j <= k; j++) buy[j] = Long.MIN_VALUE / 4;
+
+        for (int p : prices) {
+            for (int j = 1; j <= k; j++) {
+                buy[j] = Math.max(buy[j], sell[j - 1] - p);  // fund j-th buy
+                sell[j] = Math.max(sell[j], buy[j] + p);     // close it
+            }
+        }
+        return (int) sell[k];
+    }
 }
 ```
 
 ```cpp
-int knapsack(vector<int>& weights, vector<int>& values, int cap) {
-    vector<int> dp(cap + 1, 0);
-    for (size_t i = 0; i < weights.size(); ++i)
-        for (int w = cap; w >= weights[i]; --w)
-            dp[w] = max(dp[w], dp[w - weights[i]] + values[i]);
-    return dp[cap];
+#include <algorithm>
+#include <climits>
+#include <vector>
+using namespace std;
+
+// Two-state machine; fee is charged once per completed round trip.
+int maxProfitUnlimited(const vector<int>& prices, int fee) {
+    long long cash = 0, hold = LLONG_MIN / 4;      // cannot hold before day 0
+
+    for (int p : prices) {
+        long long prevCash = cash, prevHold = hold;      // yesterday's snapshot
+        cash = max(prevCash, prevHold + p - fee);        // stay, or sell
+        hold = max(prevHold, prevCash - p);              // stay, or buy
+    }
+    return (int)cash;
+}
+
+// k stacked buy/sell layers.
+int maxProfitAtMostK(const vector<int>& prices, int k) {
+    int n = (int)prices.size();
+    if (n == 0 || k <= 0) return 0;
+
+    if (k >= n / 2) {                              // cap unreachable
+        int profit = 0;
+        for (int i = 1; i < n; ++i)
+            if (prices[i] > prices[i - 1]) profit += prices[i] - prices[i - 1];
+        return profit;
+    }
+
+    vector<long long> buy(k + 1, LLONG_MIN / 4), sell(k + 1, 0);
+
+    for (int p : prices) {
+        for (int j = 1; j <= k; ++j) {
+            buy[j] = max(buy[j], sell[j - 1] - p);       // fund the j-th buy
+            sell[j] = max(sell[j], buy[j] + p);          // close the position
+        }
+    }
+    return (int)sell[k];
 }
 ```
 
@@ -231,124 +500,331 @@ int knapsack(vector<int>& weights, vector<int>& values, int cap) {
 ## 9. Solved Example 1
 
 ### Problem — Best Time Stock (LeetCode 121)
-At most **one** transaction: buy once, sell once (later). Maximize profit; return 0 if no gain is possible.
+You may complete **at most one** transaction: buy on one day and sell on a later day. Return the maximum profit, or `0` if no profitable pair exists.
 
 ### Thought Process
-1. Two states per day: `cash` = max profit holding no stock, `hold` = max profit currently holding a share.
-2. Transitions: `cash = max(cash, hold + price)` (sell today); `hold = max(hold, -price)` (buy today — note `-price`, not `cash - price`, because only one buy is allowed).
-3. Start `cash = 0`, `hold = -inf`. Answer is `cash` after the last day.
+1. **What do the states mean?** Two variables, each holding a running best over all days seen so far.
+   `cash` = *the best profit I can be sitting on at the end of today, having already sold (or never bought).*
+   `hold` = *the best profit I can be sitting on at the end of today while owning the one share I am allowed to buy* — a negative number, because money went out and none has come back.
+2. **How do we compute them?** At price `p`:
+   `cash = max(cash, hold + p)` — either stay in cash, or sell the share I'm holding for `p`.
+   `hold = max(hold, -p)` — either keep the share I have, or buy today. Note the term is `-p`, **not** `cash - p`: with only one transaction allowed, the purchase must start from a zero baseline. Funding it from `cash` would spend the profit of an earlier sale, which is a second transaction.
+3. **What is the base case?** `cash = 0`: before day 0 you own nothing and have earned nothing. `hold = -infinity`: owning a share before day 0 is impossible, and the sentinel has to lose every `max`. Setting `hold = 0` would claim a free share and inflate the answer by the first sale price.
+4. **Why forward, and why a snapshot?** Days are processed left to right because a state at day `d` is defined from day `d-1`. Here `hold` never reads `cash`, so the two lines are independent and order does not matter — but writing `cash` first keeps the habit that saves you in the cooldown variant.
+5. Answer is `cash` after the last day — you would never choose to end still holding.
 
 ### Dry Run
-prices = [7,1,5,3,6,4]
-- day 7: hold=-7, cash=0
-- day 1: hold=max(-7,-1)=-1, cash=0
-- day 5: hold=-1, cash=max(0,-1+5)=4
-- day 6: hold=-1, cash=max(4,-1+6)=5
-- Answer = **5** (buy at 1, sell at 6).
+
+Input: `prices = [7, 1, 5, 3, 6, 4]`
+
+| day | `p` | `hold + p` (sell today) | `cash` = max(prev, that) | `-p` (buy today) | `hold` = max(prev, that) |
+|-----|-----|--------------------------|---------------------------|-------------------|---------------------------|
+| — | start | — | **0** | — | **-inf** |
+| 0 | 7 | `-inf + 7` | **0** | -7 | **-7** |
+| 1 | 1 | `-7 + 1 = -6` | **0** | -1 | **-1** |
+| 2 | 5 | `-1 + 5 = 4` | **4** | -5 | **-1** |
+| 3 | 3 | `-1 + 3 = 2` | **4** | -3 | **-1** |
+| 4 | 6 | `-1 + 6 = 5` | **5** | -6 | **-1** |
+| 5 | 4 | `-1 + 4 = 3` | **5** | -4 | **-1** |
+
+Output: **5** — buy at 1 (day 1), sell at 6 (day 4).
+
+Day 2 is the row worth studying: `cash` jumps to 4 by selling at 5, but `hold` stays at `-1`. The machine keeps both worlds alive simultaneously, so when day 4's price of 6 arrives, the still-open position bought at 1 is right there waiting. A single-variable "best so far" cannot do that.
 
 ### Visualization
-```
-hold ──▶ [ best profit while owning a share, single buy ]
-cash ──▶ [ best profit after selling, read as the answer ]
+
+```text
+        stay                                     stay
+       ┌───┐                                    ┌───┐
+       v   │                                    v   │
+  ┌──────────┐    buy: hold = max(hold, -p)    ┌──────────┐
+  │   cash   │ ──────────────────────────────▶ │   hold   │
+  │  own 0   │                                 │  own 1   │
+  └──────────┘ ◀────────────────────────────── └──────────┘
+                 sell: cash = max(cash, hold+p)
+
+prices:   7     1     5     3     6     4
+cash:     0     0     4     4     5     5     <-- answer
+hold:    -7    -1    -1    -1    -1    -1
+               ^                 ^
+               |                 |
+          cheapest buy      best sale against it
+             so far            (-1) + 6 = 5
 ```
 
 ### Code
+
+```go
+// maxProfit solves "at most one transaction" with a two-state machine.
+//   cash = best profit today while owning nothing
+//   hold = best profit today while owning the one permitted share
+func maxProfit(prices []int) int {
+    cash, hold := 0, -1<<62 // owning a share before day 0 is impossible
+
+    for _, p := range prices {
+        prevCash, prevHold := cash, hold // yesterday's snapshot
+
+        cash = max(prevCash, prevHold+p) // stay in cash, or sell today
+        hold = max(prevHold, -p)         // keep the share, or buy today.
+        // -p, not prevCash-p: only ONE transaction is allowed, so the
+        // purchase cannot be funded by an earlier sale.
+    }
+    return cash // never end still holding
+}
+```
+
 ```python
 def maxProfit(prices):
-    cash, hold = 0, float('-inf')
-    for price in prices:
-        cash = max(cash, hold + price)   # sell today (or skip)
-        hold = max(hold, -price)         # buy today (only one buy allowed)
-    return cash
+    cash, hold = 0, float('-inf')     # cannot own a share before day 0
+
+    for p in prices:
+        prev_cash, prev_hold = cash, hold          # yesterday's snapshot
+        cash = max(prev_cash, prev_hold + p)       # stay in cash, or sell
+        hold = max(prev_hold, -p)                  # keep it, or buy today
+        # -p (not prev_cash - p): one transaction only, so an earlier
+        # sale's profit may not fund this purchase.
+    return cash                       # never end still holding
 ```
 
 ### Complexity
-Time O(n), Space O(1) — two scalar states swept once over the prices.
+Time O(n) — one pass, two comparisons per day. Space O(1) — two scalars, regardless of how long the price series is.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Cooldown (LeetCode 309)
-Unlimited transactions, but after selling you must **rest one day** before buying again. Maximize profit.
+Unlimited transactions, but after you sell you must **wait one full day** before buying again. Maximize profit.
 
 ### Thought Process
-1. Three states: `hold` = own a share, `sold` = just sold today (in cooldown), `rest` = idle and free to buy.
-2. Transitions each day: `hold = max(hold, rest - price)` (buy, only from rest); `sold = hold + price` (sell today); `rest = max(rest, prev_sold)` (stay idle or exit cooldown).
-3. Compute with the *previous* day's values, then update. Answer = `max(sold, rest)` at the end (never end holding).
+1. **What do the states mean?** The cooldown forces `cash` to split in two, because "in cash and free to buy" and "in cash but frozen" behave differently tomorrow.
+   `hold` = *best profit at the end of today while owning a share.*
+   `sold` = *best profit at the end of today, having sold **today** — so I am frozen and cannot buy tomorrow.*
+   `rest` = *best profit at the end of today, owning nothing and free to buy tomorrow.*
+2. **How do we compute them?** From yesterday's values:
+   `hold = max(prevHold, prevRest - p)` — keep holding, or buy today; buying is only legal out of `rest`, never out of `sold`. **That missing arrow is the cooldown.**
+   `sold = prevHold + p` — the only way to be in `sold` is to have been holding yesterday and sell today.
+   `rest = max(prevRest, prevSold)` — stay idle, or arrive from yesterday's `sold` now that the freeze has expired.
+3. **What is the base case?** `rest = 0` (day zero: idle, nothing earned), `hold = -infinity` (cannot own a share yet), `sold = -infinity` (cannot have sold yet). The two sentinels must lose every `max`; `0` would grant a free share or a free imaginary sale.
+4. **Why the snapshot is mandatory here.** Every right-hand side above is yesterday's value. Feed `rest` today's freshly-written `sold` and you let it buy on the same day it sold — the cooldown disappears. On `prices = [1,3,2,4]` the broken version returns **4** (`1→3` and `2→4`, back-to-back) while the correct answer is **3** (`1→4`). Same code shape, one-day difference, wrong answer.
+5. Answer is `max(sold, rest)` — the two ways to finish without a share. Ending in `hold` would mean money still tied up.
 
 ### Dry Run
-prices = [1,2,3,0,2]
-- start: hold=-inf, sold=0, rest=0
-- p=1: hold=-1, sold=-inf, rest=0
-- p=2: hold=-1, sold=1, rest=0
-- p=3: hold=-1, sold=2, rest=1
-- p=0: hold=1, sold=-1, rest=2
-- p=2: hold=1, sold=3, rest=2 → Answer = **3** (buy1/sell3, cooldown, buy0/sell2).
+
+Input: `prices = [1, 2, 3, 0, 2]`
+
+| day | `p` | `hold` = max(prevHold, prevRest−p) | `sold` = prevHold + p | `rest` = max(prevRest, prevSold) |
+|-----|-----|------------------------------------|------------------------|-----------------------------------|
+| — | start | **-inf** | **-inf** | **0** |
+| 0 | 1 | `max(-inf, 0−1)` = **-1** | `-inf + 1` = **-inf** | `max(0, -inf)` = **0** |
+| 1 | 2 | `max(-1, 0−2)` = **-1** | `-1 + 2` = **1** | `max(0, -inf)` = **0** |
+| 2 | 3 | `max(-1, 0−3)` = **-1** | `-1 + 3` = **2** | `max(0, 1)` = **1** |
+| 3 | 0 | `max(-1, 1−0)` = **1** | `-1 + 0` = **-1** | `max(1, 2)` = **2** |
+| 4 | 2 | `max(1, 2−2)` = **1** | `1 + 2` = **3** | `max(2, -1)` = **2** |
+
+Output: **`max(sold, rest) = max(3, 2) = 3`** — buy at 1, sell at 3, cooldown, buy at 0, sell at 2.
+
+Day 3 is where the cooldown is visible. `hold` becomes `1` by buying at price 0 out of `prevRest = 1`. That `1` had entered `rest` on **day 2**, from the sale made on **day 1**. The profit had to sit in `sold` for a day before `rest` would accept it — precisely one skipped buying opportunity.
 
 ### Visualization
-```
-rest ──▶ buy ──▶ hold ──▶ sell ──▶ sold ──▶ (cooldown) ──▶ rest
+
+```text
+                buy:  hold = max(prevHold, prevRest − p)
+        ┌────────────────────────────────────────────┐
+        │                                            v
+  ┌───────────┐                              ┌──────────────┐
+  │   rest    │                              │     hold     │
+  │ idle, may │                              │  own 1 share │
+  │ buy today │                              └──────────────┘
+  └───────────┘                                     │
+        ^                                           │ sell:
+        │  cooldown expires:                        │ sold = prevHold + p
+        │  rest = max(prevRest, prevSold)           v
+        │                                    ┌──────────────┐
+        └────────────────────────────────────│     sold     │
+                                             │ sold TODAY,  │
+                                             │ frozen       │
+                                             └──────────────┘
+        there is NO sold ──▶ hold arrow. That absence IS the cooldown.
+
+prices:    1     2     3     0     2
+hold:     -1    -1    -1     1     1
+sold:   -inf     1     2    -1     3   <-- answer 3
+rest:      0     0     1     2     2
+                       ^     ^
+                       |     └── buys at 0 using the profit that
+                       └──────── landed in rest one day AFTER the sale
 ```
 
 ### Code
+
+```go
+// maxProfitCooldown solves unlimited transactions with a one-day rest after
+// every sale, using a three-state machine.
+//   hold = best profit today while owning a share
+//   sold = best profit today, having sold TODAY (frozen tomorrow)
+//   rest = best profit today, owning nothing and free to buy tomorrow
+func maxProfitCooldown(prices []int) int {
+    const neg = -1 << 62
+    hold, sold, rest := neg, neg, 0
+
+    for _, p := range prices {
+        // Snapshot yesterday. Without this, `rest` could absorb a sale made
+        // today and buy again immediately, erasing the cooldown.
+        prevHold, prevSold, prevRest := hold, sold, rest
+
+        hold = max(prevHold, prevRest-p) // keep it, or buy — only out of rest
+        sold = prevHold + p              // the only route into sold: sell today
+        rest = max(prevRest, prevSold)   // stay idle, or thaw from yesterday
+    }
+
+    return max(sold, rest) // finishing while still holding is never best
+}
+```
+
 ```python
-def maxProfit(prices):
-    hold, sold, rest = float('-inf'), float('-inf'), 0
-    for price in prices:
-        prev_sold = sold
-        hold = max(hold, rest - price)   # buy only from rest
-        sold = hold + price              # sell today
-        rest = max(rest, prev_sold)      # exit cooldown into rest
-    return max(sold, rest)
+def maxProfitCooldown(prices):
+    NEG = float('-inf')
+    hold, sold, rest = NEG, NEG, 0
+
+    for p in prices:
+        # Snapshot yesterday: if `rest` read today's `sold`, it could buy on the
+        # same day it sold and the cooldown would vanish.
+        prev_hold, prev_sold, prev_rest = hold, sold, rest
+
+        hold = max(prev_hold, prev_rest - p)   # keep, or buy — only out of rest
+        sold = prev_hold + p                   # only route into sold
+        rest = max(prev_rest, prev_sold)       # stay idle, or thaw
+
+    return max(sold, rest)                     # never end still holding
 ```
 
 ### Complexity
-Time O(n), Space O(1) — three rolling scalar states.
+Time O(n) — three constant-time updates per day. Space O(1) — three scalars.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Stock IV (LeetCode 188)
-At most **k** transactions. Maximize profit over the price series.
+Complete **at most `k`** transactions over the price series. Maximize total profit.
 
 ### Thought Process
-1. For each transaction slot `j` in 1..k keep two states: `buy[j]` = best profit after the j-th buy, `sell[j]` = best profit after the j-th sell.
-2. Per price: `buy[j] = max(buy[j], sell[j-1] - price)` (open j-th position from proceeds of j-1 sells); `sell[j] = max(sell[j], buy[j] + price)` (close it).
-3. If `k >= n//2`, transactions are effectively unlimited — sum every positive delta instead (avoids O(nk) blowup). Answer = `sell[k]`.
+1. **What do the states mean?** The two-state machine, stacked `k` times — one floor per transaction.
+   `buy[j]` = *best profit at the end of today, having opened the `j`-th position and still holding it.*
+   `sell[j]` = *best profit at the end of today, having completed exactly `j` sales and holding nothing.*
+2. **How do we compute them?** At price `p`, for each floor `j = 1..k`:
+   `buy[j] = max(buy[j], sell[j-1] - p)` — keep the `j`-th position open, or open it today. The capital comes from `sell[j-1]`: the profit after `j-1` completed transactions. That subscript is the transaction counter incrementing.
+   `sell[j] = max(sell[j], buy[j] + p)` — keep the `j`-th sale as it was, or close today's position now.
+3. **What is the base case?** `sell[0] = 0` — zero transactions completed, zero profit; this is the ground floor every ladder climbs from. `sell[j] = 0` for all `j` (doing nothing is always allowed, and profits are never negative). `buy[j] = -infinity` for every `j` — no position has been opened yet.
+4. **Why this direction, and is the in-place read safe?** Days sweep forward as always. Inside a day, `j` ascends, so `sell[j]` reads the `buy[j]` that was just written this iteration. That looks like the cooldown bug, but here it is provably harmless: if `buy[j]` was just set to `sell[j-1] - p`, then `sell[j]` becomes `sell[j-1] - p + p = sell[j-1]` — buying and selling at the same price on the same day, a no-op that can never beat an existing value. The `j-1` read in the buy line is also safe: floor `j-1` is finished for today before floor `j` starts.
+5. **The shortcut.** A transaction needs at least two days, so at most `n/2` of them fit. If `k >= n/2` the cap is unreachable and the answer is simply the sum of every upward price step — this avoids allocating a huge `k`-sized array when `k` is like `10^9`.
 
 ### Dry Run
-k = 2, prices = [3,2,6,5,0,3]
-- init buy=[-inf,-inf], sell=[0,0]
-- p=3: buy1=-3
-- p=2: buy1=-2
-- p=6: sell1=4, buy2=max(-inf,4-6)=-2
-- p=5: sell1=4, sell2=max(0,-2+5)=3
-- p=0: buy1=max(-2,0)... buy2=max(-2,4-0)=4
-- p=3: sell2=max(3,4+3)=7 → Answer = **7** (buy2/sell6 + buy0/sell3).
+
+Input: `k = 2`, `prices = [3, 2, 6, 5, 0, 3]` (`n = 6`, and `k = 2 < 3 = n/2`, so the full ladder runs)
+
+Start: `sell = [0, 0, 0]`, `buy = [–, -inf, -inf]`.
+
+| day | `p` | `buy[1]` = max(prev, `sell[0]`−p) | `sell[1]` = max(prev, `buy[1]`+p) | `buy[2]` = max(prev, `sell[1]`−p) | `sell[2]` = max(prev, `buy[2]`+p) |
+|-----|-----|------------------------------------|------------------------------------|------------------------------------|------------------------------------|
+| 0 | 3 | `max(-inf, 0−3)` = **-3** | `max(0, -3+3)` = **0** | `max(-inf, 0−3)` = **-3** | `max(0, -3+3)` = **0** |
+| 1 | 2 | `max(-3, 0−2)` = **-2** | `max(0, -2+2)` = **0** | `max(-3, 0−2)` = **-2** | `max(0, -2+2)` = **0** |
+| 2 | 6 | `max(-2, -6)` = **-2** | `max(0, -2+6)` = **4** | `max(-2, 4−6)` = **-2** | `max(0, -2+6)` = **4** |
+| 3 | 5 | `max(-2, -5)` = **-2** | `max(4, 3)` = **4** | `max(-2, 4−5)` = **-1** | `max(4, -1+5)` = **4** |
+| 4 | 0 | `max(-2, 0−0)` = **0** | `max(4, 0+0)` = **4** | `max(-1, 4−0)` = **4** | `max(4, 4+0)` = **4** |
+| 5 | 3 | `max(0, 0−3)` = **0** | `max(4, 0+3)` = **4** | `max(4, 4−3)` = **4** | `max(4, 4+3)` = **7** |
+
+Output: **`sell[2] = 7`** — buy at 2 / sell at 6 (profit 4), then buy at 0 / sell at 3 (profit 3).
+
+Day 4 is the interesting one: `buy[2]` becomes `4`, which reads "I have banked 4 from my first transaction and my second share cost me nothing (price 0), so my net position is `+4`." The `sell[1] - p` term is literally the first transaction's profit being rolled into the second purchase.
 
 ### Visualization
-```
-sell[j-1] ──▶ buy[j] ──▶ sell[j]   (k stacked buy/sell layers)
+
+```text
+the ladder — k stacked copies of the two-state machine
+
+  sell[0] = 0
+      │ buy[1] = sell[0] − p
+      v
+  [ buy[1] ]  ──── sell[1] = buy[1] + p ────▶  [ sell[1] ]
+                                                    │ buy[2] = sell[1] − p
+                                                    v
+                                               [ buy[2] ] ──── + p ──▶ [ sell[2] ]
+
+prices:      3     2     6     5     0     3
+buy[1]:     -3    -2    -2    -2     0     0
+sell[1]:     0     0     4     4     4     4     first transaction: 2 -> 6
+buy[2]:     -3    -2    -2    -1     4     4
+sell[2]:     0     0     4     4     4    [7]    second: 0 -> 3, on top of 4
+                                          ^
+                                       answer
 ```
 
 ### Code
-```python
-def maxProfit(k, prices):
-    n = len(prices)
-    if not prices or k == 0:
+
+```go
+// maxProfitK allows at most k transactions.
+//   buy[j]  = best profit today with the j-th position open (holding)
+//   sell[j] = best profit today after exactly j completed sales (in cash)
+func maxProfitK(k int, prices []int) int {
+    n := len(prices)
+    if n == 0 || k <= 0 {
         return 0
-    if k >= n // 2:                       # unlimited transactions
-        return sum(max(0, prices[i] - prices[i-1]) for i in range(1, n))
-    buy = [float('-inf')] * (k + 1)
-    sell = [0] * (k + 1)
-    for price in prices:
+    }
+
+    // A transaction needs two days, so more than n/2 of them can never be
+    // used. Then the answer is just every upward step, and we skip the ladder.
+    if k >= n/2 {
+        profit := 0
+        for i := 1; i < n; i++ {
+            if prices[i] > prices[i-1] {
+                profit += prices[i] - prices[i-1]
+            }
+        }
+        return profit
+    }
+
+    buy := make([]int, k+1)
+    sell := make([]int, k+1) // sell[0] = 0: zero transactions, zero profit
+    for j := 1; j <= k; j++ {
+        buy[j] = -1 << 62 // no position opened yet
+    }
+
+    for _, p := range prices {
+        for j := 1; j <= k; j++ {
+            buy[j] = max(buy[j], sell[j-1]-p) // open the j-th position
+            sell[j] = max(sell[j], buy[j]+p)  // close it
+        }
+    }
+    return sell[k]
+}
+```
+
+```python
+def maxProfitK(k, prices):
+    n = len(prices)
+    if n == 0 or k <= 0:
+        return 0
+
+    # A transaction needs two days: more than n // 2 of them cannot be used.
+    if k >= n // 2:
+        return sum(max(0, prices[i] - prices[i - 1]) for i in range(1, n))
+
+    buy = [float('-inf')] * (k + 1)     # no position opened yet
+    sell = [0] * (k + 1)                # sell[0] = 0: the ground floor
+
+    for p in prices:
         for j in range(1, k + 1):
-            buy[j] = max(buy[j], sell[j-1] - price)
-            sell[j] = max(sell[j], buy[j] + price)
+            buy[j] = max(buy[j], sell[j - 1] - p)   # open the j-th position
+            sell[j] = max(sell[j], buy[j] + p)      # close it
     return sell[k]
 ```
 
 ### Complexity
-Time O(n·k) (O(n) in the unlimited fast path), Space O(k).
+Time O(n·k) — `k` constant-time floors per day — collapsing to O(n) whenever the `k >= n/2` shortcut fires. Space O(k) for the two ladders.
 
+---
 
 ## 12. LeetCode Practice Set
 
