@@ -41,32 +41,126 @@ Two-pointer scans power stream merging, log compaction, and zero-copy buffer pro
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"Which four elements sum to a target?"* — and, more usefully, *"how do I stop the exponent from growing every time the problem adds a number?"*
+
 ### Intuition
-Check every pair/triplet with nested loops — O(n^2) or O(n^3).
+Four unknowns, four nested loops.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. Loop `i`, then `j > i`, then `k > j`, then `l > k`.
+2. If the four values sum to `target`, record the quadruplet.
+3. Deduplicate the collected quadruplets at the end.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n⁴)**.
+- Space: O(number of results).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Four Sum Pattern pattern is built to use.
+- At `n = 200`, O(n⁴) is 1.6 × 10⁹ — already too slow, and the constraints go higher.
+- Each extra number in the problem statement adds a whole factor of `n`. That's the real problem: the approach doesn't scale with `k`.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Four Sum Pattern invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Fix numbers with loops until only two are left, then finish with two pointers.**
+
+Two pointers solve the last two in O(n) instead of O(n²). So you always save exactly one factor of `n`, no matter how big `k` gets.
+
+```text
+k-Sum = (k-2) nested loops  +  one two-pointer sweep
+```
+
+### The thought process
+
+```text
+We need    : quadruplets summing to target.
+Obvious way: four nested loops.
+Too slow   : O(n^4).
+Notice     : we already know 3Sum = fix one + two pointers = O(n^2).
+             So 4Sum = fix one + 3Sum = O(n^3).
+             Unrolled: fix TWO + two pointers.
+Therefore  : sort, loop i, loop j, then two-point the remaining suffix.
+Now        : O(n^3) — one factor of n cheaper, and the same recipe
+             extends to any k.
+```
+
+### Steps
+
+```text
+Step 1 → Sort the array.
+Step 2 → For i = 0 .. n-4:      skip if nums[i] == nums[i-1]
+Step 3 →   For j = i+1 .. n-3:  skip if nums[j] == nums[j-1]   (j > i+1 !)
+Step 4 →     left = j+1, right = n-1
+Step 5 →     while left < right:
+Step 6 →         sum = nums[i]+nums[j]+nums[left]+nums[right]
+Step 7 →         sum < target → left++
+Step 8 →         sum > target → right--
+Step 9 →         sum == target → record, skip duplicates on both sides, move both
+```
+
+### The dedup rule that trips everyone: `j > i+1`
+
+For the outer index the guard is `i > 0 && nums[i] == nums[i-1]`. For the inner index it must be:
+
+```go
+if j > i+1 && nums[j] == nums[j-1] { continue }
+```
+
+**Not** `j > 0`. Here's why. Take `nums = [2, 2, 2, 2]`, `target = 8`. When `i = 0` and `j = 1`, we have `nums[j] == nums[j-1]` (both `2`). With a `j > 0` guard we would skip `j = 1` entirely and never find `[2,2,2,2]`.
+
+The rule in words: **the first `j` of each new `i` is always allowed.** Only *repeats within the same `i`* get skipped. `j > i+1` says exactly that.
+
+### Pruning: why it matters here more than in 3Sum
+
+With three nested levels, cheap early exits pay off a lot. Because the array is sorted:
+
+```text
+smallest possible sum from here = nums[i] + nums[i+1] + nums[i+2] + nums[i+3]
+    → if that already exceeds target, break out entirely
+
+largest possible sum with this i = nums[i] + nums[n-3] + nums[n-2] + nums[n-1]
+    → if that is still below target, this i is hopeless → continue
+```
+
+These turn many worst-case inputs into near-linear ones without changing the O(n³) bound.
+
+### The other half of this pattern: split into two halves
+
+Sometimes the four numbers come from **four separate arrays** (LeetCode 454). Then indices can't be ordered, sorting doesn't help, and two pointers don't apply. A different trade works:
+
+```text
+a + b + c + d = 0
+        ⇕
+   (a + b) = -(c + d)
+```
+
+Count every `a+b` sum in a hash map (n² pairs), then for every `c+d` look up how many partners exist. That's **O(n²) time and O(n²) space** — the *meet in the middle* idea, splitting `k` numbers into two halves of `k/2`.
+
+| Situation | Tool |
+|---|---|
+| One array, indices must satisfy `i<j<k<l` | sort + fix `k−2` + two pointers |
+| Separate arrays, any combination allowed | split in half + hash map of pair sums |
+
+### How should I recognize this?
+
+```text
+If you see...
+  "find all quadruplets", "four numbers such that..."
+  a sum problem where k > 3
+        ↓
+Think about...
+  "Can I peel off numbers with loops until exactly two remain?"
+  "Or are these separate arrays — should I split and hash pair sums?"
+        ↓
+Use...
+  one array   → sort, (k-2) loops, two pointers, skip equal neighbours
+  k arrays    → hash the first half's sums, look up the second half's
+```
 
 ### Visual explanation
 
@@ -94,76 +188,236 @@ Maintain two indices and an invariant that tells you which pointer to advance, e
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Four Sum Pattern  : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+nums = [1, 0, -1, 0, -2, 2]  target = 0    sorted → [-2, -1, 0, 0, 1, 2]
+
+i = 0 (-2), j = 1 (-1)  ⇒  the pair must total +3
+
+[-2, -1,  0,  0,  1,  2]      -2 + -1 + 1 + 2 = 0  ✓  → [-2,-1,1,2]
+          ↑              ↑
+        left          right
 ```
 
 ### Interview explanation
-"This is a Four Sum Pattern problem. I'll maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks. That brings the complexity down to O(n) or O(n log n) time and O(1) space — here's the template."
+"4Sum is 3Sum with one more loop, and 3Sum is 2Sum with one more loop. The general recipe is: sort, then fix `k−2` elements with nested loops, and solve the final two with two pointers in O(n). So 4Sum is O(n³). The dedup rule needs care — for the inner index the guard is `j > i+1`, not `j > 0`, otherwise inputs like `[2,2,2,2]` lose their only answer. I'd also prune using the smallest and largest reachable sums. If instead the numbers come from four *different* arrays, sorting doesn't help; I'd hash all `a+b` sums and look up `-(c+d)`, which is O(n²) time and space."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Two Pointers** family template. Adapt the comparison/condition to the specific problem.
+> `k−2` loops, then two pointers. The recursive version below is the same idea written once for all `k`.
 
 ```go
-// Opposite-direction two pointers on a sorted array (pair sum).
-func twoSumSorted(a []int, target int) (int, int) {
-    l, r := 0, len(a)-1
-    for l < r {
-        s := a[l] + a[r]
-        switch {
-        case s == target:
-            return l, r
-        case s < target:
-            l++ // need a bigger sum
-        default:
-            r-- // need a smaller sum
+// FourSum returns all unique quadruplets summing to target.
+func FourSum(nums []int, target int) [][]int {
+    sort.Ints(nums)
+    n := len(nums)
+    result := [][]int{}
+
+    for i := 0; i < n-3; i++ {
+        if i > 0 && nums[i] == nums[i-1] {
+            continue // dedup the first fixed number
+        }
+        for j := i + 1; j < n-2; j++ {
+            // j > i+1, NOT j > 0: the first j of each i must be allowed.
+            if j > i+1 && nums[j] == nums[j-1] {
+                continue
+            }
+
+            left, right := j+1, n-1
+            for left < right {
+                sum := nums[i] + nums[j] + nums[left] + nums[right]
+                switch {
+                case sum < target:
+                    left++
+                case sum > target:
+                    right--
+                default:
+                    result = append(result, []int{nums[i], nums[j], nums[left], nums[right]})
+                    for left < right && nums[left] == nums[left+1] {
+                        left++
+                    }
+                    for left < right && nums[right] == nums[right-1] {
+                        right--
+                    }
+                    left++
+                    right--
+                }
+            }
         }
     }
-    return -1, -1
+    return result
+}
+
+// KSum generalises the same recipe: peel off one number at a time until
+// two remain, then run the two-pointer sweep. nums must be sorted.
+func KSum(nums []int, target, k, start int) [][]int {
+    result := [][]int{}
+    if start >= len(nums) {
+        return result
+    }
+
+    if k == 2 {
+        left, right := start, len(nums)-1
+        for left < right {
+            sum := nums[left] + nums[right]
+            switch {
+            case sum < target:
+                left++
+            case sum > target:
+                right--
+            default:
+                result = append(result, []int{nums[left], nums[right]})
+                for left < right && nums[left] == nums[left+1] {
+                    left++
+                }
+                for left < right && nums[right] == nums[right-1] {
+                    right--
+                }
+                left++
+                right--
+            }
+        }
+        return result
+    }
+
+    for i := start; i <= len(nums)-k; i++ {
+        if i > start && nums[i] == nums[i-1] {
+            continue // dedup within this level
+        }
+        for _, rest := range KSum(nums, target-nums[i], k-1, i+1) {
+            result = append(result, append([]int{nums[i]}, rest...))
+        }
+    }
+    return result
 }
 ```
 
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+def four_sum(nums, target):
+    nums.sort()
+    n, result = len(nums), []
+
+    for i in range(n - 3):
+        if i > 0 and nums[i] == nums[i - 1]:
+            continue                          # dedup the first fixed number
+        for j in range(i + 1, n - 2):
+            if j > i + 1 and nums[j] == nums[j - 1]:
+                continue                      # j > i+1, NOT j > 0
+
+            left, right = j + 1, n - 1
+            while left < right:
+                total = nums[i] + nums[j] + nums[left] + nums[right]
+                if total < target:
+                    left += 1
+                elif total > target:
+                    right -= 1
+                else:
+                    result.append([nums[i], nums[j], nums[left], nums[right]])
+                    while left < right and nums[left] == nums[left + 1]:
+                        left += 1
+                    while left < right and nums[right] == nums[right - 1]:
+                        right -= 1
+                    left += 1
+                    right -= 1
+    return result
+
+def k_sum(nums, target, k, start=0):
+    """Generic k-Sum on a SORTED list: peel one number until two remain."""
+    result = []
+    if start >= len(nums):
+        return result
+
+    if k == 2:
+        left, right = start, len(nums) - 1
+        while left < right:
+            total = nums[left] + nums[right]
+            if total < target:
+                left += 1
+            elif total > target:
+                right -= 1
+            else:
+                result.append([nums[left], nums[right]])
+                while left < right and nums[left] == nums[left + 1]:
+                    left += 1
+                while left < right and nums[right] == nums[right - 1]:
+                    right -= 1
+                left += 1
+                right -= 1
+        return result
+
+    for i in range(start, len(nums) - k + 1):
+        if i > start and nums[i] == nums[i - 1]:
+            continue
+        for rest in k_sum(nums, target - nums[i], k - 1, i + 1):
+            result.append([nums[i]] + rest)
+    return result
 ```
 
 ```java
-int[] twoSumSorted(int[] a, int target) {
-    int l = 0, r = a.length - 1;
-    while (l < r) {
-        int s = a[l] + a[r];
-        if (s == target) return new int[]{l, r};
-        else if (s < target) l++;
-        else r--;
+import java.util.*;
+
+public class FourSumPattern {
+    public static List<List<Integer>> fourSum(int[] nums, int target) {
+        Arrays.sort(nums);
+        int n = nums.length;
+        List<List<Integer>> result = new ArrayList<>();
+
+        for (int i = 0; i < n - 3; i++) {
+            if (i > 0 && nums[i] == nums[i - 1]) continue;
+            for (int j = i + 1; j < n - 2; j++) {
+                if (j > i + 1 && nums[j] == nums[j - 1]) continue;  // j > i+1
+
+                int left = j + 1, right = n - 1;
+                while (left < right) {
+                    // long guards against int overflow when values are extreme.
+                    long sum = (long) nums[i] + nums[j] + nums[left] + nums[right];
+                    if (sum < target) left++;
+                    else if (sum > target) right--;
+                    else {
+                        result.add(Arrays.asList(nums[i], nums[j], nums[left], nums[right]));
+                        while (left < right && nums[left] == nums[left + 1]) left++;
+                        while (left < right && nums[right] == nums[right - 1]) right--;
+                        left++; right--;
+                    }
+                }
+            }
+        }
+        return result;
     }
-    return new int[]{-1, -1};
 }
 ```
 
 ```cpp
-pair<int,int> twoSumSorted(vector<int>& a, int target) {
-    int l = 0, r = (int)a.size() - 1;
-    while (l < r) {
-        int s = a[l] + a[r];
-        if (s == target) return {l, r};
-        else if (s < target) ++l;
-        else --r;
+#include <algorithm>
+#include <vector>
+using namespace std;
+
+vector<vector<int>> fourSum(vector<int> nums, int target) {
+    sort(nums.begin(), nums.end());
+    int n = (int)nums.size();
+    vector<vector<int>> result;
+
+    for (int i = 0; i + 3 < n; ++i) {
+        if (i > 0 && nums[i] == nums[i - 1]) continue;
+        for (int j = i + 1; j + 2 < n; ++j) {
+            if (j > i + 1 && nums[j] == nums[j - 1]) continue;   // j > i+1
+
+            int left = j + 1, right = n - 1;
+            while (left < right) {
+                long long sum = (long long)nums[i] + nums[j] + nums[left] + nums[right];
+                if (sum < target) ++left;
+                else if (sum > target) --right;
+                else {
+                    result.push_back({nums[i], nums[j], nums[left], nums[right]});
+                    while (left < right && nums[left] == nums[left + 1]) ++left;
+                    while (left < right && nums[right] == nums[right - 1]) --right;
+                    ++left; --right;
+                }
+            }
+        }
     }
-    return {-1, -1};
+    return result;
 }
 ```
 
@@ -249,117 +503,408 @@ pair<int,int> twoSumSorted(vector<int>& a, int target) {
 ## 9. Solved Example 1
 
 ### Problem — 4Sum (LeetCode 18)
-A representative **Four Sum Pattern** problem. The signal: generalize k-sum: recurse fixing elements down to a two-pointer base case.
+Return all **unique** quadruplets `[a, b, c, d]` from distinct indices with `a + b + c + d == target`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (4sum, k-sum, quadruplet, recursion, two pointer).
-2. Reach for the Four Sum Pattern template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. Sort, so two pointers work and duplicates sit next to each other.
+2. Fix two elements with nested loops (`i`, then `j`), leaving a plain two-sum on the suffix.
+3. Two pointers finish that in O(n) → O(n³) overall.
+4. Dedup `i` with `i > 0 && nums[i] == nums[i-1]`, and `j` with **`j > i+1`** && `nums[j] == nums[j-1]`.
+5. After each hit, skip duplicates on both pointers and move both.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `nums = [1, 0, -1, 0, -2, 2]`, `target = 0` → sorted: **`[-2, -1, 0, 0, 1, 2]`** (indices 0..5)
+
+**i = 0 (`-2`), j = 1 (`-1`)** — the pair must total `0 − (−2) − (−1) = 3`
+
+| left | right | values | sum | action |
+|------|-------|--------|-----|--------|
+| 2 | 5 | 0, 2 | −1 | < 0 → `left++` |
+| 3 | 5 | 0, 2 | −1 | < 0 → `left++` |
+| 4 | 5 | 1, 2 | **0** | record **`[-2,-1,1,2]`**, move both → loop ends |
+
+**i = 0, j = 2 (`0`)** — pair must total `2`
+
+| left | right | values | sum | action |
+|------|-------|--------|-----|--------|
+| 3 | 5 | 0, 2 | **0** | record **`[-2,0,0,2]`**, move both → loop ends |
+
+**i = 0, j = 3 (`0`)** — `j > i+1` (3 > 1) and `nums[3] == nums[2]` → **skipped**. Without this, `[-2,0,0,2]` would be emitted twice.
+
+**i = 1 (`-1`), j = 2 (`0`)** — pair must total `1`
+
+| left | right | values | sum | action |
+|------|-------|--------|-----|--------|
+| 3 | 5 | 0, 2 | 1 | > 0 → `right--` |
+| 3 | 4 | 0, 1 | **0** | record **`[-1,0,0,1]`**, move both → loop ends |
+
+**i = 1, j = 3** → skipped (duplicate `0`). **i = 2 (`0`), j = 3 (`0`)** → sum `0+0+1+2 = 3 > 0`, `right--`, pointers meet, nothing found.
+
+Output: **`[[-2,-1,1,2], [-2,0,0,2], [-1,0,0,1]]`**
+
+### Why `j > i+1` and not `j > 0`
+
+Try `nums = [2,2,2,2]`, `target = 8`. At `i = 0, j = 1`: `nums[1] == nums[0]`, so a `j > 0` guard would `continue` and the loop would never form `[2,2,2,2]` — the one correct answer. `j > i+1` allows the *first* `j` under each `i` and only skips repeats after it.
 
 ### Visualization
-```
-input  ──▶ [ apply Four Sum Pattern step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+sorted: [-2, -1,  0,  0,  1,  2]
+          0   1   2   3   4   5
+
+i=0, j=1 fix (-2,-1)  ⇒  remaining pair must total 3
+
+        [-2, -1,  0,  0,  1,  2]
+                          ↑    ↑    1 + 2 = 3  ✓ → [-2,-1,1,2]
+                        left right
+
+i=0, j=3 is another 0  →  skipped (j > i+1 and equals nums[j-1])
 ```
 
 ### Code
+
+```go
+func fourSum(nums []int, target int) [][]int {
+    sort.Ints(nums)
+    n := len(nums)
+    result := [][]int{}
+
+    for i := 0; i < n-3; i++ {
+        if i > 0 && nums[i] == nums[i-1] {
+            continue
+        }
+        // Prune: the smallest sum reachable from i already overshoots.
+        if nums[i]+nums[i+1]+nums[i+2]+nums[i+3] > target {
+            break
+        }
+        // Prune: the largest sum reachable with this i still falls short.
+        if nums[i]+nums[n-3]+nums[n-2]+nums[n-1] < target {
+            continue
+        }
+
+        for j := i + 1; j < n-2; j++ {
+            if j > i+1 && nums[j] == nums[j-1] {
+                continue // j > i+1: the first j of each i is always allowed
+            }
+
+            left, right := j+1, n-1
+            for left < right {
+                sum := nums[i] + nums[j] + nums[left] + nums[right]
+                switch {
+                case sum < target:
+                    left++
+                case sum > target:
+                    right--
+                default:
+                    result = append(result, []int{nums[i], nums[j], nums[left], nums[right]})
+                    for left < right && nums[left] == nums[left+1] {
+                        left++
+                    }
+                    for left < right && nums[right] == nums[right-1] {
+                        right--
+                    }
+                    left++
+                    right--
+                }
+            }
+        }
+    }
+    return result
+}
+```
+
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+def fourSum(nums, target):
+    nums.sort()
+    n, result = len(nums), []
+
+    for i in range(n - 3):
+        if i > 0 and nums[i] == nums[i - 1]:
+            continue
+        if nums[i] + nums[i+1] + nums[i+2] + nums[i+3] > target:
+            break                                   # smallest reachable overshoots
+        if nums[i] + nums[n-3] + nums[n-2] + nums[n-1] < target:
+            continue                                # largest reachable falls short
+
+        for j in range(i + 1, n - 2):
+            if j > i + 1 and nums[j] == nums[j - 1]:
+                continue                            # j > i+1, not j > 0
+
+            left, right = j + 1, n - 1
+            while left < right:
+                total = nums[i] + nums[j] + nums[left] + nums[right]
+                if total < target:
+                    left += 1
+                elif total > target:
+                    right -= 1
+                else:
+                    result.append([nums[i], nums[j], nums[left], nums[right]])
+                    while left < right and nums[left] == nums[left + 1]:
+                        left += 1
+                    while left < right and nums[right] == nums[right - 1]:
+                        right -= 1
+                    left += 1
+                    right -= 1
+    return result
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time **O(n³)** — two nested loops over an O(n) sweep. Space O(1) beyond the output.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — 4Sum II (LeetCode 454)
-A representative **Four Sum Pattern** problem. The signal: generalize k-sum: recurse fixing elements down to a two-pointer base case.
+Given four arrays of equal length `n`, count the index tuples `(i, j, k, l)` with `a[i] + b[j] + c[k] + d[l] == 0`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (4sum, k-sum, quadruplet, recursion, two pointer).
-2. Reach for the Four Sum Pattern template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. This looks like 4Sum, but it is a different problem: the numbers come from **four separate arrays**, so any combination is legal and there is no `i<j<k<l` ordering to exploit.
+2. Sorting therefore buys nothing, and two pointers don't apply.
+3. But we can **split the four arrays into two halves** and rewrite the condition:
+   `a + b + c + d = 0` ⇔ `a + b = −(c + d)`.
+4. Enumerate all `n²` sums of `a+b` into a map `sum → how many ways`.
+5. Enumerate all `n²` sums of `c+d` and add `map[−(c+d)]` to the answer.
+6. We also want *counts*, not distinct tuples — so no deduplication at all.
+
+That is **meet in the middle**: O(n⁴) → O(n²) by splitting `k` numbers into two groups of `k/2`.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `nums1 = [1,2]`, `nums2 = [-2,-1]`, `nums3 = [-1,2]`, `nums4 = [0,2]`
+
+**Step 1 — count every `a + b`:**
+
+| a | b  | a+b |
+|---|----|-----|
+| 1 | −2 | −1  |
+| 1 | −1 | 0   |
+| 2 | −2 | 0   |
+| 2 | −1 | 1   |
+
+map = `{−1: 1, 0: 2, 1: 1}`
+
+**Step 2 — for each `c + d`, look up `−(c+d)`:**
+
+| c  | d | c+d | need = −(c+d) | map[need] | running total |
+|----|---|-----|---------------|-----------|---------------|
+| −1 | 0 | −1  | 1             | 1         | 1 |
+| −1 | 2 | 1   | −1            | 1         | 2 |
+| 2  | 0 | 2   | −2            | 0         | 2 |
+| 2  | 2 | 4   | −4            | 0         | 2 |
+
+Output: **`2`**
+
+The two tuples are `(0,0,0,1)` → `1 + (−2) + (−1) + 2 = 0` and `(1,1,0,0)` → `2 + (−1) + (−1) + 0 = 0`. ✓
 
 ### Visualization
-```
-input  ──▶ [ apply Four Sum Pattern step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+   first half              second half
+  ┌────────────┐          ┌────────────┐
+  │  a  +  b   │          │  c  +  d   │
+  └────────────┘          └────────────┘
+        │                        │
+   build a map              for each sum,
+   sum → count              look up -(sum)
+        │                        │
+        └──────── match ─────────┘
+
+  n² pairs stored  +  n² lookups  =  O(n²)
 ```
 
 ### Code
+
+```go
+func fourSumCount(nums1, nums2, nums3, nums4 []int) int {
+    // First half: how many ways can a+b make each sum?
+    countAB := make(map[int]int, len(nums1)*len(nums2))
+    for _, a := range nums1 {
+        for _, b := range nums2 {
+            countAB[a+b]++
+        }
+    }
+
+    // Second half: every c+d needs a partner of -(c+d).
+    total := 0
+    for _, c := range nums3 {
+        for _, d := range nums4 {
+            total += countAB[-(c + d)]
+        }
+    }
+    return total
+}
+```
+
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+from collections import defaultdict
+
+def fourSumCount(nums1, nums2, nums3, nums4):
+    count_ab = defaultdict(int)
+    for a in nums1:                       # first half: n² sums
+        for b in nums2:
+            count_ab[a + b] += 1
+
+    total = 0
+    for c in nums3:                       # second half: n² lookups
+        for d in nums4:
+            total += count_ab[-(c + d)]
+    return total
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time **O(n²)**, Space **O(n²)** for the map. Compare with O(n⁴) brute force — at `n = 200` that is 1.6 × 10⁹ operations versus 4 × 10⁴.
+
+---
 
 ## 11. Solved Example 3
 
-### Problem — 3Sum (LeetCode 15)
-A representative **Four Sum Pattern** problem. The signal: generalize k-sum: recurse fixing elements down to a two-pointer base case.
+### Problem — 3Sum, solved by the generic k-Sum routine (LeetCode 15)
+Find all unique triplets summing to zero — but this time using one routine that handles **any** `k`.
 
 ### Thought Process
-1. Confirm the pattern via its recognition signals (4sum, k-sum, quadruplet, recursion, two pointer).
-2. Reach for the Four Sum Pattern template below and map the problem's entities onto it.
-3. Maintain two indices and an invariant that tells you which pointer to advance, eliminating redundant pair checks.
+1. 2Sum, 3Sum, 4Sum all share a shape: peel off one number, recurse on a smaller `k` with an adjusted target.
+2. Base case `k == 2`: the two-pointer sweep on the sorted suffix.
+3. Recursive case: for each candidate first element, solve `(k−1)`-Sum on the rest for `target − nums[i]`, then prepend.
+4. Dedup at every level with the same rule: skip `nums[i] == nums[i-1]` when `i > start`. `start`, not `0` — each recursion level has its own left edge, exactly like `j > i+1` in the unrolled version.
+5. Calling it with `k = 3` reproduces 3Sum; `k = 4` reproduces 4Sum.
 
 ### Dry Run
-Walk a small input by hand, tracking the core state the template maintains. Verify the invariant holds after each step and that boundaries (empty, single element, all-equal) behave.
+
+Input: `nums = [-1, 0, 1, 2, -1, -4]`, `target = 0`, `k = 3` → sorted: **`[-4, -1, -1, 0, 1, 2]`**
+
+**Level 1 (`k = 3`, start = 0)** — peel off the first number:
+
+| i | nums[i] | recurse as | result of the 2-Sum call | prepend → |
+|---|---------|------------|--------------------------|-----------|
+| 0 | −4 | 2-Sum on `[-1,-1,0,1,2]` for target `4` | none (max pair is `1+2 = 3`) | — |
+| 1 | −1 | 2-Sum on `[-1,0,1,2]` for target `1` | `[-1,2]`, `[0,1]` | `[-1,-1,2]`, `[-1,0,1]` |
+| 2 | −1 | `i > start` and `nums[2] == nums[1]` | **skipped** | — |
+| 3 | 0  | 2-Sum on `[1,2]` for target `0` | none | — |
+
+**Inside the `i = 1` call** — 2-Sum on indices 2..5 for target `1`:
+
+| left | right | values | sum | action |
+|------|-------|--------|-----|--------|
+| 2 | 5 | −1, 2 | **1** | record `[-1,2]`; move both |
+| 3 | 4 | 0, 1  | **1** | record `[0,1]`; move both |
+| 4 | 3 | — | — | stop |
+
+Output: **`[[-1,-1,2], [-1,0,1]]`** — identical to the hand-rolled 3Sum. ✓
 
 ### Visualization
-```
-input  ──▶ [ apply Four Sum Pattern step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+kSum(k=3, target=0)
+   │
+   ├─ peel -4 → kSum(k=2, target=4)  → nothing
+   │
+   ├─ peel -1 → kSum(k=2, target=1)  → [-1,2], [0,1]
+   │                                     ↓ prepend -1
+   │                                   [-1,-1,2], [-1,0,1]
+   │
+   ├─ peel -1 → SKIPPED (duplicate at this level)
+   │
+   └─ peel  0 → kSum(k=2, target=0)  → nothing
+
+base case k=2 is always the two-pointer sweep
 ```
 
 ### Code
+
+```go
+func threeSumViaKSum(nums []int) [][]int {
+    sort.Ints(nums) // kSum requires sorted input
+    return kSum(nums, 0, 3, 0)
+}
+
+// kSum finds unique k-tuples in the sorted nums[start:] summing to target.
+func kSum(nums []int, target, k, start int) [][]int {
+    result := [][]int{}
+    if start+k > len(nums) {
+        return result // not enough elements left
+    }
+
+    if k == 2 { // base case: the two-pointer sweep
+        left, right := start, len(nums)-1
+        for left < right {
+            sum := nums[left] + nums[right]
+            switch {
+            case sum < target:
+                left++
+            case sum > target:
+                right--
+            default:
+                result = append(result, []int{nums[left], nums[right]})
+                for left < right && nums[left] == nums[left+1] {
+                    left++
+                }
+                for left < right && nums[right] == nums[right-1] {
+                    right--
+                }
+                left++
+                right--
+            }
+        }
+        return result
+    }
+
+    // Recursive case: peel off one number, solve (k-1)-Sum on the rest.
+    for i := start; i <= len(nums)-k; i++ {
+        if i > start && nums[i] == nums[i-1] {
+            continue // dedup relative to THIS level's left edge
+        }
+        for _, rest := range kSum(nums, target-nums[i], k-1, i+1) {
+            tuple := append([]int{nums[i]}, rest...)
+            result = append(result, tuple)
+        }
+    }
+    return result
+}
+```
+
 ```python
-def two_sum_sorted(a, target):
-    l, r = 0, len(a) - 1
-    while l < r:
-        s = a[l] + a[r]
-        if s == target:
-            return (l, r)
-        elif s < target:
-            l += 1          # increase sum
-        else:
-            r -= 1          # decrease sum
-    return (-1, -1)
+def threeSumViaKSum(nums):
+    nums.sort()                      # kSum requires sorted input
+    return kSum(nums, 0, 3, 0)
+
+def kSum(nums, target, k, start):
+    """Unique k-tuples in the sorted nums[start:] summing to target."""
+    result = []
+    if start + k > len(nums):
+        return result                # not enough elements left
+
+    if k == 2:                       # base case: two-pointer sweep
+        left, right = start, len(nums) - 1
+        while left < right:
+            total = nums[left] + nums[right]
+            if total < target:
+                left += 1
+            elif total > target:
+                right -= 1
+            else:
+                result.append([nums[left], nums[right]])
+                while left < right and nums[left] == nums[left + 1]:
+                    left += 1
+                while left < right and nums[right] == nums[right - 1]:
+                    right -= 1
+                left += 1
+                right -= 1
+        return result
+
+    for i in range(start, len(nums) - k + 1):
+        if i > start and nums[i] == nums[i - 1]:
+            continue                 # dedup relative to THIS level's left edge
+        for rest in kSum(nums, target - nums[i], k - 1, i + 1):
+            result.append([nums[i]] + rest)
+    return result
 ```
 
 ### Complexity
-Time O(n) or O(n log n), Space O(1). Sorting (if needed) dominates; the scan itself is O(n).
+Time **O(n^(k−1))** — `k−2` levels of looping over an O(n) base sweep, so O(n²) for 3Sum and O(n³) for 4Sum. Space O(k) recursion depth beyond the output.
 
+---
 
 ## 12. LeetCode Practice Set
 
