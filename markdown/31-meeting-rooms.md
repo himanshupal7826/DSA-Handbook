@@ -41,32 +41,134 @@ meeting rooms, min rooms, overlap count, heap, chronological.
 
 ## 3. Brute Force Approach
 
+**The question this pattern keeps answering:** *"How many things are happening at the same time — and what is the busiest moment?"*
+
 ### Intuition
-Compare every pair of intervals for overlap — O(n^2).
+Compare every meeting against every other one to see if they clash.
 
 ### Algorithm
-1. Enumerate the naive candidates directly.
-2. Evaluate each independently, repeating work.
-3. Return the best/last valid result.
+1. For each pair `(i, j)` with `i < j`:
+2. &nbsp;&nbsp;They overlap if `start[i] < end[j]` **and** `start[j] < end[i]`.
+3. For "can I attend all?", return `false` on the first clash.
+4. For "how many rooms?", the pairwise view doesn't even answer the question — you would have to check, for every candidate instant, how many meetings cover it.
 
 ### Complexity
-Typically slower than the optimal below — often a polynomial or exponential factor worse.
+- Time: **O(n²)** for the pairwise check; worse if you sample time instants.
+- Space: O(1).
 
 ### Drawbacks
-Redundant recomputation; does not exploit the structure the Meeting Rooms pattern is built to use.
+- Most pairs are nowhere near each other in time, and we compare them anyway.
+- The room-count version is the real problem: the *maximum simultaneous overlap* is a global property, and no amount of pairwise checking assembles it directly.
 
 ---
 
 ## 4. Optimal Approach
 
 ### Core idea
-Sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps.
 
-### Optimization journey
-1. Start with the brute force to establish correctness.
-2. Identify the repeated work or exploitable structure.
-3. Introduce the Meeting Rooms invariant/structure so each element/query costs far less.
-4. (Optional) optimize space with rolling state.
+One sentence:
+
+> **Stop thinking about intervals. Think about a timeline of arrivals and departures, processed in time order.**
+
+A meeting is not one thing — it is two **events**: someone walks in, and later someone walks out. Sort all events by time, walk through them, and keep a counter:
+
+```text
++1 when a meeting starts
+-1 when a meeting ends
+```
+
+The counter is the number of rooms in use *right now*. Its maximum over the whole timeline is the answer.
+
+### The thought process
+
+```text
+We need    : the maximum number of overlapping intervals.
+Obvious way: compare all pairs.
+Doesn't work: overlap is a global count, not a pairwise fact.
+Notice     : the count only changes at a start or an end.
+             Between events, nothing happens.
+Therefore  : sort the events by time and sweep, tracking a
+             running counter of "currently active".
+Now        : O(n log n) for the sort, O(n) for the sweep.
+```
+
+### Two equivalent implementations
+
+**A. Event sweep** — split starts and ends into two sorted arrays and merge-walk them.
+
+```text
+starts: 0   5  15
+ends  : 10 20  30
+
+pointer into each; whichever time is smaller happens next
+start → count++,  end → count--
+```
+
+**B. Min-heap of end times** — sort meetings by start; the heap holds the end times of meetings still running.
+
+```text
+for each meeting in start order:
+    if the earliest end <= this start → that room is free → reuse it (pop)
+    push this meeting's end
+    rooms = max(rooms, heap size)
+```
+
+Both are O(n log n). Use the heap when you need to know *which* room; use the sweep when you only need the count.
+
+### The tie-break rule that decides correctness
+
+When a meeting **ends at exactly the moment** another **starts**, do they need two rooms?
+
+For meetings, no — `[0,10]` and `[10,20]` share a room, because the interval is half-open in spirit: you leave at 10, the next person arrives at 10.
+
+So when a start and an end land on the same timestamp, **process the end first**:
+
+```text
+process ends before starts at equal times  →  [0,10] and [10,20] need 1 room  ✓
+process starts before ends at equal times  →  they would need 2 rooms         ✗
+```
+
+In the two-array sweep this falls out of using `<=`:
+
+```go
+if starts[i] < ends[j] { count++ } else { count-- }   // ties take the `else` → end first
+```
+
+In the heap version it falls out of `heap[0] <= start` (not `<`).
+
+If a problem *does* treat endpoints as closed — "the lecture hall must be empty before the next class" — flip the comparison. Always ask which convention the problem wants.
+
+### Steps (minimum rooms, heap version)
+
+```text
+Step 1 → Sort meetings by start time.
+Step 2 → Create an empty min-heap of end times.
+Step 3 → For each meeting:
+Step 4 →     if heap is non-empty and heap.min <= meeting.start:
+                 pop  ← that room has freed up
+Step 5 →     push meeting.end
+Step 6 →     rooms = max(rooms, heap.size())
+Step 7 → Return rooms.
+```
+
+### How should I recognize this?
+
+```text
+If you see...
+  "minimum number of rooms / platforms / servers / CPUs"
+  "can this person attend all meetings"
+  "maximum number of overlapping intervals"
+  "how many are active at the busiest moment"
+        ↓
+Think about...
+  "Turn each interval into a +1 event and a -1 event,
+   then walk the timeline in order."
+        ↓
+Use...
+  can-attend-all → sort by start, check adjacent pairs
+  room count     → event sweep, or a min-heap of end times
+  bounded times  → a difference array is even simpler
+```
 
 ### Visual explanation
 
@@ -100,72 +202,159 @@ Sorting linearizes the geometry so a single left-to-right sweep resolves all ove
 </svg>
 ```
 
-```
-brute  : recompute everything each step      ──▶ slow
-Meeting Rooms     : maintain state, update in O(1)/O(log n) ──▶ fast
+```text
+meetings: [0,30]  [5,10]  [15,20]
+
+timeline:  0    5    10   15   20        30
+           │    │    │    │    │         │
+events  : +1   +1   -1   +1   -1        -1
+count   :  1    2    1    2    1         0
+                ↑
+        maximum = 2  →  two rooms needed
 ```
 
 ### Interview explanation
-"This is a Meeting Rooms problem. I'll sorting linearizes the geometry so a single left-to-right sweep resolves all overlaps. That brings the complexity down to O(n log n) time and O(n) space — here's the template."
+"I'll stop treating each meeting as one object and treat it as two events: a `+1` when it starts and a `−1` when it ends. Sorting all events by time and sweeping gives me a running count of how many meetings are active, and the maximum of that count is the number of rooms. The one subtlety is ties: when a meeting ends exactly when another starts they can share a room, so I process the end event first. That's O(n log n) for the sort and O(n) for the sweep. Equivalently I can sort by start and keep a min-heap of end times, popping whenever the earliest end is at or before the current start — the heap size is the rooms in use."
 
 ---
 
 ## 5. Generic Templates
 
-> The skeleton below is the reusable **Intervals** family template. Adapt the comparison/condition to the specific problem.
+> Two events per interval, processed in time order. Ends win ties.
 
 ```go
-// Merge overlapping intervals.
-func merge(intervals [][]int) [][]int {
-    sort.Slice(intervals, func(i, j int) bool { return intervals[i][0] < intervals[j][0] })
-    res := [][]int{}
-    for _, in := range intervals {
-        n := len(res)
-        if n > 0 && in[0] <= res[n-1][1] {
-            if in[1] > res[n-1][1] { res[n-1][1] = in[1] } // extend
-        } else {
-            res = append(res, in)
+// CanAttendAll reports whether the meetings are pairwise non-overlapping.
+func CanAttendAll(intervals [][]int) bool {
+    sort.Slice(intervals, func(a, b int) bool {
+        return intervals[a][0] < intervals[b][0]
+    })
+    for i := 1; i < len(intervals); i++ {
+        // Sorted by start, so only the immediate predecessor can clash.
+        if intervals[i][0] < intervals[i-1][1] {
+            return false
         }
     }
-    return res
+    return true
+}
+
+// MinRooms counts the maximum simultaneous overlap via an event sweep.
+func MinRooms(intervals [][]int) int {
+    starts := make([]int, len(intervals))
+    ends := make([]int, len(intervals))
+    for i, iv := range intervals {
+        starts[i], ends[i] = iv[0], iv[1]
+    }
+    sort.Ints(starts)
+    sort.Ints(ends)
+
+    rooms, best := 0, 0
+    i, j := 0, 0
+    for i < len(starts) {
+        if starts[i] < ends[j] {
+            rooms++ // a meeting begins
+            i++
+            if rooms > best {
+                best = rooms
+            }
+        } else {
+            rooms-- // a meeting ends; ties land here, so ends go first
+            j++
+        }
+    }
+    return best
 }
 ```
 
 ```python
-def merge(intervals):
-    intervals.sort(key=lambda x: x[0])
-    res = []
-    for s, e in intervals:
-        if res and s <= res[-1][1]:
-            res[-1][1] = max(res[-1][1], e)   # extend last
+import heapq
+
+def can_attend_all(intervals):
+    """True if no two meetings overlap."""
+    intervals.sort(key=lambda iv: iv[0])
+    for i in range(1, len(intervals)):
+        if intervals[i][0] < intervals[i - 1][1]:   # only the predecessor can clash
+            return False
+    return True
+
+def min_rooms(intervals):
+    """Maximum simultaneous overlap, via an event sweep."""
+    starts = sorted(iv[0] for iv in intervals)
+    ends = sorted(iv[1] for iv in intervals)
+
+    rooms = best = 0
+    i = j = 0
+    while i < len(starts):
+        if starts[i] < ends[j]:
+            rooms += 1                    # a meeting begins
+            i += 1
+            best = max(best, rooms)
         else:
-            res.append([s, e])
-    return res
+            rooms -= 1                    # a meeting ends; ties come here
+            j += 1
+    return best
+
+def min_rooms_heap(intervals):
+    """Same answer, min-heap of end times. Heap size = rooms in use."""
+    intervals.sort(key=lambda iv: iv[0])
+    ends = []                             # min-heap of end times
+    for start, end in intervals:
+        if ends and ends[0] <= start:     # <= : ending exactly now frees the room
+            heapq.heappop(ends)
+        heapq.heappush(ends, end)
+    return len(ends)
 ```
 
 ```java
-int[][] merge(int[][] intervals) {
-    Arrays.sort(intervals, (a, b) -> Integer.compare(a[0], b[0]));
-    List<int[]> res = new ArrayList<>();
-    for (int[] in : intervals) {
-        if (!res.isEmpty() && in[0] <= res.get(res.size()-1)[1])
-            res.get(res.size()-1)[1] = Math.max(res.get(res.size()-1)[1], in[1]);
-        else res.add(in);
+import java.util.*;
+
+public class MeetingRooms {
+    public static boolean canAttendAll(int[][] intervals) {
+        Arrays.sort(intervals, (a, b) -> Integer.compare(a[0], b[0]));
+        for (int i = 1; i < intervals.length; i++)
+            if (intervals[i][0] < intervals[i - 1][1]) return false;
+        return true;
     }
-    return res.toArray(new int[0][]);
+
+    // Min-heap of end times: the heap size is the rooms in use.
+    public static int minRooms(int[][] intervals) {
+        if (intervals.length == 0) return 0;
+        Arrays.sort(intervals, (a, b) -> Integer.compare(a[0], b[0]));
+
+        PriorityQueue<Integer> ends = new PriorityQueue<>();
+        for (int[] iv : intervals) {
+            if (!ends.isEmpty() && ends.peek() <= iv[0]) ends.poll();  // room freed
+            ends.add(iv[1]);
+        }
+        return ends.size();
+    }
 }
 ```
 
 ```cpp
-vector<vector<int>> merge(vector<vector<int>>& intervals) {
-    sort(intervals.begin(), intervals.end());
-    vector<vector<int>> res;
-    for (auto& in : intervals) {
-        if (!res.empty() && in[0] <= res.back()[1])
-            res.back()[1] = max(res.back()[1], in[1]);
-        else res.push_back(in);
+#include <algorithm>
+#include <queue>
+#include <vector>
+using namespace std;
+
+bool canAttendAll(vector<vector<int>> intervals) {
+    sort(intervals.begin(), intervals.end(),
+         [](const vector<int>& a, const vector<int>& b) { return a[0] < b[0]; });
+    for (size_t i = 1; i < intervals.size(); ++i)
+        if (intervals[i][0] < intervals[i - 1][1]) return false;
+    return true;
+}
+
+// Min-heap of end times: the heap size is the rooms in use.
+int minRooms(vector<vector<int>> intervals) {
+    sort(intervals.begin(), intervals.end(),
+         [](const vector<int>& a, const vector<int>& b) { return a[0] < b[0]; });
+
+    priority_queue<int, vector<int>, greater<int>> ends;
+    for (const auto& iv : intervals) {
+        if (!ends.empty() && ends.top() <= iv[0]) ends.pop();   // room freed
+        ends.push(iv[1]);
     }
-    return res;
+    return (int)ends.size();
 }
 ```
 
@@ -251,123 +440,281 @@ vector<vector<int>> merge(vector<vector<int>>& intervals) {
 ## 9. Solved Example 1
 
 ### Problem — Meeting Rooms (LeetCode 252)
-Given meeting time intervals, decide whether a person can attend all of them (i.e., no two overlap).
+Given meeting intervals, determine whether a person could attend **all** of them.
 
 ### Thought Process
-1. If any two meetings overlap, the person cannot attend all — so we only need to detect a single overlap.
-2. Sort by start time; then overlaps can only occur between adjacent meetings.
-3. Scan adjacent pairs: if the next meeting starts before the current one ends, return False.
+1. "Attend all" means no two meetings overlap at all.
+2. Checking every pair is O(n²) — but after sorting by start time, a meeting can only clash with the one **immediately before it**.
+3. Why? Everything earlier starts even sooner; if it doesn't reach the previous meeting's start, it certainly doesn't reach this one's. Sorting reduces a global check to a local one.
+4. So: sort by start, then check each adjacent pair.
+5. Use `<` not `<=`: a meeting starting exactly when the previous ends is fine.
 
 ### Dry Run
-Input `[[0,30],[5,10],[15,20]]`. Sort by start → same order.
-- `[0,30]` then `[5,10]`: 5 < 30 → overlap → return False.
-- (If input were `[[7,10],[2,4]]`: sort → `[[2,4],[7,10]]`; 7 ≥ 4, no overlap → True.)
+
+Input: `intervals = [[0,30], [5,10], [15,20]]` → sorted by start (already is)
+
+| i | previous | current | `current.start < previous.end`? | verdict |
+|---|----------|---------|--------------------------------|---------|
+| 1 | `[0,30]` | `[5,10]` | `5 < 30` → **yes** | overlap → return **`false`** |
+
+Output: **`false`** — the 0–30 meeting swallows the 5–10 one.
+
+**A passing case**, `intervals = [[7,10], [2,4]]` → sorted: `[[2,4], [7,10]]`
+
+| i | previous | current | `7 < 4`? | verdict |
+|---|----------|---------|----------|---------|
+| 1 | `[2,4]` | `[7,10]` | no | no overlap |
+
+Output: **`true`** ✓
+
+**The boundary case**, `[[0,10], [10,20]]`: `10 < 10` is false, so they don't clash — you leave at 10 and arrive at 10. That is the convention this problem uses.
 
 ### Visualization
-```
-input  ──▶ [ apply Meeting Rooms step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+sorted:   0────────────────────────────30
+              5────10
+                        15────20
+
+          the 5–10 meeting starts at 5, before 30  →  clash  ✗
+
+sorted:   2──4
+                 7────10
+          7 is not before 4  →  no clash  ✓
 ```
 
 ### Code
+
+```go
+func canAttendMeetings(intervals [][]int) bool {
+    sort.Slice(intervals, func(a, b int) bool {
+        return intervals[a][0] < intervals[b][0]
+    })
+
+    for i := 1; i < len(intervals); i++ {
+        // Sorted by start, so only the immediate predecessor can clash.
+        // Strict <: starting exactly when the previous ends is fine.
+        if intervals[i][0] < intervals[i-1][1] {
+            return false
+        }
+    }
+    return true
+}
+```
+
 ```python
 def canAttendMeetings(intervals):
-    intervals.sort(key=lambda x: x[0])
+    intervals.sort(key=lambda iv: iv[0])
     for i in range(1, len(intervals)):
+        # Only the immediate predecessor can clash once sorted.
+        # Strict <: starting exactly when the previous ends is fine.
         if intervals[i][0] < intervals[i - 1][1]:
             return False
     return True
 ```
 
 ### Complexity
-Time O(n log n), Space O(1). Sorting dominates; the adjacent scan is O(n).
+Time O(n log n) — the sort dominates the O(n) scan. Space O(1) beyond the sort.
+
+---
 
 ## 10. Solved Example 2
 
 ### Problem — Meeting Rooms II (LeetCode 253)
-Given meeting intervals, return the minimum number of rooms required to hold all meetings.
+Return the **minimum number of conference rooms** required.
 
 ### Thought Process
-1. The answer is the maximum number of meetings running at the same instant.
-2. Sort meetings by start; keep a min-heap of end times for rooms currently in use.
-3. For each meeting, if the earliest-ending room is free by its start, reuse it (pop); always push the new end. The heap size is the running room count.
+1. The answer is the maximum number of meetings active at any one instant.
+2. Sort meetings by start time and process them in order. Keep a **min-heap of end times** for the meetings currently occupying rooms.
+3. Before placing a meeting, check the heap's smallest end time — the room that frees up soonest. If it is `<= this meeting's start`, that room is available: pop it.
+4. Push this meeting's end time (it now occupies a room).
+5. The heap **size** is the number of rooms in use, and its maximum is the answer. Since we only ever pop at most one per meeting, the final size *is* the maximum.
+6. Why check only the earliest end? If the soonest-freeing room isn't free yet, none of the others are either.
 
 ### Dry Run
-Input `[[0,30],[5,10],[15,20]]`, heap of ends.
-- `[0,30]`: heap `[30]` → 1 room.
-- `[5,10]`: 5 < 30, no free room → push → `[10,30]` → 2 rooms.
-- `[15,20]`: earliest end 10 ≤ 15, reuse → pop 10, push 20 → `[20,30]` → still 2.
-- Answer 2.
+
+Input: `intervals = [[0,30], [5,10], [15,20]]` → sorted by start (already is)
+
+| meeting | heap before | earliest end `<= start`? | action | heap after | rooms |
+|---------|-------------|---------------------------|--------|------------|-------|
+| `[0,30]`  | `[]`      | heap empty | push 30 | `[30]`     | 1 |
+| `[5,10]`  | `[30]`    | `30 <= 5`? **no** | need a new room; push 10 | `[10, 30]` | **2** |
+| `[15,20]` | `[10,30]` | `10 <= 15`? **yes** | pop 10 (room freed), push 20 | `[20, 30]` | 2 |
+
+Output: **2**
+
+Step 2 is where a room gets added: the 0–30 meeting is still running at time 5, so the 5–10 meeting needs its own room. Step 3 reuses the room the 5–10 meeting vacated at time 10.
 
 ### Visualization
-```
-input  ──▶ [ apply Meeting Rooms step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+room 1:  0━━━━━━━━━━━━━━━━━━━━━━━━━━━━30
+room 2:      5━━━10      15━━━20
+                         └ reuses the room freed at 10
+
+busiest instant (e.g. t = 6): two meetings active  →  2 rooms
 ```
 
 ### Code
+
+```go
+// minEndHeap is a min-heap of meeting end times.
+type minEndHeap []int
+
+func (h minEndHeap) Len() int            { return len(h) }
+func (h minEndHeap) Less(i, j int) bool  { return h[i] < h[j] }
+func (h minEndHeap) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
+func (h *minEndHeap) Push(x any)         { *h = append(*h, x.(int)) }
+func (h *minEndHeap) Pop() any {
+    old := *h
+    n := len(old)
+    last := old[n-1]
+    *h = old[:n-1]
+    return last
+}
+
+func minMeetingRooms(intervals [][]int) int {
+    if len(intervals) == 0 {
+        return 0
+    }
+
+    sort.Slice(intervals, func(a, b int) bool {
+        return intervals[a][0] < intervals[b][0]
+    })
+
+    ends := &minEndHeap{} // end times of meetings currently in rooms
+    heap.Init(ends)
+
+    for _, iv := range intervals {
+        // The soonest-freeing room; if it isn't free, no other room is either.
+        // <= : a meeting ending exactly now releases the room.
+        if ends.Len() > 0 && (*ends)[0] <= iv[0] {
+            heap.Pop(ends)
+        }
+        heap.Push(ends, iv[1])
+    }
+
+    // We pop at most once per meeting, so the final size is the peak.
+    return ends.Len()
+}
+```
+
 ```python
 import heapq
 
 def minMeetingRooms(intervals):
     if not intervals:
         return 0
-    intervals.sort(key=lambda x: x[0])
-    heap = []  # end times of rooms in use
-    for s, e in intervals:
-        if heap and heap[0] <= s:
-            heapq.heapreplace(heap, e)   # reuse freed room
-        else:
-            heapq.heappush(heap, e)      # need a new room
-    return len(heap)
+    intervals.sort(key=lambda iv: iv[0])
+
+    ends = []                          # min-heap of end times
+    for start, end in intervals:
+        # Soonest-freeing room; <= means ending exactly now frees it.
+        if ends and ends[0] <= start:
+            heapq.heappop(ends)
+        heapq.heappush(ends, end)
+
+    return len(ends)                   # peak occupancy
 ```
 
 ### Complexity
-Time O(n log n), Space O(n). Sort plus heap operations per meeting.
+Time **O(n log n)** — sorting plus at most `n` heap pushes and pops. Space O(n) for the heap.
+
+---
 
 ## 11. Solved Example 3
 
 ### Problem — Car Pooling (LeetCode 1094)
-Given trips `[numPassengers, from, to]` and a car capacity, return whether all trips fit without ever exceeding capacity.
+A car with `capacity` seats drives one direction. Each trip `[numPassengers, from, to]` boards passengers at `from` and drops them at `to`. Return `true` if the car never exceeds capacity.
 
 ### Thought Process
-1. This is a max-concurrent-load problem: passengers board at `from` and leave at `to`.
-2. Use a difference array over locations: `diff[from] += num`, `diff[to] -= num`.
-3. Sweep locations left to right accumulating the running load; if it ever exceeds capacity, return False.
+1. Same question as Meeting Rooms II — peak simultaneous occupancy — but now we compare it against a fixed limit instead of reporting it.
+2. Each trip is two events: `+numPassengers` at `from`, `−numPassengers` at `to`.
+3. **Half-open ranges:** passengers leave *at* `to`, so location `to` is already free. The drop event goes at `to`, with no `+1`.
+4. Locations are capped at 1000 by the constraints, so instead of sorting events we can index a fixed array directly — a **difference array**, which is the event sweep with O(1) bucketing.
+5. Sweep locations in increasing order accumulating occupancy; if it ever exceeds `capacity`, return `false`.
 
 ### Dry Run
-`trips=[[2,1,5],[3,3,7]]`, `capacity=4`.
-- diff: +2 at 1, -2 at 5, +3 at 3, -3 at 7.
-- Sweep: at 1 → 2; at 3 → 5 > 4 → return False.
-- (Capacity 5 would give running max 5 ≤ 5 → True.)
+
+Input: `trips = [[2,1,5], [3,3,7]]`, `capacity = 4`
+
+**Events:**
+
+| trip | boards | drops |
+|------|--------|-------|
+| `[2,1,5]` | `+2` at location 1 | `−2` at location 5 |
+| `[3,3,7]` | `+3` at location 3 | `−3` at location 7 |
+
+**Sweep by location:**
+
+| location | change | occupancy | ≤ 4? |
+|----------|--------|-----------|------|
+| 1 | +2 | 2 | yes |
+| 2 | 0  | 2 | yes |
+| 3 | +3 | **5** | **no → `false`** |
+
+Output: **`false`** — at location 3 the car holds 5 people but seats only 4.
+
+**With `capacity = 5`** the sweep continues: location 5 drops to `5 − 2 = 3`, location 7 drops to `0`, never exceeding 5 → **`true`**. Note the first group leaves at location 5 exactly when nobody is boarding there — that is the half-open convention doing its job.
 
 ### Visualization
-```
-input  ──▶ [ apply Meeting Rooms step-by-step ]
-state  ──▶ updated incrementally, never recomputed from scratch
-output ──▶ read directly from the maintained state
+
+```text
+location:  1   2   3   4   5   6   7
+trip1   : [--- 2 passengers ---)          drops at 5
+trip2   :         [--- 3 passengers ---)  drops at 7
+          ─────────────────────────────
+occupied:  2   2   5   5   3   3   0
+                   ↑
+              5 > capacity 4  →  false
 ```
 
 ### Code
+
+```go
+func carPooling(trips [][]int, capacity int) bool {
+    const maxLocation = 1001
+    // change[i] = net passengers boarding/leaving at location i.
+    change := make([]int, maxLocation+1)
+
+    for _, t := range trips {
+        num, from, to := t[0], t[1], t[2]
+        change[from] += num // board here
+        change[to] -= num   // leave here: the range is half-open [from, to)
+    }
+
+    occupancy := 0
+    for _, delta := range change {
+        occupancy += delta
+        if occupancy > capacity {
+            return false
+        }
+    }
+    return true
+}
+```
+
 ```python
 def carPooling(trips, capacity):
-    diff = [0] * 1001            # locations 0..1000
+    change = [0] * 1002                # locations 0..1000, plus slack
     for num, start, end in trips:
-        diff[start] += num
-        diff[end] -= num
-    load = 0
-    for delta in diff:
-        load += delta
-        if load > capacity:
+        change[start] += num           # board here
+        change[end] -= num             # leave here: half-open [start, end)
+
+    occupancy = 0
+    for delta in change:
+        occupancy += delta
+        if occupancy > capacity:
             return False
     return True
 ```
 
 ### Complexity
-Time O(n + R) where R is the location range; Space O(R) for the difference array.
+Time O(m + maxLocation) for `m` trips, Space O(maxLocation).
 
+> When locations are unbounded, drop the fixed array and sort the events instead — O(m log m). That is the Sweep Line pattern, and the difference array is simply its O(1)-bucketing special case.
+
+---
 
 ## 12. LeetCode Practice Set
 
