@@ -54,6 +54,7 @@ Served over HTTP, pattern pages fetch the raw `markdown/*.md` files live — han
 DSA-Patterns-Handbook/
 ├── index.html              # Homepage: search, categories, dashboard, roadmaps
 ├── pattern.html            # Single template that renders any pattern (?p=<slug>)
+├── daily-practice.html     # N LeetCode questions per day (you choose N); done = submitted code, stored locally
 ├── pattern-selector.html   # Interactive decision tree → recommended pattern
 ├── view.html               # Styled viewer for roadmap & resource markdown
 ├── README.md
@@ -65,6 +66,8 @@ DSA-Patterns-Handbook/
 │       ├── app.js            # Shared chrome: top bar, sidebar, nav, content loader
 │       ├── search.js         # Search by name / LeetCode # / keyword / concept
 │       ├── progress.js       # LocalStorage: completed / bookmarked / revision
+│       ├── daily.js          # Daily Practice engine: N problems/day, carry-over, code submissions store
+│       ├── journey.js        # 30-Day Journey engine (problems, XP, streaks)
 │       ├── theme.js          # Light / Dark / Auto theme manager
 │       ├── content.js        # AUTO-GENERATED offline content registry
 │       └── content/          # (reserved for per-pattern splits if desired)

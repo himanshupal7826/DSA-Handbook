@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Practice — DSA Patterns Handbook</title>
+  <meta name="description" content="Daily LeetCode practice: choose how many questions you want per day and get a fresh, pattern-balanced set every day with streaks, XP and history.">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/journey.css">
+  <link rel="icon" type="image/png" href="assets/images/03_favicon.png">
+  <script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+  <style>
+    .dp-controls { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; margin-top: 18px; }
+    .dp-field { display: flex; flex-direction: column; gap: 6px; }
+    .dp-field label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--text-soft); }
+    .dp-field select, .dp-field input[type=number] {
+      font: inherit; font-size: 14px; padding: 8px 10px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); min-width: 150px;
+    }
+    .dp-n-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .dp-n-row input[type=number] { width: 84px; min-width: 0; text-align: center; font-weight: 800; font-size: 18px; }
+    .dp-quick { display: inline-flex; gap: 4px; }
+    .dp-quick button {
+      font: inherit; font-size: 12.5px; font-weight: 700; padding: 6px 10px; cursor: pointer;
+      border-radius: 999px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text-soft);
+    }
+    .dp-quick button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .dp-progress { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 18px; }
+    .dp-progress .j-ring { flex: none; }
+    .dp-problem-idx {
+      width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 13px; background: var(--accent-soft); color: var(--accent); flex: none;
+    }
+    .dp-problem-idx.done { background: var(--green); color: #fff; }
+    .j-problem.solved { border-color: var(--green); opacity: .85; }
+    .j-problem.solved h4 { text-decoration: line-through; text-decoration-color: var(--green); }
+    .dp-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .dp-history { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+    .dp-hist-day { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 10px; background: var(--bg-elev); font-size: 12.5px; }
+    .dp-hist-day .d { font-weight: 700; }
+    .dp-hist-day .s { color: var(--text-soft); margin-top: 2px; }
+    .dp-hist-day.complete { border-color: var(--green); }
+    .dp-hist-day.today { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+    .dp-hist-day.empty { opacity: .55; }
+    .dp-heat-wrap { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .dp-legend { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--text-soft); }
+    .dp-carried { background: var(--amber-bg); color: var(--amber); }
+    .dp-submit-form { margin-top: 12px; border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 12px; background: var(--bg); }
+    .dp-submit-form .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+    .dp-submit-form label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--text-soft); }
+    .dp-submit-form select, .dp-submit-form input[type=number], .dp-submit-form input[type=text] {
+      font: inherit; font-size: 13.5px; padding: 7px 9px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); background: var(--bg-elev); color: var(--text);
+    }
+    .dp-submit-form input[type=number] { width: 80px; }
+    .dp-submit-form input[type=text] { flex: 1; min-width: 200px; }
+    .dp-code {
+      width: 100%; min-height: 180px; resize: vertical; font-family: var(--mono); font-size: 13px; line-height: 1.5;
+      padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elev); color: var(--text);
+      tab-size: 4; white-space: pre; box-sizing: border-box;
+    }
+    .dp-code:focus { outline: none; border-color: var(--accent); }
+    .dp-err { color: var(--red); font-size: 13px; margin-top: 6px; }
+    .dp-sub-meta { font-size: 13px; color: var(--text-soft); margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .dp-sub-meta b { color: var(--green); }
+    .dp-sub-view { margin-top: 8px; }
+    .dp-sub-view pre {
+      margin: 0; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg);
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.5; overflow-x: auto; max-height: 420px; white-space: pre;
+    }
+    .dp-sub-row { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-elev); padding: 10px 12px; margin-bottom: 8px; }
+    .dp-sub-row .head { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 13.5px; }
+    .dp-sub-row .head h4 { margin: 0; flex: 1; min-width: 140px; font-size: 14px; }
+    .dp-sub-row .head .when { color: var(--text-soft); font-size: 12px; }
+    .dp-io { width: 100%; min-height: 120px; font-family: var(--mono); font-size: 12px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header class="topbar" id="topbar"></header>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="layout">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <main class="main">
+      <section class="j-hero" style="background:linear-gradient(135deg,#0f766e 0%,#0e7490 55%,#4f46e5 100%)">
+        <div class="j-hero-top"><div>
+          <div class="j-day-badge" id="dp-badge">🎯 Daily Practice</div>
+          <h1 id="dp-title">Your LeetCode questions for today</h1>
+          <p class="j-quote" id="dp-intro">Tell me how many questions you want each day. I'll pick a pattern-balanced set every morning. A question only counts as done when you paste the code you submitted on LeetCode — until then it stays on your list and carries over to tomorrow.</p>
+        </div>
+        <div class="j-hero-stats" id="dp-hero-stats"></div>
+        </div>
+      </section>
+
+      <!-- Controls -->
+      <div class="j-card" style="margin-top:18px">
+        <div class="dp-controls">
+          <div class="dp-field">
+            <label for="dp-n">Questions per day</label>
+            <div class="dp-n-row">
+              <button class="j-btn small" id="dp-n-minus" aria-label="Fewer">−</button>
+              <input id="dp-n" type="number" min="1" max="20" step="1">
+              <button class="j-btn small" id="dp-n-plus" aria-label="More">+</button>
+              <span class="dp-quick" id="dp-quick"></span>
+            </div>
+          </div>
+          <div class="dp-field">
+            <label for="dp-mix">Difficulty mix</label>
+            <select id="dp-mix">
+              <option value="balanced">Balanced (Easy · Medium · Hard)</option>
+              <option value="easy">Easy only</option>
+              <option value="medium">Medium only</option>
+              <option value="hard">Hard only</option>
+              <option value="any">Any (no quota)</option>
+            </select>
+          </div>
+          <div class="dp-field">
+            <label for="dp-focus">Focus</label>
+            <select id="dp-focus"></select>
+          </div>
+        </div>
+        <div class="j-muted" id="dp-hint" style="margin-top:12px"></div>
+      </div>
+
+      <!-- Today -->
+      <div class="j-section-title"><span class="bar"></span><span id="dp-today-title">Today's set</span></div>
+      <div class="dp-progress" id="dp-progress"></div>
+      <div id="dp-list" style="margin-top:14px"></div>
+
+      <!-- Stats -->
+      <div class="j-section-title"><span class="bar"></span>Your practice stats</div>
+      <div class="j-grid cols-4" id="dp-tiles" style="grid-template-columns:repeat(5,1fr)"></div>
+
+      <!-- Consistency -->
+      <div class="j-section-title"><span class="bar"></span>Consistency (last 12 weeks)</div>
+      <div class="j-card">
+        <div class="dp-heat-wrap">
+          <div class="j-heatmap" id="dp-heat"></div>
+          <div class="dp-legend">Less <span class="j-heat-cell"></span><span class="j-heat-cell" data-l="1"></span><span class="j-heat-cell" data-l="2"></span><span class="j-heat-cell" data-l="3"></span><span class="j-heat-cell" data-l="4"></span> More</div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="j-section-title"><span class="bar"></span>Recent days</div>
+      <div class="dp-history" id="dp-history"></div>
+
+      <!-- Submissions -->
+      <div class="j-section-title"><span class="bar"></span>My submissions <span class="j-pill ghost" id="dp-sub-count"></span></div>
+      <p class="j-muted">Every solution you submit is stored in this browser. Export regularly to back it up or move it to another device.</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="j-btn small" id="dp-export">⬇ Export submissions (JSON)</button>
+        <button class="j-btn small" id="dp-import">⬆ Import</button>
+      </div>
+      <div id="dp-io-wrap" hidden><textarea class="dp-code dp-io" id="dp-io" placeholder="Paste exported JSON here…"></textarea>
+        <div style="display:flex;gap:6px;margin-top:6px"><button class="j-btn small primary" id="dp-io-apply">Import now</button><button class="j-btn small" id="dp-io-close">Close</button></div></div>
+      <div id="dp-submissions"></div>
+
+      <div style="margin-top:28px;display:flex;gap:8px;flex-wrap:wrap">
+        <a class="j-btn" href="journey.html">📅 30-Day Journey</a>
+        <a class="j-btn" href="night-revision.html">🌙 Night revision</a>
+        <button class="j-btn" id="dp-reset" style="margin-left:auto;color:var(--red)">Reset daily practice</button>
+      </div>
+    </main>
+  </div>
+
+  <div class="j-toast" id="toast"></div>
+
+  <script src="assets/js/patterns-data.js"></script>
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/progress.js"></script>
+  <script src="assets/js/search.js"></script>
+  <script src="assets/js/markdown.js"></script>
+  <script src="assets/js/content.js" onerror="window.DSA_CONTENT=window.DSA_CONTENT||{}"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/journey.js"></script>
+  <script src="assets/js/daily.js"></script>
+  <script>
+    DSAApp.initChrome(null);
+
+    (function () {
+      var D = window.DSADaily, J = window.DSAJourney;
+      function el(id) { return document.getElementById(id); }
+      function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+      function diffClass(d) { return d === "Easy" ? "easy" : d === "Medium" ? "medium" : "hard"; }
+      var toastTimer;
+      function toast(msg) {
+        var t = el("toast"); t.textContent = msg; t.classList.add("show");
+        clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove("show"); }, 1800);
+      }
+      function niceDate(iso) {
+        var p = iso.split("-"); var d = new Date(+p[0], +p[1] - 1, +p[2]);
+        return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+      }
+      function ring(pct, label, sub, cls) {
+        var r = 36, c = 2 * Math.PI * r, off = c * (1 - pct / 100);
+        return '<div class="j-ring ' + (cls || "") + '"><svg width="84" height="84" viewBox="0 0 84 84">' +
+          '<circle class="track" cx="42" cy="42" r="' + r + '" fill="none" stroke-width="8"/>' +
+          '<circle class="fill" cx="42" cy="42" r="' + r + '" fill="none" stroke-width="8" stroke-dasharray="' + c + '" stroke-dashoffset="' + off + '"/>' +
+          '</svg><div class="j-ring-label">' + label + '<small>' + sub + '</small></div></div>';
+      }
+
+      /* ---------------- Controls ---------------- */
+      var QUICK = [1, 2, 3, 5, 10];
+      function renderControls() {
+        var n = D.getN();
+        el("dp-n").value = n;
+        el("dp-quick").innerHTML = QUICK.map(function (q) {
+          return '<button data-n="' + q + '" class="' + (q === n ? "on" : "") + '">' + q + '</button>';
+        }).join("");
+        el("dp-quick").querySelectorAll("button").forEach(function (b) {
+          b.addEventListener("click", function () { applyN(+b.getAttribute("data-n")); });
+        });
+        el("dp-mix").value = D.getMix();
+
+        var focus = D.getFocus();
+        var opts = '<option value="all">All 100 patterns</option>' +
+          '<option value="journey">Patterns studied so far (30-Day Journey)</option>' +
+          '<option value="bookmarked">Bookmarked patterns</option>' +
+          '<optgroup label="Single category">' +
+          D.categories().map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join("") +
+          '</optgroup>';
+        el("dp-focus").innerHTML = opts;
+        el("dp-focus").value = focus;
+        if (el("dp-focus").value !== focus) el("dp-focus").value = "all";
+
+        var mixText = { balanced: "a balanced Easy/Medium/Hard mix", easy: "Easy problems only", medium: "Medium problems only", hard: "Hard problems only", any: "any difficulty" }[D.getMix()];
+        var focusText = focus === "all" ? "all 100 patterns" : focus === "journey" ? "only the patterns you've reached in the 30-Day Journey" : focus === "bookmarked" ? "your bookmarked patterns" : "the " + focus + " category";
+        el("dp-hint").innerHTML = "Every day you get <b>" + n + "</b> question" + (n === 1 ? "" : "s") + " with " + mixText + " from " + focusText +
+          ". <b>Nothing can be skipped:</b> a question is done only when you submit your code, and unsolved ones carry over to the next day. Raising the number adds questions today; lowering it applies from tomorrow. Mix and focus changes apply to newly picked questions.";
+      }
+      function applyN(n) {
+        var v = D.setN(n);
+        toast(v + " question" + (v === 1 ? "" : "s") + " per day");
+        renderAll();
+      }
+      el("dp-n").addEventListener("change", function () { applyN(el("dp-n").value); });
+      el("dp-n").addEventListener("keydown", function (e) { if (e.key === "Enter") applyN(el("dp-n").value); });
+      el("dp-n-minus").addEventListener("click", function () { applyN(D.getN() - 1); });
+      el("dp-n-plus").addEventListener("click", function () { applyN(D.getN() + 1); });
+      el("dp-mix").addEventListener("change", function () {
+        D.setMix(el("dp-mix").value); toast("Difficulty mix saved — applies to new questions"); renderAll();
+      });
+      el("dp-focus").addEventListener("change", function () {
+        D.setFocus(el("dp-focus").value); toast("Focus saved — applies to new questions"); renderAll();
+      });
+      el("dp-reset").addEventListener("click", function () {
+        if (confirm("Reset daily practice settings and day history? (Your stored submissions, solved state and XP are kept.)")) { D.reset(); renderAll(); toast("Daily practice reset"); }
+      });
+
+      /* ---------------- Today ---------------- */
+      function fmtTime(iso) {
+        var d = new Date(iso);
+        return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+      }
+      function langName(id) { var l = D.langs.filter(function (x) { return x.id === id; })[0]; return l ? l.name : id; }
+      function langOptions(sel) {
+        return D.langs.map(function (l) { return '<option value="' + l.id + '"' + (l.id === sel ? " selected" : "") + '>' + l.name + '</option>'; }).join("");
+      }
+      var openForms = {}; // problem id -> true while its submit form is open
+      var draftKey = function (id) { return "dsa-daily-draft-" + id; };
+
+      function submitForm(q, sub) {
+        var draft = "";
+        try { draft = localStorage.getItem(draftKey(q.id)) || ""; } catch (e) {}
+        var lang = (sub && sub.lang) || (function () { try { return localStorage.getItem("dsa-daily-lang") || "python"; } catch (e) { return "python"; } })();
+        return '<div class="dp-submit-form" data-form="' + q.id + '">' +
+          '<div class="row"><label>Language</label><select data-lang="' + q.id + '">' + langOptions(lang) + '</select>' +
+          '<label>Time spent</label><input type="number" min="0" step="1" placeholder="min" data-minutes="' + q.id + '" value="' + (sub && sub.minutes != null ? sub.minutes : "") + '">' +
+          '<input type="text" placeholder="Approach in one line (optional) — e.g. two pointers from both ends" data-note="' + q.id + '" value="' + esc(sub ? sub.note : "") + '"></div>' +
+          '<textarea class="dp-code" data-code="' + q.id + '" spellcheck="false" placeholder="Paste the exact code you submitted (and got Accepted) on LeetCode for #' + esc(q.num || q.title) + '…">' + esc(sub ? sub.code : draft) + '</textarea>' +
+          '<div class="dp-err" data-err="' + q.id + '"></div>' +
+          '<div class="dp-actions">' +
+          '<button class="j-btn small success" data-submit="' + q.id + '">' + (sub ? "✓ Resubmit" : "✓ Submit solution (+30 XP)") + '</button>' +
+          '<button class="j-btn small" data-cancel="' + q.id + '">Cancel</button>' +
+          '<span class="j-muted" style="font-size:12px">Drafts auto-save while you type.</span>' +
+          '</div></div>';
+      }
+
+      function problemCard(q, i) {
+        var sub = D.getSubmission(q.id);
+        var solved = !!sub;
+        var saved = J.isSavedProblem(q.id);
+        var p = q.patterns[0];
+        var others = q.patterns.slice(1);
+        var formOpen = !!openForms[q.id];
+        return '<div class="j-problem ' + (solved ? "solved" : "") + '" data-id="' + q.id + '">' +
+          '<div class="j-problem-head">' +
+          '<span class="dp-problem-idx ' + (solved ? "done" : "") + '">' + (solved ? "✓" : (i + 1)) + '</span>' +
+          (q.num ? '<span class="num">#' + q.num + '</span>' : "") +
+          '<h4>' + esc(q.title) + '</h4>' +
+          '<span class="j-pill ' + diffClass(q.difficulty) + '">' + q.difficulty + '</span>' +
+          (q.carried && !solved ? '<span class="j-pill dp-carried" title="Unsolved from a previous day — it stays until you submit">↩ Carried over</span>' : "") +
+          '<span class="j-pill ghost">' + esc(p.level) + '</span>' +
+          '</div>' +
+          '<div class="j-problem-metrics">' +
+          '<span>⏱ <b>' + q.estTime + ' min</b></span>' +
+          '<span>✅ Acc <b>' + q.acceptance + '</b></span>' +
+          '<span>🎯 Pattern <b><a href="pattern.html?p=' + p.slug + '">' + DSAApp.pad(p.id) + ' · ' + esc(p.name) + '</a></b>' +
+          (others.length ? ' <span class="j-muted">(also: ' + others.map(function (o) { return esc(o.name); }).join(", ") + ')</span>' : "") + '</span>' +
+          '</div>' +
+          '<div class="j-tag-row">' + q.companies.map(function (c) { return '<span class="j-company">' + esc(c) + '</span>'; }).join("") +
+          q.tags.map(function (t) { return '<span class="j-tag">' + esc(t) + '</span>'; }).join("") + '</div>' +
+          '<details><summary>Stuck? Pattern hint · complexity target · when to revisit</summary>' +
+          '<div class="j-detail-block"><strong>Pattern hint:</strong> ' + esc(p.summary) + '</div>' +
+          '<div class="j-detail-block"><strong>Recognition signals:</strong> ' + esc((p.keywords || []).join(", ")) + '</div>' +
+          '<div class="j-detail-block"><strong>Target complexity:</strong> ' + esc(q.complexity) + '</div>' +
+          '<div class="j-detail-block"><strong>When to revisit:</strong> ' + esc(q.revisit) + '</div>' +
+          '<div class="j-detail-block"><a class="j-btn small" href="pattern.html?p=' + p.slug + '#4-optimal-approach">Read the optimal approach →</a> ' +
+          '<a class="j-btn small" href="pattern.html?p=' + p.slug + '#5-generic-templates">Code templates →</a></div>' +
+          '</details>' +
+          (solved ?
+            '<div class="dp-sub-meta"><b>✓ Submitted</b><span>' + langName(sub.lang) + '</span><span>' + fmtTime(sub.at) + '</span>' +
+            (sub.minutes != null ? '<span>' + sub.minutes + ' min</span>' : "") +
+            (sub.attempts > 1 ? '<span>' + sub.attempts + ' submissions</span>' : "") +
+            (sub.note ? '<span>· ' + esc(sub.note) + '</span>' : "") + '</div>'
+            : "") +
+          '<div class="dp-actions">' +
+          '<a class="j-btn small ' + (solved ? "" : "primary") + '" href="' + q.url + '" target="_blank" rel="noopener">Open on LeetCode ↗</a>' +
+          (solved
+            ? '<button class="j-btn small" data-view="' + q.id + '">👁 View code</button>' +
+              '<button class="j-btn small" data-open="' + q.id + '">✎ Resubmit</button>' +
+              '<button class="j-btn small" data-withdraw="' + q.id + '" style="color:var(--red)">Withdraw</button>'
+            : (formOpen ? "" : '<button class="j-btn small success" data-open="' + q.id + '">✍️ Submit my solution</button>')) +
+          '<button class="j-btn small" data-save="' + q.id + '">' + (saved ? "★ Saved" : "☆ Save for later") + '</button>' +
+          '</div>' +
+          (solved ? '<div class="dp-sub-view" data-viewwrap="' + q.id + '" hidden><pre>' + esc(sub.code) + '</pre></div>' : "") +
+          (formOpen ? submitForm(q, sub) : "") +
+          '</div>';
+      }
+
+      function wireCards(root) {
+        root.querySelectorAll("[data-open]").forEach(function (b) {
+          b.addEventListener("click", function () { openForms[b.getAttribute("data-open")] = true; renderToday(); var ta = root.querySelector('[data-code="' + b.getAttribute("data-open") + '"]'); if (ta) ta.focus(); });
+        });
+        root.querySelectorAll("[data-cancel]").forEach(function (b) {
+          b.addEventListener("click", function () { delete openForms[b.getAttribute("data-cancel")]; renderToday(); });
+        });
+        root.querySelectorAll("[data-code]").forEach(function (ta) {
+          var id = ta.getAttribute("data-code");
+          ta.addEventListener("input", function () { try { localStorage.setItem(draftKey(id), ta.value); } catch (e) {} });
+          ta.addEventListener("keydown", function (e) {
+            if (e.key === "Tab") { e.preventDefault(); var st = ta.selectionStart, en = ta.selectionEnd; ta.value = ta.value.slice(0, st) + "    " + ta.value.slice(en); ta.selectionStart = ta.selectionEnd = st + 4; }
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { var btn = root.querySelector('[data-submit="' + id + '"]'); if (btn) btn.click(); }
+          });
+        });
+        root.querySelectorAll("[data-lang]").forEach(function (sel) {
+          sel.addEventListener("change", function () { try { localStorage.setItem("dsa-daily-lang", sel.value); } catch (e) {} });
+        });
+        root.querySelectorAll("[data-submit]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            var id = b.getAttribute("data-submit");
+            var res = D.submit(id, {
+              lang: root.querySelector('[data-lang="' + id + '"]').value,
+              code: root.querySelector('[data-code="' + id + '"]').value,
+              note: root.querySelector('[data-note="' + id + '"]').value,
+              minutes: root.querySelector('[data-minutes="' + id + '"]').value
+            });
+            var err = root.querySelector('[data-err="' + id + '"]');
+            if (!res.ok) { err.textContent = res.error; return; }
+            try { localStorage.removeItem(draftKey(id)); } catch (e) {}
+            delete openForms[id];
+            var after = D.getDay();
+            if (res.newlySolved && after.complete) toast("🎉 Daily set complete! +30 XP +50 bonus");
+            else if (res.newlySolved) toast("Solution stored! +30 XP · " + (after.total - after.solved) + " to go");
+            else toast("Solution updated");
+            renderAll();
+          });
+        });
+        root.querySelectorAll("[data-view]").forEach(function (b) {
+          b.addEventListener("click", function () { var w = root.querySelector('[data-viewwrap="' + b.getAttribute("data-view") + '"]'); w.hidden = !w.hidden; b.textContent = w.hidden ? "👁 View code" : "👁 Hide code"; });
+        });
+        root.querySelectorAll("[data-withdraw]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            if (!confirm("Withdraw this submission? The stored code is deleted and the question goes back to unsolved (−30 XP).")) return;
+            D.withdraw(b.getAttribute("data-withdraw")); toast("Submission withdrawn"); renderAll();
+          });
+        });
+        root.querySelectorAll("[data-save]").forEach(function (b) {
+          b.addEventListener("click", function () { var on = J.toggleSavedProblem(b.getAttribute("data-save")); toast(on ? "Saved for later" : "Removed from saved"); renderToday(); });
+        });
+      }
+
+      function renderToday() {
+        var d = D.getDay();
+        var pct = d.total ? Math.round(d.solved / d.total * 100) : 0;
+        el("dp-today-title").textContent = "Today's set · " + niceDate(d.date);
+        el("dp-badge").textContent = "🎯 Daily Practice · " + niceDate(d.date);
+        el("dp-title").textContent = d.complete
+          ? "All " + d.total + " done — great work!"
+          : d.solved + " of " + d.total + " solved · ~" + d.problems.filter(function (q) { return !D.isSolved(q.id); }).reduce(function (a, q) { return a + q.estTime; }, 0) + " min left";
+        el("dp-progress").innerHTML =
+          ring(pct, d.solved + "/" + d.total, "solved", pct === 100 ? "green" : "") +
+          '<div><div style="font-weight:700;font-size:15px">' + (d.complete ? "🎉 Today's set is complete. +50 XP bonus awarded." : "Solve on LeetCode, then paste your accepted code here to mark it done.") + '</div>' +
+          '<div class="j-muted" style="margin-top:4px">' + (d.carriedIds.length ? d.carriedIds.filter(function (id) { return !D.isSolved(id); }).length + ' carried over · ' : '') + 'Estimated ' + d.estimatedMinutes + ' min total · ' +
+          ["Easy", "Medium", "Hard"].map(function (lv) { var c = d.problems.filter(function (q) { return q.difficulty === lv; }).length; return c ? c + " " + lv : null; }).filter(Boolean).join(" · ") +
+          '</div></div>';
+        if (!d.problems.length) {
+          el("dp-list").innerHTML = '<div class="j-empty"><span class="ico">🏁</span>No unsolved problems left in this focus. Change the focus or difficulty mix above.</div>';
+          return;
+        }
+        el("dp-list").innerHTML = d.problems.map(problemCard).join("");
+        wireCards(el("dp-list"));
+      }
+
+      /* ---------------- Stats / heatmap / history ---------------- */
+      function renderStats() {
+        var s = D.stats();
+        el("dp-hero-stats").innerHTML =
+          '<div class="j-hs"><div class="n">🔥 ' + s.streak.current + '</div><div class="l">Day streak</div></div>' +
+          '<div class="j-hs"><div class="n">' + s.totalSolved + '</div><div class="l">Solved</div></div>' +
+          '<div class="j-hs"><div class="n">' + s.xp + '</div><div class="l">XP</div></div>' +
+          (s.level ? '<div class="j-hs"><div class="n">' + s.level.level.icon + '</div><div class="l">' + esc(s.level.level.name) + '</div></div>' : "");
+        function tile(big, lbl, sub) { return '<div class="j-tile"><div class="big">' + big + '</div><div class="lbl">' + lbl + '</div>' + (sub ? '<div class="sub">' + sub + '</div>' : "") + '</div>'; }
+        el("dp-tiles").innerHTML =
+          tile(s.streak.current, "Current streak", "Longest: " + s.streak.longest + " day" + (s.streak.longest === 1 ? "" : "s")) +
+          tile(s.daysComplete + "/" + s.daysPracticed, "Days completed", "sets fully solved") +
+          tile(s.solvedAssigned + "/" + s.assigned, "Daily questions solved", "from assigned sets") +
+          tile(s.submissions, "Solutions stored", Object.keys(s.langCounts).map(function (l) { return langName(l) + " " + s.langCounts[l]; }).join(" · ") || "paste code to store") +
+          tile(s.remaining, "Problems remaining", "of " + s.poolSize + " in the handbook");
+      }
+      function renderHeat() {
+        var days = D.history(84);
+        // GitHub-style: columns = weeks, rows = weekdays. Pad start so first column starts on Sunday.
+        var first = new Date(days[0].date.split("-")[0], days[0].date.split("-")[1] - 1, days[0].date.split("-")[2]);
+        var pad = first.getDay();
+        var cells = [];
+        for (var i = 0; i < pad; i++) cells.push('<span class="j-heat-cell" style="visibility:hidden"></span>');
+        days.forEach(function (d) {
+          var l = 0;
+          if (d.total) l = d.complete ? 4 : d.solved ? Math.max(1, Math.ceil(d.solved / d.total * 3)) : 1;
+          cells.push('<span class="j-heat-cell" data-l="' + l + '" title="' + d.date + (d.total ? ": " + d.solved + "/" + d.total + " solved" : ": no practice") + '"></span>');
+        });
+        var heat = el("dp-heat");
+        heat.style.gridTemplateRows = "repeat(7, 15px)";
+        heat.style.gridAutoFlow = "column";
+        heat.style.gridTemplateColumns = "none";
+        heat.innerHTML = cells.join("");
+      }
+      function renderHistory() {
+        var days = D.history(14).reverse();
+        var t = D.today();
+        el("dp-history").innerHTML = days.map(function (d) {
+          var cls = "dp-hist-day" + (d.complete ? " complete" : "") + (d.date === t ? " today" : "") + (!d.total ? " empty" : "");
+          return '<div class="' + cls + '"><div class="d">' + (d.date === t ? "Today" : niceDate(d.date)) + '</div>' +
+            '<div class="s">' + (d.total ? (d.complete ? "✓ " : "") + d.solved + "/" + d.total + " solved" : "—") + '</div></div>';
+        }).join("");
+      }
+
+      function renderSubmissions() {
+        var list = D.allSubmissions();
+        el("dp-sub-count").textContent = list.length + " stored";
+        if (!list.length) { el("dp-submissions").innerHTML = '<div class="j-empty"><span class="ico">📭</span>No submissions yet. Solve today\'s questions and paste your code.</div>'; return; }
+        el("dp-submissions").innerHTML = list.map(function (row) {
+          var q = row.problem, sub = row.submission;
+          var title = q ? (q.num ? "#" + q.num + " " : "") + q.title : "#" + row.id;
+          return '<div class="dp-sub-row"><div class="head">' +
+            '<h4>' + esc(title) + '</h4>' +
+            (q ? '<span class="j-pill ' + diffClass(q.difficulty) + '">' + q.difficulty + '</span>' : "") +
+            '<span class="j-pill ghost">' + langName(sub.lang) + '</span>' +
+            (sub.minutes != null ? '<span class="j-muted">' + sub.minutes + ' min</span>' : "") +
+            '<span class="when">' + fmtTime(sub.at) + '</span>' +
+            (q ? '<a class="j-btn small" href="pattern.html?p=' + q.patternSlug + '">' + esc(q.pattern) + '</a>' : "") +
+            '<button class="j-btn small" data-view="' + row.id + '">👁 View code</button>' +
+            '<button class="j-btn small" data-withdraw="' + row.id + '" style="color:var(--red)">Withdraw</button>' +
+            '</div>' + (sub.note ? '<div class="j-muted" style="margin-top:4px">' + esc(sub.note) + '</div>' : "") +
+            '<div class="dp-sub-view" data-viewwrap="' + row.id + '" hidden><pre>' + esc(sub.code) + '</pre></div></div>';
+        }).join("");
+        wireCards(el("dp-submissions"));
+      }
+      el("dp-export").addEventListener("click", function () {
+        var json = D.exportSubmissions();
+        el("dp-io-wrap").hidden = false; el("dp-io").value = json; el("dp-io").select();
+        if (navigator.clipboard) navigator.clipboard.writeText(json).then(function () { toast("Copied " + D.allSubmissions().length + " submissions to clipboard"); }, function () {});
+      });
+      el("dp-import").addEventListener("click", function () { el("dp-io-wrap").hidden = false; el("dp-io").value = ""; el("dp-io").focus(); });
+      el("dp-io-close").addEventListener("click", function () { el("dp-io-wrap").hidden = true; });
+      el("dp-io-apply").addEventListener("click", function () {
+        if (D.importSubmissions(el("dp-io").value)) { toast("Submissions imported"); el("dp-io-wrap").hidden = true; renderAll(); }
+        else toast("Invalid JSON");
+      });
+
+      function renderAll() { renderControls(); renderToday(); renderStats(); renderHeat(); renderHistory(); renderSubmissions(); }
+      renderAll();
+      J.onChange(function () { renderStats(); });
+    })();
+  </script>
+</body>
+</html>

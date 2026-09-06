@@ -76,6 +76,7 @@
     });
 
     html += '<div style="margin-top:18px;padding:0 8px">' +
+      '<a class="nav-link" href="daily-practice.html">🎯 Daily Practice</a>' +
       '<a class="nav-link" href="journey.html">📅 30-Day Journey</a>' +
       '<a class="nav-link" href="night-revision.html">🌙 Night Revision</a>' +
       '<a class="nav-link" href="interview.html">🎤 Interview Mode</a>' +

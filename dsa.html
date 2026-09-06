@@ -28,7 +28,8 @@
           <div class="stat"><div class="n">1000+</div><div class="l">LeetCode links</div></div>
         </div>
         <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap">
-          <a class="btn primary" href="journey.html">📅 Start 30-Day Journey</a>
+          <a class="btn primary" href="daily-practice.html">🎯 Daily Practice</a>
+          <a class="btn" href="journey.html">📅 Start 30-Day Journey</a>
           <a class="btn" href="pattern.html?p=01-frequency-counter">▶ Pattern 01</a>
           <a class="btn" href="pattern-selector.html">🧭 Which pattern do I need?</a>
           <a class="btn" href="view.html?f=roadmap/000-ROADMAP.md">🗺️ View Roadmap</a>
@@ -37,6 +38,7 @@
 
       <!-- Today's Plan banner (30-Day Journey) -->
       <section id="today-plan"></section>
+      <section id="daily-strip"></section>
 
       <!-- Progress dashboard -->
       <h2 class="section-title" id="dashboard"><span class="bar"></span>Your Progress Dashboard</h2>
@@ -71,8 +73,25 @@
   <script src="assets/js/content.js" onerror="window.DSA_CONTENT=window.DSA_CONTENT||{}"></script>
   <script src="assets/js/app.js"></script>
   <script src="assets/js/journey.js"></script>
+  <script src="assets/js/daily.js"></script>
   <script>
     DSAApp.initChrome(null);
+
+    // ---- Daily Practice strip (N LeetCode questions per day) ----
+    (function () {
+      var D = window.DSADaily; if (!D) return;
+      function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+      var d = D.getDay(), st = D.streak();
+      var items = d.problems.map(function (q) {
+        var done = D.isSolved(q.id);
+        return '<span class="chip" style="' + (done ? "text-decoration:line-through;opacity:.7" : "") + '">' + (done ? "✓ " : "") + (q.num ? "#" + q.num + " " : "") + esc(q.title) + ' · ' + q.difficulty + '</span>';
+      }).join("");
+      document.getElementById("daily-strip").innerHTML =
+        '<div class="card" style="margin-top:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">' +
+        '<div style="flex:1;min-width:220px"><h3 style="margin:0 0 4px">🎯 Daily practice · ' + d.solved + '/' + d.total + ' solved today' + (st.current ? ' · 🔥 ' + st.current + '-day streak' : '') + '</h3>' +
+        '<div class="chips" style="margin-top:8px">' + (items || '<span class="muted">No questions yet</span>') + '</div></div>' +
+        '<a class="btn primary" href="daily-practice.html">' + (d.complete ? "Done for today ✓" : "Solve today\'s " + d.total) + '</a></div>';
+    })();
 
     // ---- Today's Plan banner (links into the full 30-Day Journey) ----
     (function () {
@@ -92,6 +111,7 @@
         '<p class="j-quote" style="font-size:14px">“' + esc(day.quote) + '”</p>' +
         '<div style="display:flex;gap:10px;flex-wrap:wrap;position:relative;z-index:1">' +
         '<a class="btn" style="background:#fff;color:#4f46e5;border:none" href="journey.html">Open today\'s plan →</a>' +
+        '<a class="btn" style="background:rgba(255,255,255,.18);color:#fff;border:none" href="daily-practice.html">🎯 Daily practice</a>' +
         '<a class="btn" style="background:rgba(255,255,255,.18);color:#fff;border:none" href="night-revision.html">🌙 Night revision</a>' +
         '</div></div>' +
         '<div class="j-hero-stats">' +

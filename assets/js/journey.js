@@ -542,9 +542,12 @@
   function isSolved(id) { return !!(load().solved || {})[id]; }
   function toggleSolved(id) {
     var s = load(), b = bucket(s, "solved");
-    if (b[id]) { delete b[id]; revokeXP("solve:" + id, 30); }
-    else { b[id] = true; awardXP("solve:" + id, 30, "Solved problem " + id); }
-    save(s); return !!b[id];
+    var on = !b[id];
+    if (on) b[id] = true; else delete b[id];
+    save(s); // persist the flag first — awardXP/revokeXP re-load and save XP on top
+    if (on) awardXP("solve:" + id, 30, "Solved problem " + id);
+    else revokeXP("solve:" + id, 30);
+    return on;
   }
   function isSavedProblem(id) { return !!(load().savedProblems || {})[id]; }
   function toggleSavedProblem(id) {
