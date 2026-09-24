@@ -119,7 +119,7 @@ __THEME__
       __EXTRANAV__
       <a class="btn" href="../index.html">⌂ All handbooks</a>
     </div>
-  </section>
+  </section>__HOMEINTRO__
   <h2 class="section-title" id="dashboard"><span class="bar"></span>Your Progress</h2>
   <div class="progress-bar"><span id="pbar" style="width:0%"></span></div>
   <div class="muted" id="pmsg" style="font-size:13px;margin:6px 0 10px"></div>
@@ -288,7 +288,7 @@ def build(spec, root):
         return (t.replace("__NAME__", spec["name"]).replace("__ICON__", spec.get("icon", "📘"))
                  .replace("__TAGLINE__", spec.get("tagline", "")).replace("__COUNT__", str(len(spec["items"])))
                  .replace("__CATS__", str(cats)).replace("__THEME__", THEME_INLINE)
-                 .replace("__EXTRANAV__", extranav).replace("__ENGINE__", ENGINE_SCRIPTS))
+                 .replace("__EXTRANAV__", extranav).replace("__HOMEINTRO__", spec.get("homeIntro", "")).replace("__ENGINE__", ENGINE_SCRIPTS))
     with open(os.path.join(hb_dir, "index.html"), "w", encoding="utf-8") as f:
         f.write(fill(INDEX_TMPL))
     with open(os.path.join(hb_dir, "topic.html"), "w", encoding="utf-8") as f:

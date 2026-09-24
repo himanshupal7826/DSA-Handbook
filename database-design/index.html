@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Database Design Handbook — zariya.in</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="icon" type="image/png" href="../assets/images/03_favicon.png">
+<script>(function(){var m=localStorage.getItem("dsa-theme")||"auto";var d=m==="auto"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.setAttribute("data-theme",d);})();</script>
+</head>
+<body>
+<header class="topbar" id="topbar"></header>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+<nav class="sidebar" id="sidebar"></nav>
+<main class="main">
+  <section class="hero">
+    <h1>🗃️ Database Design Handbook</h1>
+    <p>Beginner → Expert. The sequel to the SQL Handbook: how databases really work and how to design them for production — engine architecture, storage, MVCC, locking, isolation, WAL and crash recovery, replication, consistency models, partitioning, sharding, distributed transactions, CAP, consensus, multi-region, high availability, caching, capacity planning, bottleneck diagnosis, monitoring, backups, zero-downtime migrations — plus 10 real-world database design case studies.</p>
+    <div class="stats">
+      <div class="stat"><div class="n" id="s-total">40</div><div class="l">Topics</div></div>
+      <div class="stat"><div class="n" id="s-done">0</div><div class="l">Completed</div></div>
+      <div class="stat"><div class="n" id="s-cat">10</div><div class="l">Categories</div></div>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+      <a class="btn primary" id="start-btn" href="#">▶ Start learning</a>
+      <a class="btn" href="journey.html">🗓️ 30-Day Journey</a>
+      <a class="btn" href="interview.html">🎤 Interview Mode</a>
+      <a class="btn" href="review.html">🔁 Review</a>
+      <a class="btn" href="../index.html">⌂ All handbooks</a>
+    </div>
+  </section><section class="db-intro" style="margin:18px 0 8px"><blockquote style="margin:0 0 16px;padding:16px 20px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 var(--radius) var(--radius) 0;font-size:17px;line-height:1.5;color:var(--text)"><strong>Don’t memorize database schemas. Learn to design data systems from workload, access patterns, consistency requirements, concurrency, scale, and failure.</strong></blockquote><div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px"><div style="flex:1 1 150px;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-elev)"><div style="font-size:26px;font-weight:800;color:var(--accent);line-height:1.1">30</div><div style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-soft);margin-top:4px">Core concepts</div></div><div style="flex:1 1 150px;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-elev)"><div style="font-size:26px;font-weight:800;color:var(--accent);line-height:1.1">10</div><div style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-soft);margin-top:4px">Real-world case studies</div></div><div style="flex:1 1 150px;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-elev)"><div style="font-size:26px;font-weight:800;color:var(--accent);line-height:1.1">4</div><div style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-soft);margin-top:4px">Levels · Beginner → Expert</div></div></div><p class="muted" style="font-size:14px;margin:0 0 10px">Builds on the <a href="../sql/index.html">SQL Handbook</a> — queries, joins, indexes, query plans, transactions, isolation basics and schema design live there. This handbook goes a layer down and a layer out: <em>why</em> databases behave the way they do, and how to design them for production workloads.</p><h3 style="margin:18px 0 10px">Learning path</h3><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg-elev);font-size:13px;white-space:nowrap"><span class="badge lvl-Beginner" style="margin:0">01–02</span>Foundations</span><span aria-hidden="true" style="color:var(--text-faint)">→</span><span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg-elev);font-size:13px;white-space:nowrap"><span class="badge lvl-Intermediate" style="margin:0">03–06</span>Concurrency &amp; Correctness</span><span aria-hidden="true" style="color:var(--text-faint)">→</span><span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg-elev);font-size:13px;white-space:nowrap"><span class="badge lvl-Intermediate" style="margin:0">07–08</span>Durability &amp; Recovery</span><span aria-hidden="true" style="color:var(--text-faint)">→</span><span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg-elev);font-size:13px;white-space:nowrap"><span class="badge lvl-Intermediate" style="margin:0">09–10</span>Replication &amp; Consistency</span><span aria-hidden="true" style="color:var(--text-faint)">→</span><span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg-elev);font-size:13px;white-space:nowrap"><span class="badge lvl-Advanced" style="margin:0">11–12</span>Scaling</span><span aria-hidden="true" style="color:var(--text-faint)">→</span><span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg-elev);font-size:13px;white-space:nowrap"><span class="badge lvl-Advanced" style="margin:0">13–18</span>Distributed Databases</span><span aria-hidden="true" style="color:var(--text-faint)">→</span><span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg-elev);font-size:13px;white-space:nowrap"><span class="badge lvl-Advanced" style="margin:0">19–25</span>Performance &amp; Operations</span><span aria-hidden="true" style="color:var(--text-faint)">→</span><span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg-elev);font-size:13px;white-space:nowrap"><span class="badge lvl-Advanced" style="margin:0">26–28</span>Reliability &amp; Lifecycle</span><span aria-hidden="true" style="color:var(--text-faint)">→</span><span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg-elev);font-size:13px;white-space:nowrap"><span class="badge lvl-Advanced" style="margin:0">29–30</span>Architecture Patterns</span><span aria-hidden="true" style="color:var(--text-faint)">→</span><span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg-elev);font-size:13px;white-space:nowrap"><span class="badge lvl-Expert" style="margin:0">31–40</span>Real-World Design</span></div></section>
+  <h2 class="section-title" id="dashboard"><span class="bar"></span>Your Progress</h2>
+  <div class="progress-bar"><span id="pbar" style="width:0%"></span></div>
+  <div class="muted" id="pmsg" style="font-size:13px;margin:6px 0 10px"></div>
+  <h2 class="section-title"><span class="bar"></span>Topics by Category</h2>
+  <div id="cat-sections"></div>
+</main>
+</div>
+<script src="../assets/js/theme.js"></script>
+<script src="data.js"></script>
+<script src="../assets/js/hb-progress.js"></script>
+<script src="../assets/js/hb-search.js"></script>
+<script src="../assets/js/markdown.js"></script>
+<script src="../assets/js/hb-listen.js"></script>
+<script src="content.js" onerror="window.HANDBOOK_CONTENT=window.HANDBOOK_CONTENT||{}"></script>
+<script src="../assets/js/hb-engine.js"></script>
+<script>
+DSAApp.initChrome(null);
+(function(){
+  var items = HANDBOOK.items;
+  document.getElementById("start-btn").href = "topic.html?p=" + items[0].slug;
+  // group by category preserving order
+  var cats = [];
+  items.forEach(function(p){ if(cats.indexOf(p.category)===-1) cats.push(p.category); });
+  var html = "";
+  cats.forEach(function(cat){
+    var inCat = items.filter(function(p){return p.category===cat;});
+    html += '<h3 style="margin:22px 0 10px">'+cat+'</h3><div class="card-grid">';
+    inCat.forEach(function(p){
+      html += '<a class="card" href="topic.html?p='+p.slug+'">'+
+        '<span class="badge lvl-'+p.level+'">'+p.level+'</span>'+
+        '<h3>'+String(p.id).padStart(2,"0")+'. '+p.name+'</h3>'+
+        '<p>'+p.summary+'</p></a>';
+    });
+    html += '</div>';
+  });
+  document.getElementById("cat-sections").innerHTML = html;
+  function refresh(){
+    var s = DSAProgress.stats();
+    document.getElementById("s-done").textContent = s.completed;
+    document.getElementById("pbar").style.width = s.pct+"%";
+    document.getElementById("pmsg").textContent = s.completed+" of "+s.total+" topics complete ("+s.pct+"%)";
+  }
+  refresh(); DSAProgress.onChange(refresh);
+})();
+</script>
+</body>
+</html>
