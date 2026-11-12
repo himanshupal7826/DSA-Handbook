@@ -78,16 +78,25 @@ REQUIRED_H2 = ["## 1. Overview", "## 2. Core Concepts", "## 3. Theory", "## 4. A
 SVG_RE = re.compile(r"```svg\s*(.*?)```", re.S)
 
 
+MERMAID_RE = re.compile(r"```mermaid\s*(.*?)```", re.S)
+
+
 def cmd_gate(d):
     md_dir = os.path.join(ROOT, d["id"], "markdown")
     rows, fails = [], []
+    # Optional per-handbook overrides (opt-in; absent = house defaults)
+    g = d.get("gate", {})
+    req_h2 = g.get("requiredH2", REQUIRED_H2)
+    min_svg, min_q, min_mm = g.get("minSvg", 2), g.get("minQ", 8), g.get("minMermaid", 0)
     for it in d["items"]:
         nn = "%02d" % it["id"]; p = os.path.join(md_dir, it["slug"] + ".md")
         if not os.path.exists(p):
             fails.append((it["slug"], "MISSING FILE")); continue
         t = open(p, encoding="utf-8").read()
         lines = t.count("\n") + 1
-        miss = [h for h in REQUIRED_H2 if h not in t]
+        appendix = it.get("kind") == "appendix"
+        miss = [] if appendix else [h for h in req_h2 if h not in t]
+        mm = len(MERMAID_RE.findall(t))
         svgs = SVG_RE.findall(t); bad = 0
         for s in svgs:
             try: minidom.parseString(s.strip())
@@ -96,9 +105,10 @@ def cmd_gate(d):
         probs = []
         if lines < 150: probs.append("short(%d)" % lines)
         if miss: probs.append("missingH2:%d" % len(miss))
-        if len(svgs) < 2: probs.append("svg<2(%d)" % len(svgs))
+        if not appendix and len(svgs) < min_svg: probs.append("svg<%d(%d)" % (min_svg, len(svgs)))
+        if not appendix and mm < min_mm: probs.append("mermaid<%d(%d)" % (min_mm, mm))
         if bad: probs.append("badSVG:%d" % bad)
-        if q < 8: probs.append("Q<8(%d)" % q)
+        if not appendix and q < min_q: probs.append("Q<%d(%d)" % (min_q, q))
         if not t.lstrip().startswith("# %s ·" % nn): probs.append("H1")
         if ("chapter %s." % nn) not in t: probs.append("footer")
         rows.append((nn, lines, len(svgs), q, sen, "OK" if not probs else ",".join(probs)))

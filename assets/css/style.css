@@ -365,6 +365,10 @@ a:hover { text-decoration: underline; }
 }
 .content .diagram-inner { min-width: min-content; }
 .content .diagram svg { max-width: 100%; height: auto; display: inline-block; }
+/* Mermaid source shows as plain text until mermaid.js renders it (or if offline). */
+.content .mermaid-fig pre.mermaid { margin: 0; background: transparent; color: #334155;
+  font-size: 12px; text-align: left; white-space: pre; border: 0; padding: 0; }
+.content .mermaid-fig pre.mermaid[data-processed] { text-align: center; white-space: normal; }
 
 /* ============================================================
  * Listen mode player (hb-listen.js)
