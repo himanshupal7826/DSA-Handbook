@@ -120,6 +120,386 @@ SPEC = {'id': 'ai-automation',
             'summary': 'Run models on your own hardware: Ollama, its OpenAI-compatible endpoint, quantisation and '
                        'VRAM, Hugging Face transformers and Inference Providers — and when local is worth it.',
             'keywords': ['ollama', 'hugging face', 'transformers', 'gguf', 'quantization', 'local llm', 'privacy'],
+            'refs': ['Official documentation']},
+           {'id': 9,
+            'slug': '09-n8n-fundamentals',
+            'name': 'n8n: Triggers, Nodes, AI Agent Node, Code Node, Webhooks & Self-Hosting',
+            'category': 'Part 2 · No-Code & Low-Code',
+            'level': 'Beginner',
+            'summary': 'Self-hosted workflow automation: triggers, nodes and items, expressions, the AI Agent node '
+                       'with tools and memory, the Code node, webhooks, credentials and Docker deployment.',
+            'keywords': ['n8n',
+                         'workflow',
+                         'trigger',
+                         'webhook',
+                         'ai agent node',
+                         'code node',
+                         'docker',
+                         'self-hosting'],
+            'refs': ['Official documentation']},
+           {'id': 10,
+            'slug': '10-make-zapier-power-automate',
+            'name': 'Make, Zapier & Power Automate',
+            'category': 'Part 2 · No-Code & Low-Code',
+            'level': 'Beginner',
+            'summary': 'The SaaS automation platforms: scenarios, zaps and flows, AI steps, pricing models, limits and '
+                       'governance — and how they compare to n8n.',
+            'keywords': ['make', 'zapier', 'power automate', 'saas automation', 'no-code', 'operations'],
+            'refs': ['Official documentation']},
+           {'id': 11,
+            'slug': '11-flowise-langflow-dify',
+            'name': 'Flowise, Langflow & Dify',
+            'category': 'Part 2 · No-Code & Low-Code',
+            'level': 'Beginner',
+            'summary': 'Visual LLM app builders: drag-and-drop chains, RAG and agents, their APIs, self-hosting, and '
+                       'when to graduate to code.',
+            'keywords': ['flowise', 'langflow', 'dify', 'visual builder', 'low-code llm', 'chatflow'],
+            'refs': ['Official documentation']},
+           {'id': 12,
+            'slug': '12-n8n-with-python',
+            'name': 'Connecting n8n with Python Scripts',
+            'category': 'Part 2 · No-Code & Low-Code',
+            'level': 'Beginner',
+            'summary': 'Hybrid automation: n8n calling FastAPI services, Python calling n8n webhooks, Execute Command, '
+                       'queues, auth, and where each piece of logic should live.',
+            'keywords': ['n8n', 'python', 'fastapi', 'webhook', 'hybrid automation', 'microservice'],
+            'refs': ['Official documentation']},
+           {'id': 13,
+            'slug': '13-langchain-core-lcel',
+            'name': 'LangChain Core: Prompts, Chains (LCEL) & Output Parsers',
+            'category': 'Part 3 · LangChain',
+            'level': 'Intermediate',
+            'summary': "LangChain's building blocks: chat models, prompt templates, the Runnable interface and LCEL, "
+                       'output parsers, structured output, streaming and batching.',
+            'keywords': ['langchain', 'lcel', 'runnable', 'prompt template', 'output parser', 'chat model'],
+            'refs': ['Official documentation']},
+           {'id': 14,
+            'slug': '14-langchain-tools-agents',
+            'name': 'LangChain Tools & Agents',
+            'category': 'Part 3 · LangChain',
+            'level': 'Intermediate',
+            'summary': 'Tools as Python functions, tool-calling models, create_agent, middleware, and how LangChain '
+                       'agents relate to LangGraph.',
+            'keywords': ['langchain', 'tools', 'agents', 'create_agent', 'tool calling', 'middleware'],
+            'refs': ['Official documentation']},
+           {'id': 15,
+            'slug': '15-document-loaders-splitters',
+            'name': 'Document Loaders & Text Splitters',
+            'category': 'Part 3 · LangChain',
+            'level': 'Intermediate',
+            'summary': 'Getting documents into LLM-sized pieces: loaders for PDFs, web, Office and databases; '
+                       'recursive, token, markdown and semantic splitters; metadata.',
+            'keywords': ['document loader', 'text splitter', 'chunk size', 'overlap', 'metadata', 'langchain'],
+            'refs': ['Official documentation']},
+           {'id': 16,
+            'slug': '16-rag-fundamentals',
+            'name': 'RAG Fundamentals: Chunking, Embeddings & Retrieval',
+            'category': 'Part 4 · RAG',
+            'level': 'Intermediate',
+            'summary': 'The full retrieval-augmented generation pipeline: ingest, chunk, embed, store, retrieve, '
+                       'generate with citations — and the failure modes at each step.',
+            'keywords': ['rag', 'retrieval', 'chunking', 'embeddings', 'citations', 'grounding'],
+            'refs': ['Official documentation']},
+           {'id': 17,
+            'slug': '17-reranking-hybrid-search',
+            'name': 'Reranking & Hybrid Search',
+            'category': 'Part 4 · RAG',
+            'level': 'Intermediate',
+            'summary': 'Beyond top-k cosine: BM25 + vector hybrid search, reciprocal rank fusion, cross-encoder '
+                       'reranking, query rewriting, HyDE and multi-query.',
+            'keywords': ['reranking', 'hybrid search', 'bm25', 'rrf', 'cross-encoder', 'query rewriting', 'hyde'],
+            'refs': ['Official documentation']},
+           {'id': 18,
+            'slug': '18-vector-databases',
+            'name': 'Vector Databases: Chroma, FAISS, Qdrant, Pinecone & pgvector',
+            'category': 'Part 4 · RAG',
+            'level': 'Intermediate',
+            'summary': 'Where embeddings live: ANN indexes (HNSW, IVF), filtering, persistence, scaling and cost — '
+                       'five stores compared with the same code.',
+            'keywords': ['vector database', 'chroma', 'faiss', 'qdrant', 'pinecone', 'pgvector', 'hnsw'],
+            'refs': ['Official documentation']},
+           {'id': 19,
+            'slug': '19-llamaindex-haystack',
+            'name': 'LlamaIndex & Haystack',
+            'category': 'Part 4 · RAG',
+            'level': 'Intermediate',
+            'summary': 'Two RAG-first frameworks: LlamaIndex indexes, query engines and workflows; Haystack pipelines '
+                       'and components — compared with LangChain.',
+            'keywords': ['llamaindex', 'haystack', 'query engine', 'pipeline', 'rag framework'],
+            'refs': ['Official documentation']},
+           {'id': 20,
+            'slug': '20-document-parsing',
+            'name': 'Document Parsing: PyMuPDF, Unstructured & Docling',
+            'category': 'Part 4 · RAG',
+            'level': 'Intermediate',
+            'summary': 'Garbage in, garbage out: extracting text, tables and layout from PDFs and Office files, OCR '
+                       'fallbacks, and parsing at scale.',
+            'keywords': ['pymupdf', 'unstructured', 'docling', 'pdf parsing', 'tables', 'layout'],
+            'refs': ['Official documentation']},
+           {'id': 21,
+            'slug': '21-agent-patterns',
+            'name': 'Agent Patterns: ReAct, Planning & Reflection',
+            'category': 'Part 5 · Agents & Multi-Agent',
+            'level': 'Advanced',
+            'summary': 'How agents think: the ReAct loop, plan-and-execute, reflection and self-critique, stopping '
+                       'conditions, and when a workflow beats an agent.',
+            'keywords': ['react', 'planning', 'reflection', 'agent loop', 'plan-and-execute', 'workflow vs agent'],
+            'refs': ['Official documentation']},
+           {'id': 22,
+            'slug': '22-agent-memory-mem0',
+            'name': 'Agent Memory & Mem0',
+            'category': 'Part 5 · Agents & Multi-Agent',
+            'level': 'Advanced',
+            'summary': 'Short-term vs long-term memory, summarisation, semantic memory stores, Mem0 for user-level '
+                       'memory, and privacy of remembered data.',
+            'keywords': ['memory', 'mem0', 'long-term memory', 'summarization', 'personalization'],
+            'refs': ['Official documentation']},
+           {'id': 23,
+            'slug': '23-langgraph-fundamentals',
+            'name': 'LangGraph: State, Nodes & Edges',
+            'category': 'Part 5 · Agents & Multi-Agent',
+            'level': 'Advanced',
+            'summary': 'Agents as graphs: typed state, reducers, nodes, conditional edges, cycles, tool nodes, '
+                       'subgraphs and streaming.',
+            'keywords': ['langgraph', 'state graph', 'nodes', 'edges', 'reducers', 'conditional edges'],
+            'refs': ['Official documentation']},
+           {'id': 24,
+            'slug': '24-langgraph-production',
+            'name': 'LangGraph in Production: Checkpoints & Human-in-the-Loop',
+            'category': 'Part 5 · Agents & Multi-Agent',
+            'level': 'Advanced',
+            'summary': 'Durable agents: checkpointers, threads, interrupts and approvals, time travel, persistence '
+                       'with Postgres, and deployment.',
+            'keywords': ['langgraph', 'checkpoint', 'human-in-the-loop', 'interrupt', 'persistence', 'thread'],
+            'refs': ['Official documentation']},
+           {'id': 25,
+            'slug': '25-crewai',
+            'name': 'CrewAI: Roles, Tasks & Crews',
+            'category': 'Part 5 · Agents & Multi-Agent',
+            'level': 'Advanced',
+            'summary': 'Role-based multi-agent teams: agents, tasks, crews, processes, flows, tools and memory — with '
+                       'an honest look at cost and control.',
+            'keywords': ['crewai', 'multi-agent', 'roles', 'tasks', 'crew', 'flows'],
+            'refs': ['Official documentation']},
+           {'id': 26,
+            'slug': '26-vendor-agent-sdks',
+            'name': 'OpenAI Agents SDK, Claude Agent SDK & Google ADK',
+            'category': 'Part 5 · Agents & Multi-Agent',
+            'level': 'Advanced',
+            'summary': "The model vendors' agent frameworks: agents, handoffs, guardrails and tracing; Claude Code as "
+                       "a library; Google's Agent Development Kit — compared.",
+            'keywords': ['openai agents sdk', 'claude agent sdk', 'google adk', 'handoffs', 'guardrails'],
+            'refs': ['Official documentation']},
+           {'id': 27,
+            'slug': '27-agent-frameworks-tour',
+            'name': 'PydanticAI, AutoGen/AG2, smolagents & DSPy',
+            'category': 'Part 5 · Agents & Multi-Agent',
+            'level': 'Advanced',
+            'summary': 'Four more philosophies: type-safe agents, conversational multi-agent, code-writing agents, and '
+                       'programming (not prompting) LLMs.',
+            'keywords': ['pydanticai', 'autogen', 'ag2', 'smolagents', 'dspy', 'framework comparison'],
+            'refs': ['Official documentation']},
+           {'id': 28,
+            'slug': '28-mcp-fastmcp',
+            'name': 'MCP: Building Model Context Protocol Servers with FastMCP',
+            'category': 'Part 6 · Protocols',
+            'level': 'Advanced',
+            'summary': 'The USB-C of AI tools: MCP hosts, clients and servers, tools/resources/prompts, transports, '
+                       'building servers with FastMCP, auth and security.',
+            'keywords': ['mcp', 'model context protocol', 'fastmcp', 'tools', 'resources', 'stdio', 'streamable http'],
+            'refs': ['Official documentation']},
+           {'id': 29,
+            'slug': '29-a2a-protocol',
+            'name': 'A2A: The Agent-to-Agent Protocol',
+            'category': 'Part 6 · Protocols',
+            'level': 'Advanced',
+            'summary': 'How independent agents discover and delegate to each other: agent cards, tasks, messages, '
+                       'artifacts, streaming — and how A2A complements MCP.',
+            'keywords': ['a2a', 'agent card', 'agent-to-agent', 'interoperability', 'tasks'],
+            'refs': ['Official documentation']},
+           {'id': 30,
+            'slug': '30-google-workspace-m365',
+            'name': 'Gmail, Google Workspace & Microsoft 365',
+            'category': 'Part 7 · Automation Integrations',
+            'level': 'Advanced',
+            'summary': 'Automating email, calendars, docs and sheets: OAuth, service accounts, Gmail and Graph APIs, '
+                       'push notifications, and AI triage pipelines.',
+            'keywords': ['gmail', 'google workspace', 'microsoft 365', 'graph api', 'oauth', 'email automation'],
+            'refs': ['Official documentation']},
+           {'id': 31,
+            'slug': '31-chat-bots',
+            'name': 'Telegram, WhatsApp, Slack & Discord Bots',
+            'category': 'Part 7 · Automation Integrations',
+            'level': 'Advanced',
+            'summary': 'AI assistants where users already are: bot APIs, webhooks vs polling, message formats, rate '
+                       'limits and conversation state.',
+            'keywords': ['telegram', 'whatsapp', 'slack', 'discord', 'chatbot', 'webhook'],
+            'refs': ['Official documentation']},
+           {'id': 32,
+            'slug': '32-browser-agents',
+            'name': 'Browser Agents: Playwright & browser-use',
+            'category': 'Part 7 · Automation Integrations',
+            'level': 'Advanced',
+            'summary': 'Automating the web: deterministic Playwright scripts, LLM-driven browser agents, selectors vs '
+                       'vision, anti-bot reality and safety.',
+            'keywords': ['playwright', 'browser-use', 'web automation', 'scraping', 'computer use'],
+            'refs': ['Official documentation']},
+           {'id': 33,
+            'slug': '33-voice-agents',
+            'name': 'Voice: Whisper, ElevenLabs, Vapi & Retell',
+            'category': 'Part 7 · Automation Integrations',
+            'level': 'Advanced',
+            'summary': 'Speech in, speech out: transcription, text-to-speech, real-time voice agents, latency budgets '
+                       'and telephony.',
+            'keywords': ['whisper', 'speech to text', 'elevenlabs', 'tts', 'vapi', 'retell', 'voice agent'],
+            'refs': ['Official documentation']},
+           {'id': 34,
+            'slug': '34-ocr-vision',
+            'name': 'OCR & Multimodal Vision',
+            'category': 'Part 7 · Automation Integrations',
+            'level': 'Advanced',
+            'summary': 'Reading images and documents: Tesseract and cloud OCR versus vision LLMs, invoice and receipt '
+                       'extraction, and accuracy checks.',
+            'keywords': ['ocr', 'tesseract', 'vision', 'multimodal', 'invoice extraction', 'image'],
+            'refs': ['Official documentation']},
+           {'id': 35,
+            'slug': '35-rpa',
+            'name': 'RPA: UiPath & pyautogui',
+            'category': 'Part 7 · Automation Integrations',
+            'level': 'Advanced',
+            'summary': 'When there is no API: robotic process automation, desktop scripting with pyautogui, UiPath, '
+                       'and adding AI to legacy workflows.',
+            'keywords': ['rpa', 'uipath', 'pyautogui', 'desktop automation', 'legacy'],
+            'refs': ['Official documentation']},
+           {'id': 36,
+            'slug': '36-scheduling-task-queues',
+            'name': 'Cron, APScheduler & Celery + Redis',
+            'category': 'Part 8 · Scheduling & Orchestration',
+            'level': 'Advanced',
+            'summary': 'Running automations on time and in the background: cron, APScheduler, Celery workers with '
+                       'Redis, retries and idempotency.',
+            'keywords': ['cron', 'apscheduler', 'celery', 'redis', 'task queue', 'scheduling'],
+            'refs': ['Official documentation']},
+           {'id': 37,
+            'slug': '37-workflow-orchestrators',
+            'name': 'Prefect, Airflow & Temporal',
+            'category': 'Part 8 · Scheduling & Orchestration',
+            'level': 'Advanced',
+            'summary': 'Orchestrating multi-step pipelines: DAGs, flows, durable execution, retries and observability '
+                       '— which orchestrator for which job.',
+            'keywords': ['prefect', 'airflow', 'temporal', 'orchestration', 'dag', 'durable execution'],
+            'refs': ['Official documentation']},
+           {'id': 38,
+            'slug': '38-ai-uis',
+            'name': 'UIs for AI Apps: Streamlit, Gradio & Chainlit',
+            'category': 'Part 9 · Deployment & LLMOps',
+            'level': 'Expert',
+            'summary': 'Putting a face on an automation: chat UIs, file upload, streaming, auth and sharing — three '
+                       'frameworks compared.',
+            'keywords': ['streamlit', 'gradio', 'chainlit', 'chat ui', 'demo'],
+            'refs': ['Official documentation']},
+           {'id': 39,
+            'slug': '39-deploy-docker-cicd',
+            'name': 'Deployment: Docker, Cloud/VPS Hosting & GitHub Actions',
+            'category': 'Part 9 · Deployment & LLMOps',
+            'level': 'Expert',
+            'summary': 'Shipping AI services: Dockerfiles for Python AI apps, VPS vs PaaS vs serverless, secrets, and '
+                       'CI/CD with evals in the pipeline.',
+            'keywords': ['docker', 'vps', 'cloud', 'github actions', 'ci/cd', 'deployment'],
+            'refs': ['Official documentation']},
+           {'id': 40,
+            'slug': '40-observability-langsmith-langfuse',
+            'name': 'Monitoring: LangSmith & Langfuse',
+            'category': 'Part 9 · Deployment & LLMOps',
+            'level': 'Expert',
+            'summary': 'Seeing inside LLM apps: traces, spans, prompts, token and cost tracking, user feedback, '
+                       'datasets — hosted and self-hosted.',
+            'keywords': ['langsmith', 'langfuse', 'tracing', 'observability', 'opentelemetry', 'monitoring'],
+            'refs': ['Official documentation']},
+           {'id': 41,
+            'slug': '41-evaluation',
+            'name': 'Evaluation: RAGAS, DeepEval & promptfoo',
+            'category': 'Part 9 · Deployment & LLMOps',
+            'level': 'Expert',
+            'summary': 'Proving your automation works: golden datasets, LLM-as-judge, RAG metrics, regression tests in '
+                       'CI and red-teaming.',
+            'keywords': ['evaluation', 'ragas', 'deepeval', 'promptfoo', 'llm as judge', 'regression'],
+            'refs': ['Official documentation']},
+           {'id': 42,
+            'slug': '42-reliability-cost',
+            'name': 'Caching, Rate Limits, Retries & Cost Tracking',
+            'category': 'Part 9 · Deployment & LLMOps',
+            'level': 'Expert',
+            'summary': 'Production hardening: prompt and response caching, backoff, circuit breakers, concurrency '
+                       'limits, budgets and per-feature cost attribution.',
+            'keywords': ['caching', 'rate limits', 'retries', 'backoff', 'cost tracking', 'budget'],
+            'refs': ['Official documentation']},
+           {'id': 43,
+            'slug': '43-prompt-injection-sandboxing',
+            'name': 'Prompt Injection & Sandboxing Code Execution',
+            'category': 'Part 10 · Security',
+            'level': 'Expert',
+            'summary': 'The top LLM risk: direct and indirect injection, the lethal trifecta, defence in depth, least '
+                       'privilege, and running model-written code safely.',
+            'keywords': ['prompt injection',
+                         'indirect injection',
+                         'sandbox',
+                         'least privilege',
+                         'owasp llm',
+                         'code execution'],
+            'refs': ['Official documentation']},
+           {'id': 44,
+            'slug': '44-secrets-pii',
+            'name': 'Secrets Management & PII Handling',
+            'category': 'Part 10 · Security',
+            'level': 'Expert',
+            'summary': 'Keeping keys and personal data safe: env vars, secret managers, rotation, PII detection and '
+                       'redaction with Presidio, retention and compliance.',
+            'keywords': ['secrets', 'api keys', 'pii', 'presidio', 'redaction', 'gdpr', 'compliance'],
+            'refs': ['Official documentation']},
+           {'id': 45,
+            'slug': '45-glossary',
+            'name': 'Appendix A · Glossary of AI Automation Terms',
+            'category': 'Appendices',
+            'level': 'Expert',
+            'summary': 'Every term used in the handbook, defined in one or two plain sentences with a link to its home '
+                       'chapter.',
+            'keywords': ['glossary', 'terms', 'definitions'],
+            'refs': ['Official documentation']},
+           {'id': 46,
+            'slug': '46-cheat-sheet',
+            'name': 'Appendix B · Cheat Sheet: Key Commands & Snippets',
+            'category': 'Appendices',
+            'level': 'Expert',
+            'summary': 'One-screen reference: install commands, env vars, the canonical snippet for each SDK and '
+                       'framework, and Docker one-liners.',
+            'keywords': ['cheat sheet', 'commands', 'snippets', 'reference'],
+            'refs': ['Official documentation']},
+           {'id': 47,
+            'slug': '47-portfolio-projects',
+            'name': 'Appendix C · 10 Portfolio Project Ideas',
+            'category': 'Appendices',
+            'level': 'Expert',
+            'summary': 'Ten projects from beginner to advanced, each with scope, stack, stretch goals and what it '
+                       'proves to an employer or client.',
+            'keywords': ['portfolio', 'projects', 'ideas', 'beginner to advanced'],
+            'refs': ['Official documentation']},
+           {'id': 48,
+            'slug': '48-capstone',
+            'name': 'Appendix D · Capstone: n8n + LangGraph + RAG + MCP, Deployed',
+            'category': 'Appendices',
+            'level': 'Expert',
+            'summary': 'An end-to-end support-operations automation: n8n intake, a LangGraph agent with RAG and MCP '
+                       'tools, human approval, Docker deployment, tracing and evals.',
+            'keywords': ['capstone', 'n8n', 'langgraph', 'rag', 'mcp', 'deployment'],
+            'refs': ['Official documentation']},
+           {'id': 49,
+            'slug': '49-roadmap',
+            'name': 'Appendix E · 12-Week Learning Roadmap',
+            'category': 'Appendices',
+            'level': 'Expert',
+            'summary': 'A week-by-week plan through the handbook with hours, deliverables and checkpoints.',
+            'keywords': ['roadmap', '12 weeks', 'study plan', 'learning path'],
             'refs': ['Official documentation']}],
  'homeIntro': '<section class="aa-intro" style="margin:18px 0 8px"><blockquote style="margin:0 0 16px;padding:16px '
               '20px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 var(--radius) '
@@ -168,138 +548,98 @@ SPEC = {'id': 'ai-automation',
               'var(--border);border-radius:var(--radius);background:var(--bg-elev);padding:8px 14px;margin:0 0 '
               '8px"><summary style="cursor:pointer;font-weight:600">🧩 Part 2 · No-Code &amp; Low-Code <span '
               'class="badge lvl-Beginner" style="margin-left:6px">09–12</span></summary><ol start="9" '
-              'style="margin:8px 0 4px;padding-left:28px;font-size:14px"><li style="margin:2px '
-              '0;color:var(--text-soft)">n8n: Triggers, Nodes, AI Agent Node, Code Node, Webhooks &amp; Self-Hosting '
-              '<span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Make, Zapier &amp; Power Automate <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Flowise, Langflow &amp; Dify <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Connecting n8n with Python Scripts '
-              '<span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li></ol></details><details style="border:1px solid '
+              'style="margin:8px 0 4px;padding-left:28px;font-size:14px"><li style="margin:2px 0"><a '
+              'href="topic.html?p=09-n8n-fundamentals">n8n: Triggers, Nodes, AI Agent Node, Code Node, Webhooks &amp; '
+              'Self-Hosting</a></li><li style="margin:2px 0"><a '
+              'href="topic.html?p=10-make-zapier-power-automate">Make, Zapier &amp; Power Automate</a></li><li '
+              'style="margin:2px 0"><a href="topic.html?p=11-flowise-langflow-dify">Flowise, Langflow &amp; '
+              'Dify</a></li><li style="margin:2px 0"><a href="topic.html?p=12-n8n-with-python">Connecting n8n with '
+              'Python Scripts</a></li></ol></details><details style="border:1px solid '
               'var(--border);border-radius:var(--radius);background:var(--bg-elev);padding:8px 14px;margin:0 0 '
               '8px"><summary style="cursor:pointer;font-weight:600">⛓️ Part 3 · LangChain <span class="badge '
               'lvl-Intermediate" style="margin-left:6px">13–15</span></summary><ol start="13" style="margin:8px 0 '
-              '4px;padding-left:28px;font-size:14px"><li style="margin:2px 0;color:var(--text-soft)">LangChain Core: '
-              'Prompts, Chains (LCEL) &amp; Output Parsers <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">LangChain Tools &amp; Agents <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Document Loaders &amp; Text Splitters '
-              '<span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li></ol></details><details style="border:1px solid '
+              '4px;padding-left:28px;font-size:14px"><li style="margin:2px 0"><a '
+              'href="topic.html?p=13-langchain-core-lcel">LangChain Core: Prompts, Chains (LCEL) &amp; Output '
+              'Parsers</a></li><li style="margin:2px 0"><a href="topic.html?p=14-langchain-tools-agents">LangChain '
+              'Tools &amp; Agents</a></li><li style="margin:2px 0"><a '
+              'href="topic.html?p=15-document-loaders-splitters">Document Loaders &amp; Text '
+              'Splitters</a></li></ol></details><details style="border:1px solid '
               'var(--border);border-radius:var(--radius);background:var(--bg-elev);padding:8px 14px;margin:0 0 '
               '8px"><summary style="cursor:pointer;font-weight:600">📚 Part 4 · RAG <span class="badge '
               'lvl-Intermediate" style="margin-left:6px">16–20</span></summary><ol start="16" style="margin:8px 0 '
-              '4px;padding-left:28px;font-size:14px"><li style="margin:2px 0;color:var(--text-soft)">RAG Fundamentals: '
-              'Chunking, Embeddings &amp; Retrieval <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Reranking &amp; Hybrid Search <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Vector Databases: Chroma, FAISS, '
-              'Qdrant, Pinecone &amp; pgvector <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">LlamaIndex &amp; Haystack <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Document Parsing: PyMuPDF, Unstructured '
-              '&amp; Docling <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· '
-              'coming soon</span></li></ol></details><details style="border:1px solid '
+              '4px;padding-left:28px;font-size:14px"><li style="margin:2px 0"><a '
+              'href="topic.html?p=16-rag-fundamentals">RAG Fundamentals: Chunking, Embeddings &amp; '
+              'Retrieval</a></li><li style="margin:2px 0"><a href="topic.html?p=17-reranking-hybrid-search">Reranking '
+              '&amp; Hybrid Search</a></li><li style="margin:2px 0"><a href="topic.html?p=18-vector-databases">Vector '
+              'Databases: Chroma, FAISS, Qdrant, Pinecone &amp; pgvector</a></li><li style="margin:2px 0"><a '
+              'href="topic.html?p=19-llamaindex-haystack">LlamaIndex &amp; Haystack</a></li><li style="margin:2px '
+              '0"><a href="topic.html?p=20-document-parsing">Document Parsing: PyMuPDF, Unstructured &amp; '
+              'Docling</a></li></ol></details><details style="border:1px solid '
               'var(--border);border-radius:var(--radius);background:var(--bg-elev);padding:8px 14px;margin:0 0 '
               '8px"><summary style="cursor:pointer;font-weight:600">🤖 Part 5 · Agents &amp; Multi-Agent <span '
               'class="badge lvl-Advanced" style="margin-left:6px">21–27</span></summary><ol start="21" '
-              'style="margin:8px 0 4px;padding-left:28px;font-size:14px"><li style="margin:2px '
-              '0;color:var(--text-soft)">Agent Patterns: ReAct, Planning &amp; Reflection <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Agent Memory &amp; Mem0 <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">LangGraph: State, Nodes &amp; Edges '
-              '<span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">LangGraph in Production: Checkpoints '
-              '&amp; Human-in-the-Loop <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">CrewAI: Roles, Tasks &amp; Crews <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">OpenAI Agents SDK, Claude Agent SDK '
-              '&amp; Google ADK <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">PydanticAI, AutoGen/AG2, smolagents '
-              '&amp; DSPy <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· '
-              'coming soon</span></li></ol></details><details style="border:1px solid '
+              'style="margin:8px 0 4px;padding-left:28px;font-size:14px"><li style="margin:2px 0"><a '
+              'href="topic.html?p=21-agent-patterns">Agent Patterns: ReAct, Planning &amp; Reflection</a></li><li '
+              'style="margin:2px 0"><a href="topic.html?p=22-agent-memory-mem0">Agent Memory &amp; Mem0</a></li><li '
+              'style="margin:2px 0"><a href="topic.html?p=23-langgraph-fundamentals">LangGraph: State, Nodes &amp; '
+              'Edges</a></li><li style="margin:2px 0"><a href="topic.html?p=24-langgraph-production">LangGraph in '
+              'Production: Checkpoints &amp; Human-in-the-Loop</a></li><li style="margin:2px 0"><a '
+              'href="topic.html?p=25-crewai">CrewAI: Roles, Tasks &amp; Crews</a></li><li style="margin:2px 0"><a '
+              'href="topic.html?p=26-vendor-agent-sdks">OpenAI Agents SDK, Claude Agent SDK &amp; Google '
+              'ADK</a></li><li style="margin:2px 0"><a href="topic.html?p=27-agent-frameworks-tour">PydanticAI, '
+              'AutoGen/AG2, smolagents &amp; DSPy</a></li></ol></details><details style="border:1px solid '
               'var(--border);border-radius:var(--radius);background:var(--bg-elev);padding:8px 14px;margin:0 0 '
               '8px"><summary style="cursor:pointer;font-weight:600">🔌 Part 6 · Protocols <span class="badge '
               'lvl-Advanced" style="margin-left:6px">28–29</span></summary><ol start="28" style="margin:8px 0 '
-              '4px;padding-left:28px;font-size:14px"><li style="margin:2px 0;color:var(--text-soft)">MCP: Building '
-              'Model Context Protocol Servers with FastMCP <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">A2A: The Agent-to-Agent Protocol <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li></ol></details><details style="border:1px solid '
+              '4px;padding-left:28px;font-size:14px"><li style="margin:2px 0"><a '
+              'href="topic.html?p=28-mcp-fastmcp">MCP: Building Model Context Protocol Servers with '
+              'FastMCP</a></li><li style="margin:2px 0"><a href="topic.html?p=29-a2a-protocol">A2A: The Agent-to-Agent '
+              'Protocol</a></li></ol></details><details style="border:1px solid '
               'var(--border);border-radius:var(--radius);background:var(--bg-elev);padding:8px 14px;margin:0 0 '
               '8px"><summary style="cursor:pointer;font-weight:600">📬 Part 7 · Automation Integrations <span '
               'class="badge lvl-Advanced" style="margin-left:6px">30–35</span></summary><ol start="30" '
-              'style="margin:8px 0 4px;padding-left:28px;font-size:14px"><li style="margin:2px '
-              '0;color:var(--text-soft)">Gmail, Google Workspace &amp; Microsoft 365 <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Telegram, WhatsApp, Slack &amp; Discord '
-              'Bots <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Browser Agents: Playwright &amp; '
-              'browser-use <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· '
-              'coming soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Voice: Whisper, ElevenLabs, Vapi '
-              '&amp; Retell <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· '
-              'coming soon</span></li><li style="margin:2px 0;color:var(--text-soft)">OCR &amp; Multimodal Vision '
-              '<span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">RPA: UiPath &amp; pyautogui <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li></ol></details><details style="border:1px solid '
+              'style="margin:8px 0 4px;padding-left:28px;font-size:14px"><li style="margin:2px 0"><a '
+              'href="topic.html?p=30-google-workspace-m365">Gmail, Google Workspace &amp; Microsoft 365</a></li><li '
+              'style="margin:2px 0"><a href="topic.html?p=31-chat-bots">Telegram, WhatsApp, Slack &amp; Discord '
+              'Bots</a></li><li style="margin:2px 0"><a href="topic.html?p=32-browser-agents">Browser Agents: '
+              'Playwright &amp; browser-use</a></li><li style="margin:2px 0"><a '
+              'href="topic.html?p=33-voice-agents">Voice: Whisper, ElevenLabs, Vapi &amp; Retell</a></li><li '
+              'style="margin:2px 0"><a href="topic.html?p=34-ocr-vision">OCR &amp; Multimodal Vision</a></li><li '
+              'style="margin:2px 0"><a href="topic.html?p=35-rpa">RPA: UiPath &amp; '
+              'pyautogui</a></li></ol></details><details style="border:1px solid '
               'var(--border);border-radius:var(--radius);background:var(--bg-elev);padding:8px 14px;margin:0 0 '
               '8px"><summary style="cursor:pointer;font-weight:600">⏱️ Part 8 · Scheduling &amp; Orchestration <span '
               'class="badge lvl-Advanced" style="margin-left:6px">36–37</span></summary><ol start="36" '
-              'style="margin:8px 0 4px;padding-left:28px;font-size:14px"><li style="margin:2px '
-              '0;color:var(--text-soft)">Cron, APScheduler &amp; Celery + Redis <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Prefect, Airflow &amp; Temporal <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li></ol></details><details style="border:1px solid '
+              'style="margin:8px 0 4px;padding-left:28px;font-size:14px"><li style="margin:2px 0"><a '
+              'href="topic.html?p=36-scheduling-task-queues">Cron, APScheduler &amp; Celery + Redis</a></li><li '
+              'style="margin:2px 0"><a href="topic.html?p=37-workflow-orchestrators">Prefect, Airflow &amp; '
+              'Temporal</a></li></ol></details><details style="border:1px solid '
               'var(--border);border-radius:var(--radius);background:var(--bg-elev);padding:8px 14px;margin:0 0 '
               '8px"><summary style="cursor:pointer;font-weight:600">🚀 Part 9 · Deployment &amp; LLMOps <span '
               'class="badge lvl-Expert" style="margin-left:6px">38–42</span></summary><ol start="38" style="margin:8px '
-              '0 4px;padding-left:28px;font-size:14px"><li style="margin:2px 0;color:var(--text-soft)">UIs for AI '
-              'Apps: Streamlit, Gradio &amp; Chainlit <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Deployment: Docker, Cloud/VPS Hosting '
-              '&amp; GitHub Actions <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Monitoring: LangSmith &amp; Langfuse '
-              '<span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Evaluation: RAGAS, DeepEval &amp; '
-              'promptfoo <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· '
-              'coming soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Caching, Rate Limits, Retries '
-              '&amp; Cost Tracking <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li></ol></details><details style="border:1px solid '
+              '0 4px;padding-left:28px;font-size:14px"><li style="margin:2px 0"><a href="topic.html?p=38-ai-uis">UIs '
+              'for AI Apps: Streamlit, Gradio &amp; Chainlit</a></li><li style="margin:2px 0"><a '
+              'href="topic.html?p=39-deploy-docker-cicd">Deployment: Docker, Cloud/VPS Hosting &amp; GitHub '
+              'Actions</a></li><li style="margin:2px 0"><a '
+              'href="topic.html?p=40-observability-langsmith-langfuse">Monitoring: LangSmith &amp; '
+              'Langfuse</a></li><li style="margin:2px 0"><a href="topic.html?p=41-evaluation">Evaluation: RAGAS, '
+              'DeepEval &amp; promptfoo</a></li><li style="margin:2px 0"><a '
+              'href="topic.html?p=42-reliability-cost">Caching, Rate Limits, Retries &amp; Cost '
+              'Tracking</a></li></ol></details><details style="border:1px solid '
               'var(--border);border-radius:var(--radius);background:var(--bg-elev);padding:8px 14px;margin:0 0 '
               '8px"><summary style="cursor:pointer;font-weight:600">🛡️ Part 10 · Security <span class="badge '
               'lvl-Expert" style="margin-left:6px">43–44</span></summary><ol start="43" style="margin:8px 0 '
-              '4px;padding-left:28px;font-size:14px"><li style="margin:2px 0;color:var(--text-soft)">Prompt Injection '
-              '&amp; Sandboxing Code Execution <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Secrets Management &amp; PII Handling '
-              '<span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li></ol></details><details style="border:1px solid '
+              '4px;padding-left:28px;font-size:14px"><li style="margin:2px 0"><a '
+              'href="topic.html?p=43-prompt-injection-sandboxing">Prompt Injection &amp; Sandboxing Code '
+              'Execution</a></li><li style="margin:2px 0"><a href="topic.html?p=44-secrets-pii">Secrets Management '
+              '&amp; PII Handling</a></li></ol></details><details style="border:1px solid '
               'var(--border);border-radius:var(--radius);background:var(--bg-elev);padding:8px 14px;margin:0 0 '
               '8px"><summary style="cursor:pointer;font-weight:600">📎 Appendices <span class="badge lvl-Expert" '
               'style="margin-left:6px">45–49</span></summary><ol start="45" style="margin:8px 0 '
-              '4px;padding-left:28px;font-size:14px"><li style="margin:2px 0;color:var(--text-soft)">Appendix A · '
-              'Glossary of AI Automation Terms <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Appendix B · Cheat Sheet: Key Commands '
-              '&amp; Snippets <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· '
-              'coming soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Appendix C · 10 Portfolio '
-              'Project Ideas <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· '
-              'coming soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Appendix D · Capstone: n8n + '
-              'LangGraph + RAG + MCP, Deployed <span '
-              'style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li><li style="margin:2px 0;color:var(--text-soft)">Appendix E · 12-Week Learning Roadmap '
-              '<span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.8">· coming '
-              'soon</span></li></ol></details></section>'}
+              '4px;padding-left:28px;font-size:14px"><li style="margin:2px 0"><a '
+              'href="topic.html?p=45-glossary">Appendix A · Glossary of AI Automation Terms</a></li><li '
+              'style="margin:2px 0"><a href="topic.html?p=46-cheat-sheet">Appendix B · Cheat Sheet: Key Commands &amp; '
+              'Snippets</a></li><li style="margin:2px 0"><a href="topic.html?p=47-portfolio-projects">Appendix C · 10 '
+              'Portfolio Project Ideas</a></li><li style="margin:2px 0"><a href="topic.html?p=48-capstone">Appendix D '
+              '· Capstone: n8n + LangGraph + RAG + MCP, Deployed</a></li><li style="margin:2px 0"><a '
+              'href="topic.html?p=49-roadmap">Appendix E · 12-Week Learning Roadmap</a></li></ol></details></section>'}

@@ -86,3 +86,25 @@ Target 550–900 lines per chapter (gate floor 150). Code-heavy is good; every c
 
 ## Self-check
 `python3 tools/hb_pipeline.py gate tools/topics/ai_automation_topics.json` — your rows must be OK (unwritten ones show MISSING).
+
+## House conventions established in Part 1 (keep them)
+- Calibrate on `ai-automation/markdown/04-function-calling.md` and `07-multi-provider-routing.md` before writing: depth, tone, code density, how Setup/.env blocks look, how outputs are labelled "Illustrative output" when they need a live model.
+- Default runnable path = **free/local**: Ollama (`llama3.2`, `qwen3:8b`, `nomic-embed-text`) via the OpenAI-compatible helper `llm.py` (Ch 02 setup: `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`), Chroma for vectors, self-hosted n8n in Docker. Name paid alternatives alongside.
+- Claude code: `anthropic` SDK, model from `os.getenv("CLAUDE_MODEL", "claude-opus-5-5")`, `max_tokens` always set, **never `temperature`** (rejected; use `output_config={"effort": ...}`), filter `block.type == "text"`. Frameworks that wrap Claude (LangChain `ChatAnthropic`, LiteLLM, CrewAI, PydanticAI…) — don't pass temperature to Claude there either.
+- Prose rules: no em-dash spam; second person; short paragraphs; bold key terms once; callouts `> **Why this matters:**`, `> **Gotcha:**`, `> **Version note:**`.
+- Chapter-specific `.env.example` blocks; `python-dotenv` everywhere; `if __name__ == "__main__":` in scripts.
+- Link back to Part 1 chapters instead of re-explaining (tokens → Ch 01, schemas → Ch 03, tool loop → Ch 04, embeddings → Ch 05, provider SDKs → Ch 06, LiteLLM aliases → Ch 07, Ollama → Ch 08).
+
+## Verifying code (required)
+- A Python 3.13 interpreter is at `/opt/homebrew/bin/python3.13`. Make your OWN venv in the scratchpad dir you're given (e.g. `<scratch>/venv-<batch>`), `pip install` the libraries your chapters use (skip torch-heavy ones), and **introspect** every import, class, function and keyword argument you use (`inspect.signature`, `hasattr`). Fix the chapter to match the installed version and state that version in the `> **Versions used:**` line.
+- AST-parse every ```python block; YAML-parse ```yaml blocks; run anything that works offline (no API keys, no running Ollama/n8n). Never print fabricated output as if it were real — label it "Illustrative output".
+- You may use WebFetch/WebSearch on official docs for fast-moving APIs (n8n nodes, LangGraph, MCP spec, A2A, Agents SDKs).
+- Mermaid: only `flowchart LR|TD` and `sequenceDiagram`; quote any label with punctuation `A["text (x)"]`; no `;` inside labels, no HTML, no `%%{init}%%`, no parentheses/brackets in unquoted labels, no `end` as a bare node id.
+
+## Appendix chapters (45–49)
+Same H1 + `> **In one line:**` + footer format; their own H2s; no SVG/Q minimum (gate skips them) but diagrams welcome.
+- 45 Glossary: 120+ terms A–Z, `**Term** — one or two plain sentences. → [Ch NN](topic.html?p=slug)` linking the home chapter.
+- 46 Cheat sheet: install lines, env vars, canonical snippet per SDK/framework/tool (from the chapters), Docker/n8n/Ollama/LiteLLM one-liners, a "which tool when" decision table.
+- 47 Portfolio: 10 projects beginner → advanced; each: problem, stack, architecture mermaid, milestones, stretch goals, what it proves, which chapters it uses.
+- 48 Capstone: support-ops automation — n8n intake (email/webhook) → LangGraph agent with RAG (Chroma) + MCP tool server (FastMCP) + human approval → actions; Docker Compose for all services; Langfuse tracing; promptfoo/DeepEval evals in GitHub Actions; full code for every component; milestones.
+- 49 Roadmap: 12 weeks, table + per-week goals, chapters, hours, deliverable, checkpoint questions.
